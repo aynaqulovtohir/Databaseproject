@@ -1,0 +1,21 @@
+# Maxfiy sozlamalar
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django
+*.log
+/backend/staticfiles/
+/backend/media/
+
+# Node
+node_modules/
+
+# Muharrir / OS
+.idea/
+.vscode/
+.DS_Store
