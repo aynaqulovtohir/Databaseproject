@@ -1,5 +1,5 @@
 """Materiallar va topshiriqlar API'lari."""
-from django.db.models import ProtectedError
+from django.db.models import Prefetch, ProtectedError
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -9,6 +9,8 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from submissions.models import Submission
 
 from .access import visible_assignments, visible_materials
 from .models import MaterialFile
@@ -96,11 +98,15 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffRoleOrReadOnly]
 
     def get_queryset(self):
-        return (
-            visible_assignments(self.request.user)
-            .select_related("author")
-            .prefetch_related("groups")
-        )
+        user = self.request.user
+        queryset = visible_assignments(user).select_related("author")
+        if user.is_student:
+            # Ro'yxatda har bir topshiriq bo'yicha talabaning o'z holati ko'rinishi uchun
+            own_attempts = (
+                Submission.objects.filter(student=user).select_related("grade").order_by("-attempt_number")
+            )
+            return queryset.prefetch_related(Prefetch("submissions", queryset=own_attempts, to_attr="my_attempts"))
+        return queryset.prefetch_related("groups")
 
     def get_serializer_class(self):
         if self.request.user.is_student:

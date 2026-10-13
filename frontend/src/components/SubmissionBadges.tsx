@@ -14,7 +14,7 @@ const STATUS_CLASSES: Record<SubmissionStatus, string> = {
   returned: 'bg-amber-100 text-amber-800',
 }
 
-export function SubmissionStatusBadge({ submission }: { submission: Submission }) {
+export function SubmissionStatusBadge({ submission }: { submission: Pick<Submission, 'status' | 'is_late'> }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge className={STATUS_CLASSES[submission.status]}>{STATUS_LABELS[submission.status]}</Badge>

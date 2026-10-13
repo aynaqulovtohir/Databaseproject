@@ -89,9 +89,25 @@ export interface Assignment {
   groups?: number[]
   deadline: string
   created_at: string
+  /** Faqat talabaga keladi: o'zining oxirgi urinishi (topshirmagan bo'lsa null) */
+  my_submission?: MySubmission | null
 }
 
 export type SubmissionStatus = 'submitted' | 'graded' | 'returned'
+
+export interface MySubmission {
+  id: number
+  status: SubmissionStatus
+  is_late: boolean
+  attempt_number: number
+  /** Faqat baholangan holatda */
+  score: number | null
+}
+
+/** Topshiriq bo'yicha hali yechim topshirmagan talaba */
+export interface MissingStudent extends PersonShort {
+  group: string
+}
 
 export interface Grade {
   score: number
