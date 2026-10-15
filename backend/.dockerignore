@@ -1,0 +1,6 @@
+# Foydalanuvchilar yuklagan fayllar va yig'ilgan statik fayllar obrazga kirmasin
+media/
+staticfiles/
+__pycache__/
+*.py[cod]
+er-diagramma-*.dot
