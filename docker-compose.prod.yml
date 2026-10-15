@@ -1,0 +1,151 @@
+# Ishchi server (internet). Ishga tushirish: docker compose -f docker-compose.prod.yml up -d --build
+# Batafsil: DEPLOY.md. Tashqariga faqat Caddy (80/443) ochiq; baza va backend ichki tarmoqda.
+name: mb-platforma
+
+x-backend: &backend
+  build:
+    context: ./backend
+    target: production
+  env_file: ${ENV_FILE:-.env}
+  restart: unless-stopped
+
+services:
+  db:
+    image: docker.io/library/postgres:17
+    env_file: ${ENV_FILE:-.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Talabalar SQL kodi faqat shu alohida, resurslari cheklangan serverda bajariladi (docker-compose.yml dagi izohga qarang)
+  lab_db:
+    image: docker.io/library/postgres:17
+    environment:
+      POSTGRES_USER: ${LAB_DB_USER:-lab_admin}
+      POSTGRES_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}
+      POSTGRES_DB: ${LAB_SANDBOX_DB:-lab_sandbox}
+    command: >-
+      postgres -c max_connections=60 -c shared_buffers=64MB -c temp_file_limit=256MB
+      -c max_parallel_workers_per_gather=0 -c log_min_duration_statement=-1
+    tmpfs:
+      - /var/lib/postgresql/data:size=512m
+    shm_size: 128m
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 200
+    networks:
+      - lab
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    <<: *backend
+    environment:
+      # Caddy orqasida: HTTPS va foydalanuvchi IP'si proksi sarlavhalaridan olinadi
+      TRUST_PROXY: "true"
+      # Urinishlar cheklovlari barcha gunicorn jarayonlari uchun umumiy bo'lsin
+      CACHE_BACKEND: database
+      LAB_DB_HOST: lab_db
+      LAB_DB_PORT: "5432"
+      LAB_DB_USER: ${LAB_DB_USER:-lab_admin}
+      LAB_DB_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    networks:
+      - default
+      - lab
+    depends_on:
+      db:
+        condition: service_healthy
+      lab_db:
+        condition: service_healthy
+    healthcheck:
+      # Istalgan HTTP javob (masalan, 401) — server ishlayapti degani
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os, urllib.error, urllib.request
+          host = os.environ["ALLOWED_HOSTS"].split(",")[0].strip()
+          request = urllib.request.Request("http://127.0.0.1:8000/api/auth/me/", headers={"Host": host})
+          try:
+              urllib.request.urlopen(request, timeout=5)
+          except urllib.error.HTTPError:
+              pass
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  ai_worker:
+    <<: *backend
+    command: python manage.py run_ai_worker
+    environment:
+      CACHE_BACKEND: database
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  telegram_bot:
+    <<: *backend
+    command: python manage.py run_telegram_bot
+    environment:
+      CACHE_BACKEND: database
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN .env faylida ko'rsatilishi kerak (masalan, mb.example.uz)}
+      HSTS_MAX_AGE: ${HSTS_MAX_AGE:-31536000}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - static_data:/srv/static:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Har kuni bazaning va yuklangan fayllarning zaxira nusxasi: ./backups papkasiga
+  backup:
+    image: docker.io/library/postgres:17
+    env_file: ${ENV_FILE:-.env}
+    entrypoint: ["bash", "/backup.sh"]
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+      - media_data:/media:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+  lab:
+    internal: true
+
+volumes:
+  postgres_data:
+  media_data:
+  static_data:
+  caddy_data:
+  caddy_config:

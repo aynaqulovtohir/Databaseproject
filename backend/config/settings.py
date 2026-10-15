@@ -97,6 +97,8 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+# Ishchi serverda collectstatic shu papkaga yig'adi, Caddy esa uni to'g'ridan-to'g'ri beradi (Django admin uchun)
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Yuklangan fayllar. Ochiq URL orqali berilmaydi, faqat API orqali yuklab olinadi.
 MEDIA_ROOT = BASE_DIR / "media"
@@ -132,11 +134,35 @@ REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/auth/"
 # HTTPS'da (DEBUG=False) cookie faqat shifrlangan ulanish orqali yuboriladi
 REFRESH_COOKIE_SECURE = not DEBUG
+# Ilova teskari proksi (Caddy) orqasida ishlaganda. Faqat proksi bu sarlavhalarni o'zi qo'yganda yoqiladi,
+# aks holda foydalanuvchi ularni soxtalashtirishi mumkin.
+TRUST_PROXY = env.bool("TRUST_PROXY", default=False)
+if TRUST_PROXY:
+    # HTTPS ni proksi qabul qiladi; Django so'rov xavfsiz ekanini X-Forwarded-Proto dan biladi
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Login cheklovi kabi IP bo'yicha cheklovlar proksining emas, foydalanuvchining IP'sini ko'rsin
+    REST_FRAMEWORK["NUM_PROXIES"] = 1
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 # HTTPS majburiyligi: sayt faqat HTTPS orqali ishlashi aniq bo'lgandan keyin .env da yoqiladi
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
+
+# Kesh: urinishlar cheklovlari (login, kod ishga tushirish) shu yerda hisoblanadi. Ishchi serverda gunicorn
+# bir nechta jarayon ochadi, shuning uchun hisob bazada umumiy saqlanadi (CACHE_BACKEND=database).
+if env("CACHE_BACKEND", default="locmem") == "database":
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "django_cache"}}
+
+# Loglar konsolga (Docker loglari) chiqadi: DEBUG=False da ham server xatolari ko'rinadi
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"simple": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="WARNING")},
+    "loggers": {"django": {"handlers": ["console"], "level": "WARNING", "propagate": False}},
+}
 
 # Sun'iy intellekt. AI_PROVIDER qaysi xizmat ishlatilishini belgilaydi: "anthropic" yoki "gemini".
 # Tanlangan xizmat kaliti bo'sh bo'lsa, AI funksiyalari kutish holatida turadi.
