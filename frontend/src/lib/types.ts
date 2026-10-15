@@ -412,3 +412,46 @@ export interface QuizStudentResult extends PersonShort {
   started_at: string | null
   submitted_at: string | null
 }
+
+// ---------- Statistika ----------
+
+export interface StatisticsLab {
+  id: number
+  title: string
+  kind: LabKind
+  students: number
+  started: number
+  solved: number
+  solved_rate: number | null
+  attempts_to_solve: number | null
+  average_grade: number | null
+}
+
+export interface StatisticsGroup {
+  id: number
+  name: string
+  ai_enabled: boolean
+  students: number
+  solved_rate: number | null
+  average_grade: number | null
+  pre_test: number | null
+  post_test: number | null
+  pre_count: number
+  post_count: number
+  gain: number | null
+}
+
+export interface AiEffectBucket {
+  pairs: number
+  solved: number
+  rate: number | null
+}
+
+export interface Statistics {
+  groups_available: GroupShort[]
+  overview: { students: number; labs: number; attempts: number; solved_rate: number | null; average_grade: number | null }
+  top_errors: { category: string; label: string; count: number }[]
+  labs: StatisticsLab[]
+  ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
+  groups: StatisticsGroup[]
+}

@@ -14,6 +14,7 @@ const DESCRIPTIONS: Record<Role, Record<string, string>> = {
     '/assignments': 'Barcha topshiriqlar va yechimlar.',
     '/labs': 'Barcha laboratoriyalar va talabalar natijalari.',
     '/quizzes': 'Kirish, chiqish va oddiy testlar natijalari.',
+    '/statistics': "Xatolar, laboratoriyalar qiyinligi va guruhlarni taqqoslash.",
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
   teacher: {
@@ -21,6 +22,7 @@ const DESCRIPTIONS: Record<Role, Record<string, string>> = {
     '/assignments': 'Topshiriq berish, yechimlarni tekshirish va baholash.',
     '/labs': "SQL laboratoriyalari yaratish va kim bajarganini ko'rish.",
     '/quizzes': 'Kirish va chiqish testlari tuzish, natijalarni solishtirish.',
+    '/statistics': "Eng ko'p xatolar, AI ta'siri va tajriba guruhlarini taqqoslash.",
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
   student: {

@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardCheck, ClipboardList, FlaskConical, Home, UserRound, Users, UsersRound, type LucideIcon } from 'lucide-react'
+import { BarChart3, BookOpen, ClipboardCheck, ClipboardList, FlaskConical, Home, UserRound, Users, UsersRound, type LucideIcon } from 'lucide-react'
 
 import type { Role } from '@/lib/types'
 
@@ -25,8 +25,9 @@ const ROLE_ITEMS: Record<Role, NavItem[]> = {
     { to: '/users', label: 'Foydalanuvchilar', icon: Users },
     { to: '/groups', label: 'Guruhlar', icon: UsersRound },
     ...LEARNING_ITEMS,
+    { to: '/statistics', label: 'Statistika', icon: BarChart3 },
   ],
-  teacher: [HOME, ...LEARNING_ITEMS],
+  teacher: [HOME, ...LEARNING_ITEMS, { to: '/statistics', label: 'Statistika', icon: BarChart3 }],
   student: [HOME, ...LEARNING_ITEMS],
 }
 

@@ -351,3 +351,22 @@ class LabAttemptAdviceView(APIView):
         attempt.ai_requested_at = timezone.now()
         attempt.save(update_fields=["ai_advice", "ai_requested_at"])
         return Response({"advice": advice})
+
+
+class StatisticsView(APIView):
+    """O'qituvchi statistikasi: ?group=<id> bilan bitta guruh, aks holda barcha ruxsat etilgan guruhlar."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .statistics import allowed_groups, build_statistics
+
+        if request.user.is_student:
+            raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
+        group = None
+        group_id = request.query_params.get("group")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            group = get_object_or_404(allowed_groups(request.user), pk=group_id)
+        return Response(build_statistics(request.user, group))

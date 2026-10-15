@@ -941,3 +941,43 @@ class AiDisabledGroupTests(BaseTestCase):
         self.auth_as(self.teacher_a)
         response = self.client.patch(f"/api/groups/{self.group_a.pk}/", {"ai_enabled": False}, format="json")
         self.assertIn(response.status_code, (403, 404))
+
+
+class StatisticsTests(BaseTestCase):
+    stats_url = "/api/statistics/"
+
+    def test_numbers(self):
+        self.auth_as(self.student_a1)
+        self.run_code("SELEC 1;")  # sintaksis
+        wrong = self.run_code("SELECT 1;").data["attempt_id"]
+        LabAttempt.objects.filter(pk=wrong).update(ai_advice="maslahat")
+        self.run_code(SOLUTION)  # maslahatdan keyin yechdi
+        self.auth_as(self.student_a2)
+        self.run_code("SELECT 1;")  # yechmadi, maslahatsiz
+
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.stats_url).data
+        self.assertEqual(data["overview"]["students"], 2)
+        self.assertEqual(data["overview"]["attempts"], 4)
+        self.assertEqual(data["overview"]["solved_rate"], 50.0)
+        categories = {item["category"]: item["count"] for item in data["top_errors"]}
+        self.assertEqual(categories["sintaksis"], 1)
+        self.assertEqual(categories["natija_ustunlari_soni"], 2)
+        lab = data["labs"][0]
+        self.assertEqual((lab["students"], lab["solved"], lab["attempts_to_solve"]), (2, 1, 3.0))
+        self.assertEqual(data["ai_effect"]["with_advice"], {"pairs": 1, "solved": 1, "rate": 100.0})
+        self.assertEqual(data["ai_effect"]["without_advice"], {"pairs": 1, "solved": 0, "rate": 0.0})
+        self.assertEqual([group["name"] for group in data["groups"]], ["A-guruh"])
+
+    def test_permissions_and_group_filter(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.stats_url).status_code, 403)
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.client.get(self.stats_url, {"group": self.group_b.pk}).status_code, 404)
+        self.assertEqual(self.client.get(self.stats_url, {"group": "x"}).status_code, 400)
+        self.assertEqual(self.client.get(self.stats_url, {"group": self.group_a.pk}).data["overview"]["students"], 2)
+        # Boshqa o'qituvchi A-guruh laboratoriyasini ko'rmaydi
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.get(self.stats_url).data["overview"]["labs"], 0)
+        self.auth_as(self.admin)
+        self.assertEqual(len(self.client.get(self.stats_url).data["groups_available"]), 2)
