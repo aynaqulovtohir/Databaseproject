@@ -513,3 +513,61 @@ class SubmitForGradeTests(BaseTestCase):
         rows = {row["id"]: row for row in self.client.get(f"{self.url}progress/").data}
         self.assertEqual(rows[self.student_a1.pk]["grade"]["score"], 100)
         self.assertIsNone(rows[self.student_a2.pk]["grade"])
+
+
+class DesignLabsTests(BaseTestCase):
+    """Loyihalash bo'yicha tayyor laboratoriyalar (design_labs.py) va ularni qo'shuvchi buyruq."""
+
+    def test_every_solution_passes_its_own_check(self):
+        from .checker import check_code
+        from .design_labs import DESIGN_LABS
+
+        for lab_data in DESIGN_LABS:
+            result = check_code(Lab(**lab_data), lab_data["solution_sql"])
+            self.assertTrue(result["is_correct"], (lab_data["title"], result))
+
+    def test_typical_mistakes_are_explained(self):
+        from .checker import check_code
+        from .design_labs import DESIGN_LABS
+
+        normal_form = Lab(**DESIGN_LABS[3])
+        # Telefonlar bo'sh joylari bilan ko'chirilgan: qatorlar soni to'g'ri, qiymatlar xato
+        result = check_code(
+            normal_form,
+            "CREATE TABLE talaba (id INT PRIMARY KEY, ism VARCHAR(100) NOT NULL);"
+            "CREATE TABLE talaba_telefon (talaba_id INT NOT NULL REFERENCES talaba(id),"
+            " telefon VARCHAR(20) NOT NULL, PRIMARY KEY (talaba_id, telefon));"
+            "INSERT INTO talaba SELECT id, ism FROM talaba_eski;"
+            "INSERT INTO talaba_telefon SELECT id, unnest(string_to_array(telefonlar, ',')) FROM talaba_eski;",
+        )
+        self.assertFalse(result["is_correct"])
+        self.assertIn("qatorlar soni to'g'ri, lekin ayrim qiymatlar", " ".join(result["differences"]))
+
+        keys = Lab(**DESIGN_LABS[0])
+        result = check_code(
+            keys,
+            "CREATE TABLE kitob (isbn VARCHAR(13), nomi VARCHAR(200) NOT NULL,"
+            " muallif VARCHAR(100) NOT NULL, yil INT, sahifalar INT);",
+        )
+        self.assertIn("«kitob» jadvalida PRIMARY KEY cheklovi yetishmaydi", " ".join(result["differences"]))
+
+    def test_seed_command_is_idempotent(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        from .design_labs import DESIGN_LABS
+
+        call_command("seed_design_labs", author="teacher_a", group=["A-guruh"], stdout=StringIO())
+        call_command("seed_design_labs", author="teacher_a", group=["A-guruh"], stdout=StringIO())
+        labs = Lab.objects.filter(author=self.teacher_a, title__startswith="Loyihalash")
+        self.assertEqual(labs.count(), len(DESIGN_LABS))
+        self.assertTrue(all(lab.groups.filter(pk=self.group_a.pk).exists() for lab in labs))
+        # Ro'yxatda 1-laboratoriya birinchi turadi
+        self.assertTrue(labs.order_by("-created_at", "-id").first().title.startswith("Loyihalash 1."))
+
+        with self.assertRaises(CommandError):
+            call_command("seed_design_labs", author="student_a1", stdout=StringIO())
+        with self.assertRaises(CommandError):
+            call_command("seed_design_labs", author="teacher_a", group=["Yo'q-guruh"], stdout=StringIO())
