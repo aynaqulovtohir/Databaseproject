@@ -269,3 +269,35 @@ class QuizExportTests(QuizTestCase):
         self.auth_as(self.other_teacher)
         archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
         self.assertEqual(read("testlar.csv"), [])
+
+
+class EntryTestCommandTests(QuizTestCase):
+    def test_question_bank_is_valid_and_pre_post_are_identical(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from .question_bank import QUESTIONS
+
+        call_command("seed_entry_test", author="q_teacher", group=["Q-guruh"], stdout=StringIO())
+        call_command("seed_entry_test", author="q_teacher", group=["Q-guruh"], stdout=StringIO())  # takrorlanmaydi
+        pre, post = Quiz.objects.get(kind="pre"), Quiz.objects.get(kind="post")
+        self.assertEqual(Quiz.objects.count(), 2)
+        self.assertEqual(pre.questions.count(), len(QUESTIONS))
+        self.assertEqual(pre.time_limit_minutes, 30)
+        self.assertFalse(pre.show_answers)
+        signature = lambda quiz: [  # noqa: E731
+            (q.text, q.kind, q.points, [(c.text, c.is_correct) for c in q.choices.all()]) for q in quiz.questions.all()
+        ]
+        self.assertEqual(signature(pre), signature(post))
+        self.assertTrue(pre.groups.filter(pk=self.group.pk).exists())
+
+    def test_markdown_has_answer_key(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        output = StringIO()
+        call_command("seed_entry_test", markdown=True, stdout=output)
+        self.assertIn("## Javoblar kaliti", output.getvalue())
+        self.assertEqual(Quiz.objects.count(), 0)
