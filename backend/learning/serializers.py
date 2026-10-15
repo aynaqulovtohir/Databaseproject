@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from submissions.models import Submission
 from users.models import StudentGroup, User
 
 from .models import Assignment, Material, MaterialFile
@@ -97,8 +98,25 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
     """Talaba uchun: baholash mezonlari va guruhlar ro'yxati ko'rsatilmaydi."""
 
     author = AuthorSerializer(read_only=True)
+    my_submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Assignment
-        fields = ["id", "title", "description", "author", "deadline", "created_at"]
+        fields = ["id", "title", "description", "author", "deadline", "created_at", "my_submission"]
         read_only_fields = fields
+
+    def get_my_submission(self, assignment):
+        # Talabaning shu topshiriqdagi oxirgi urinishi (view'da oldindan yuklab qo'yiladi)
+        attempts = getattr(assignment, "my_attempts", None)
+        if not attempts:
+            return None
+        latest = attempts[0]
+        graded = latest.status == Submission.Status.GRADED
+        grade = getattr(latest, "grade", None) if graded else None
+        return {
+            "id": latest.pk,
+            "status": latest.status,
+            "is_late": latest.is_late,
+            "attempt_number": latest.attempt_number,
+            "score": grade.score if grade else None,
+        }

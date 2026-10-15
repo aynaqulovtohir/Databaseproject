@@ -6,13 +6,14 @@ import { Link } from 'react-router-dom'
 import { AssignmentDialog } from '@/components/AssignmentDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
-import { DeadlineBadge } from '@/components/SubmissionBadges'
+import { DeadlineBadge, SubmissionStatusBadge } from '@/components/SubmissionBadges'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
-import type { Assignment } from '@/lib/types'
+import { MAX_SCORE, type Assignment } from '@/lib/types'
 
 export function AssignmentsPage() {
   const user = useUser()
@@ -60,7 +61,21 @@ export function AssignmentsPage() {
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 className="min-w-0 font-medium">{assignment.title}</h2>
-                <DeadlineBadge deadline={assignment.deadline} />
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  {assignment.my_submission ? (
+                    <>
+                      <SubmissionStatusBadge submission={assignment.my_submission} />
+                      {assignment.my_submission.score !== null ? (
+                        <Badge variant="outline" className="tabular-nums">
+                          {assignment.my_submission.score} / {MAX_SCORE}
+                        </Badge>
+                      ) : null}
+                    </>
+                  ) : !isStaff ? (
+                    <Badge variant="outline">Topshirilmagan</Badge>
+                  ) : null}
+                  <DeadlineBadge deadline={assignment.deadline} />
+                </span>
               </div>
               <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{assignment.description}</p>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">

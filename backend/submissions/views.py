@@ -10,10 +10,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from learning.access import visible_assignments
+from users.models import User
 
 from .access import visible_submissions
 from .models import Submission
-from .serializers import SubmissionCreateSerializer, SubmissionSerializer
+from .serializers import MissingStudentSerializer, SubmissionCreateSerializer, SubmissionSerializer
 
 
 class AssignmentSubmissionsView(APIView):
@@ -81,6 +82,24 @@ class AssignmentSubmissionsView(APIView):
             SubmissionSerializer(submission, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class AssignmentMissingStudentsView(APIView):
+    """Topshiriq berilgan guruhlardagi hali birorta yechim topshirmagan talabalar."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, assignment_pk):
+        if not (request.user.is_admin or request.user.is_teacher):
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        assignment = get_object_or_404(visible_assignments(request.user), pk=assignment_pk)
+        students = (
+            User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=assignment.groups.all())
+            .exclude(submissions__assignment=assignment)
+            .select_related("group")
+            .order_by("group__name", "last_name", "first_name", "id")
+        )
+        return Response(MissingStudentSerializer(students, many=True).data)
 
 
 class SubmissionDetailView(RetrieveAPIView):

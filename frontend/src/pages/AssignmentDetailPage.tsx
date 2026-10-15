@@ -21,7 +21,7 @@ import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime, isPast } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
-import { MAX_SCORE, type Assignment, type Submission } from '@/lib/types'
+import { MAX_SCORE, type Assignment, type MissingStudent, type Submission } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -69,6 +69,11 @@ function StaffView({ assignment }: { assignment: Assignment }) {
   const submissions = useQuery({
     queryKey: ['submissions', assignment.id],
     queryFn: () => api<Submission[]>(`/assignments/${assignment.id}/submissions/`),
+  })
+
+  const missing = useQuery({
+    queryKey: ['missing-students', assignment.id],
+    queryFn: () => api<MissingStudent[]>(`/assignments/${assignment.id}/missing-students/`),
   })
 
   const remove = useMutation({
@@ -129,6 +134,26 @@ function StaffView({ assignment }: { assignment: Assignment }) {
     )
   }
 
+  let missingContent
+  if (missing.isPending) {
+    missingContent = <ListSkeleton rows={1} />
+  } else if (missing.isError) {
+    missingContent = <ErrorState error={missing.error} onRetry={() => void missing.refetch()} />
+  } else if (!missing.data.length) {
+    missingContent = <p className="text-sm text-muted-foreground">Barcha talabalar yechim topshirgan.</p>
+  } else {
+    missingContent = (
+      <ul className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+        {missing.data.map((student) => (
+          <li key={student.id} className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate">{fullName(student)}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{student.group}</span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
   return (
     <>
       <BackLink />
@@ -164,6 +189,13 @@ function StaffView({ assignment }: { assignment: Assignment }) {
             <CardDescription>Har bir talabaning oxirgi urinishi ko'rsatiladi.</CardDescription>
           </CardHeader>
           <CardContent>{submissionsContent}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Topshirmaganlar{missing.data?.length ? ` (${missing.data.length})` : ''}</CardTitle>
+            <CardDescription>Topshiriq berilgan guruhlardagi hali birorta yechim yubormagan talabalar.</CardDescription>
+          </CardHeader>
+          <CardContent>{missingContent}</CardContent>
         </Card>
       </div>
 
@@ -259,6 +291,7 @@ function SubmitForm({ assignment, isRetry }: { assignment: Assignment; isRetry: 
         submission,
         ...(current ?? []),
       ])
+      void queryClient.invalidateQueries({ queryKey: ['assignments'] })
     },
     onError: (caught) => {
       const message = fieldErrors(caught).sql_code

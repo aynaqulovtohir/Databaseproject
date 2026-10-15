@@ -27,7 +27,7 @@ class Command(BaseCommand):
             if not is_configured():
                 if not warned_not_configured:
                     self.stdout.write(
-                        "ANTHROPIC_API_KEY ko'rsatilmagan. Tahlillar navbatda kutib turadi."
+                        "AI kaliti (.env) ko'rsatilmagan. Tahlillar navbatda kutib turadi."
                     )
                     warned_not_configured = True
                 time.sleep(NOT_CONFIGURED_SLEEP_SECONDS)

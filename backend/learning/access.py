@@ -2,7 +2,8 @@
 from .models import Assignment, Material
 
 
-def _visible(queryset, user):
+def filter_visible(queryset, user):
+    """Admin — hammasi, o'qituvchi — o'zi yaratganlari, talaba — o'z guruhiga berilganlar."""
     if user.is_admin:
         return queryset
     if user.is_teacher:
@@ -14,8 +15,8 @@ def _visible(queryset, user):
 
 
 def visible_materials(user):
-    return _visible(Material.objects.all(), user)
+    return filter_visible(Material.objects.all(), user)
 
 
 def visible_assignments(user):
-    return _visible(Assignment.objects.all(), user)
+    return filter_visible(Assignment.objects.all(), user)

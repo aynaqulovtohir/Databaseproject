@@ -91,7 +91,7 @@ class DataMixin:
         cache.clear()
 
 
-@override_settings(ANTHROPIC_API_KEY="test-key", AI_MODEL="claude-sonnet-5-5")
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key", AI_MODEL="claude-sonnet-5-5")
 class AnalysisServiceTests(DataMixin, TestCase):
     def test_analysis_is_queued_for_every_new_submission(self):
         self.assertEqual(self.submission.analysis.status, AIAnalysis.Status.PENDING)
@@ -138,7 +138,7 @@ class AnalysisServiceTests(DataMixin, TestCase):
                 with self.assertRaises(AIPermanentError):
                     analyze_submission(self.submission)
 
-    @override_settings(ANTHROPIC_API_KEY="")
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="")
     def test_missing_key_raises_not_configured(self):
         with self.assertRaises(AINotConfigured):
             analyze_submission(self.submission)
@@ -167,7 +167,7 @@ class AnalysisServiceTests(DataMixin, TestCase):
                     analyze_submission(self.submission)
 
 
-@override_settings(ANTHROPIC_API_KEY="test-key")
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key")
 class WorkerTests(DataMixin, TestCase):
     def test_empty_queue(self):
         AIAnalysis.objects.all().delete()
@@ -303,7 +303,7 @@ class AnalysisApiTests(ApiTestCase):
         self.assertEqual(analysis.data["status"], "pending")
 
 
-@override_settings(ANTHROPIC_API_KEY="test-key", AI_CHAT_DAILY_LIMIT=3)
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key", AI_CHAT_DAILY_LIMIT=3)
 class ChatApiTests(ApiTestCase):
     def setUp(self):
         super().setUp()
@@ -373,7 +373,7 @@ class ChatApiTests(ApiTestCase):
             self.assertEqual(self.ask().status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertEqual(ChatMessage.objects.count(), 0)
 
-    @override_settings(ANTHROPIC_API_KEY="")
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="")
     def test_not_configured(self):
         self.auth_as(self.student)
         response = self.ask()
@@ -417,7 +417,7 @@ class ChatApiTests(ApiTestCase):
         self.assertNotIn("SINFDOSH-SAVOLI", payload)
 
 
-@override_settings(ANTHROPIC_API_KEY="test-key")
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key")
 class ChatServiceTests(DataMixin, TestCase):
     def test_chat_uses_low_effort_and_no_json_format(self):
         client = fake_client("javob")
@@ -425,3 +425,115 @@ class ChatServiceTests(DataMixin, TestCase):
             self.assertEqual(chat_reply(self.assignment, [], "savol"), "javob")
         kwargs = client.messages.create.call_args.kwargs
         self.assertEqual(kwargs["output_config"], {"effort": "low"})
+
+
+@override_settings(
+    AI_PROVIDER="gemini", GEMINI_API_KEY="gemini-kalit", GEMINI_MODEL="gemini-sinov", GEMINI_FALLBACK_MODELS=[]
+)
+class GeminiProviderTests(DataMixin, TestCase):
+    """AI_PROVIDER=gemini bo'lganda so'rov Google Gemini API'ga boradi."""
+
+    @staticmethod
+    def gemini_response(text="javob", status_code=200, finish_reason="STOP", body=None):
+        response = MagicMock()
+        response.status_code = status_code
+        response.json.return_value = body or {
+            "candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": finish_reason}],
+            "usageMetadata": {"promptTokenCount": 120, "candidatesTokenCount": 30, "thoughtsTokenCount": 10},
+        }
+        return response
+
+    def test_analysis_request_and_result(self):
+        with patch("ai.client.requests.post", return_value=self.gemini_response(json.dumps(GOOD_RESULT))) as post:
+            result, input_tokens, output_tokens = analyze_submission(self.submission)
+        self.assertEqual(result.suggested_score, 55)
+        self.assertEqual((input_tokens, output_tokens), (120, 40))
+
+        self.assertIn("gemini-sinov:generateContent", post.call_args.args[0])
+        self.assertEqual(post.call_args.kwargs["headers"], {"x-goog-api-key": "gemini-kalit"})
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["contents"][0]["role"], "user")
+        self.assertIn(SQL, body["contents"][0]["parts"][0]["text"])
+        config = body["generationConfig"]
+        self.assertEqual(config["responseMimeType"], "application/json")
+        self.assertEqual(config["responseSchema"]["type"], "OBJECT")
+        self.assertNotIn("additionalProperties", json.dumps(config["responseSchema"]))
+        # Shaxsiy ma'lumot Gemini'ga ham yuborilmaydi
+        payload = json.dumps(body, ensure_ascii=False)
+        for secret in ("maxfiy_login", "Maxfiyism", "Maxfiyfamiliya", "MAXFIY-GURUH-A"):
+            self.assertNotIn(secret, payload)
+
+    def test_chat_history_roles_are_converted(self):
+        from .services import chat_reply
+
+        history = [{"role": "user", "content": "savol"}, {"role": "assistant", "content": "javob"}]
+        with patch("ai.client.requests.post", return_value=self.gemini_response("yangi javob")) as post:
+            self.assertEqual(chat_reply(self.assignment, history, "yana savol"), "yangi javob")
+        roles = [item["role"] for item in post.call_args.kwargs["json"]["contents"]]
+        self.assertEqual(roles, ["user", "model", "user"])
+        self.assertNotIn("responseSchema", post.call_args.kwargs["json"]["generationConfig"])
+
+    def test_errors_are_classified(self):
+        import requests
+
+        from .client import create_message
+
+        invalid_key = self.gemini_response(status_code=400, body={"error": {"message": "API key not valid."}})
+        cases = [
+            (self.gemini_response(status_code=429), AITransientError),
+            (self.gemini_response(status_code=503), AITransientError),
+            (self.gemini_response(status_code=404), AIPermanentError),
+            (invalid_key, AIPermanentError),
+            (self.gemini_response(finish_reason="MAX_TOKENS"), AIPermanentError),
+            (self.gemini_response(body={"promptFeedback": {"blockReason": "SAFETY"}}), AIPermanentError),
+        ]
+        for response, expected in cases:
+            with patch("ai.client.requests.post", return_value=response), self.assertRaises(expected):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+        with patch("ai.client.requests.post", side_effect=requests.ConnectionError()):
+            with self.assertRaises(AITransientError):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1", "gemini-sinov", "zaxira-2"])
+    def test_busy_model_falls_back_to_next(self):
+        from .client import create_message, extract_text
+
+        busy = self.gemini_response(status_code=503)
+        with patch("ai.client.requests.post", side_effect=[busy, busy, self.gemini_response("zaxira javob")]) as post:
+            response = create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+        self.assertEqual(extract_text(response), "zaxira javob")
+        # Asosiy model takroran sinalmaydi
+        urls = [call.args[0] for call in post.call_args_list]
+        self.assertEqual([url.split("models/")[1].split(":")[0] for url in urls], ["gemini-sinov", "zaxira-1", "zaxira-2"])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1"])
+    def test_all_models_busy_is_transient(self):
+        import requests
+
+        from .client import create_message
+
+        with patch("ai.client.requests.post", side_effect=[requests.Timeout(), self.gemini_response(status_code=503)]):
+            with self.assertRaises(AITransientError):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1"])
+    def test_bad_key_does_not_fall_back(self):
+        from .client import create_message
+
+        with patch("ai.client.requests.post", return_value=self.gemini_response(status_code=403)) as post:
+            with self.assertRaises(AIPermanentError):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+        self.assertEqual(post.call_count, 1)
+
+    @override_settings(GEMINI_API_KEY="")
+    def test_not_configured_without_gemini_key(self):
+        from .client import AINotConfigured, create_message, is_configured
+
+        self.assertFalse(is_configured())
+        with self.assertRaises(AINotConfigured):
+            create_message(max_tokens=100, system="s", messages=[])
+
+    def test_worker_records_gemini_model(self):
+        with patch("ai.client.requests.post", return_value=self.gemini_response(json.dumps(GOOD_RESULT))):
+            self.assertTrue(worker.process_next())
+        self.assertEqual(AIAnalysis.objects.get(submission=self.submission).model_name, "gemini-sinov")

@@ -10,4 +10,5 @@ urlpatterns = [
     path("api/", include("ai.urls")),
     path("api/", include("grading.urls")),
     path("api/", include("notifications.urls")),
+    path("api/", include("labs.urls")),
 ]

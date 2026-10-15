@@ -12,6 +12,16 @@ class StudentShortSerializer(serializers.ModelSerializer):
         fields = ["id", "first_name", "last_name"]
 
 
+class MissingStudentSerializer(serializers.ModelSerializer):
+    """Yechim topshirmagan talaba: o'qituvchi kimga eslatishni bilishi uchun."""
+
+    group = serializers.CharField(source="group.name", read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "first_name", "last_name", "group"]
+
+
 class SubmissionSerializer(serializers.ModelSerializer):
     student = StudentShortSerializer(read_only=True)
     grade = serializers.SerializerMethodField()

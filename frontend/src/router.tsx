@@ -9,6 +9,8 @@ import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
 import { HomePage } from '@/pages/HomePage'
+import { LabDetailPage } from '@/pages/LabDetailPage'
+import { LabsPage } from '@/pages/LabsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { MaterialsPage } from '@/pages/MaterialsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -56,6 +58,8 @@ export const router = createBrowserRouter([
       { path: '/materials', element: <MaterialsPage /> },
       { path: '/assignments', element: <AssignmentsPage /> },
       { path: '/assignments/:id', element: <AssignmentDetailPage /> },
+      { path: '/labs', element: <LabsPage /> },
+      { path: '/labs/:id', element: <LabDetailPage /> },
       {
         element: <RequireRole roles={['admin']} />,
         children: [

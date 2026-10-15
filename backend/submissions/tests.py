@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from grading.models import Grade
 from learning.models import Assignment
 from users.models import StudentGroup, User
 
@@ -215,3 +216,87 @@ class DeletionRuleTests(BaseTestCase):
         response = self.client.delete(f"/api/users/{self.student_a1.pk}/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Submission.objects.count(), 0)
+
+
+class MissingStudentsTests(BaseTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.missing_url = f"/api/assignments/{cls.assignment.pk}/missing-students/"
+
+    def test_lists_students_without_any_attempt(self):
+        Submission.objects.create(
+            assignment=self.assignment, student=self.student_a1, sql_code=SQL, attempt_number=1
+        )
+        self.auth_as(self.teacher_a)
+        response = self.client.get(self.missing_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Boshqa guruh talabasi (student_b) ro'yxatga tushmaydi
+        self.assertEqual([item["id"] for item in response.data], [self.student_a2.pk])
+        self.assertEqual(response.data[0]["group"], "A-guruh")
+
+    def test_submission_to_other_assignment_does_not_count(self):
+        other = Assignment.objects.create(
+            title="Boshqa", description="Boshqa topshiriq", author=self.teacher_a,
+            deadline=timezone.now() + timedelta(days=7),
+        )
+        other.groups.add(self.group_a)
+        Submission.objects.create(assignment=other, student=self.student_a1, sql_code=SQL, attempt_number=1)
+        self.auth_as(self.admin)
+        ids = {item["id"] for item in self.client.get(self.missing_url).data}
+        self.assertEqual(ids, {self.student_a1.pk, self.student_a2.pk})
+
+    def test_blocked_student_is_skipped(self):
+        User.objects.filter(pk=self.student_a2.pk).update(is_active=False)
+        self.auth_as(self.teacher_a)
+        ids = [item["id"] for item in self.client.get(self.missing_url).data]
+        self.assertEqual(ids, [self.student_a1.pk])
+
+    def test_student_and_other_teacher_denied(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.missing_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.get(self.missing_url).status_code, status.HTTP_404_NOT_FOUND)
+
+
+class StudentAssignmentStatusTests(BaseTestCase):
+    """Talabaning topshiriqlar ro'yxatida o'z holati ko'rinadi."""
+
+    def my_submission(self, user):
+        self.auth_as(user)
+        return self.client.get("/api/assignments/").data[0]["my_submission"]
+
+    def test_null_until_student_submits(self):
+        self.assertIsNone(self.my_submission(self.student_a1))
+
+    def test_shows_latest_own_attempt_only(self):
+        Submission.objects.create(
+            assignment=self.assignment, student=self.student_a1, sql_code=SQL, attempt_number=1
+        )
+        latest = Submission.objects.create(
+            assignment=self.assignment, student=self.student_a1, sql_code=SQL, attempt_number=2, is_late=True
+        )
+        self.assertEqual(
+            self.my_submission(self.student_a1),
+            {"id": latest.pk, "status": "submitted", "is_late": True, "attempt_number": 2, "score": None},
+        )
+        # Sinfdoshining yechimi boshqa talabaning holatiga ta'sir qilmaydi
+        self.assertIsNone(self.my_submission(self.student_a2))
+
+    def test_score_shown_only_while_graded(self):
+        submission = Submission.objects.create(
+            assignment=self.assignment, student=self.student_a1, sql_code=SQL, attempt_number=1,
+            status=Submission.Status.GRADED,
+        )
+        Grade.objects.create(submission=submission, score=85, graded_by=self.teacher_a)
+        self.assertEqual(self.my_submission(self.student_a1)["score"], 85)
+        detail = self.client.get(f"/api/assignments/{self.assignment.pk}/").data
+        self.assertEqual(detail["my_submission"]["status"], "graded")
+
+        submission.status = Submission.Status.RETURNED
+        submission.save(update_fields=["status"])
+        self.assertIsNone(self.my_submission(self.student_a1)["score"])
+
+    def test_staff_response_has_no_my_submission(self):
+        self.auth_as(self.teacher_a)
+        self.assertNotIn("my_submission", self.client.get("/api/assignments/").data[0])
