@@ -21,12 +21,20 @@ from learning.permissions import IsStaffRoleOrReadOnly
 from users.models import User
 
 from .access import visible_labs
-from .advice import ai_grade, auto_grade, generate_advice
+from .advice import ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code
-from .models import LabAttempt, LabGrade
+from .er import build_fixed, compare
+from .models import Lab, LabAttempt, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
-from .serializers import LabSerializer, RunSerializer, StudentLabSerializer, grade_payload
+from .serializers import (
+    DiagramRunSerializer,
+    LabSerializer,
+    RunSerializer,
+    StudentLabSerializer,
+    fix_payload,
+    grade_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +68,30 @@ def grade_attempt(attempt):
     return score, comment, LabGrade.Source.AUTO
 
 
+def grade_diagram_attempt(attempt, ratio):
+    """Topshirilgan ER-diagrammani baholaydi; noto'g'ri bo'lsa, tuzatilgan diagramma va AI tushuntirishini saqlaydi."""
+    fixed = None if attempt.is_correct else build_fixed(attempt.diagram, attempt.lab.reference_diagram)
+    changes = fixed["changes"] if fixed else []
+    result = None
+    if is_configured() and ai_grades_left(attempt.student) > 0:
+        try:
+            score, comment, explanation = ai_grade_diagram(attempt, ratio, changes)
+            result = score, comment, LabGrade.Source.AI
+        except AINotConfigured:
+            pass
+        except AIError as exc:
+            logger.warning("ER urinishi #%s: AI baholay olmadi, avtomatik baho qo'yildi: %s", attempt.pk, exc)
+    if result is None:
+        explanation = ""
+        score, comment = auto_grade_diagram(attempt, ratio)
+        result = score, comment, LabGrade.Source.AUTO
+    if fixed:
+        attempt.fixed_diagram = fixed
+        attempt.fix_explanation = explanation
+        attempt.save(update_fields=["fixed_diagram", "fix_explanation"])
+    return result
+
+
 class LabViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffRoleOrReadOnly]
     # Faqat `run` amalida ishlatiladi (@action orqali beriladi)
@@ -69,7 +101,9 @@ class LabViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = visible_labs(user).select_related("author")
         if user.is_student:
-            own_attempts = LabAttempt.objects.filter(student=user).only("lab_id", "is_correct", "sql_code")
+            own_attempts = LabAttempt.objects.filter(student=user).only(
+                "lab_id", "is_correct", "sql_code", "diagram", "is_submission", "fixed_diagram", "fix_explanation"
+            )
             return queryset.prefetch_related(
                 Prefetch("attempts", queryset=own_attempts, to_attr="my_attempts"),
                 Prefetch("grades", queryset=LabGrade.objects.filter(student=user), to_attr="my_grades"),
@@ -90,12 +124,30 @@ class LabViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
     def check(self, request, lab):
-        """Kodni tekshiradi. Qaytaradi: (natija, kod) yoki xato bo'lsa (Response, None)."""
+        """Kod yoki diagrammani tekshiradi.
+
+        Qaytaradi: (natija, urinish ma'lumotlari) yoki xato bo'lsa (Response, None).
+        """
+        if lab.kind == Lab.Kind.ER:
+            serializer = DiagramRunSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            diagram = serializer.validated_data["diagram"]
+            comparison = compare(diagram, lab.reference_diagram)
+            result = {
+                "is_correct": not comparison["differences"],
+                "error": None,
+                "result": None,
+                "status_message": "",
+                "differences": comparison["differences"],
+                "checked_against_solution": True,
+            }
+            return result, {"diagram": diagram, "ratio": comparison["ratio"]}
+
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         sql_code = serializer.validated_data["sql_code"]
         try:
-            return check_code(lab, sql_code), sql_code
+            return check_code(lab, sql_code), {"sql_code": sql_code}
         except SandboxUnavailable:
             logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
             return Response(
@@ -111,11 +163,12 @@ class LabViewSet(viewsets.ModelViewSet):
             return Response({"detail": detail}, status=status.HTTP_409_CONFLICT), None
 
     @staticmethod
-    def save_attempt(lab, student, sql_code, result, is_submission=False):
+    def save_attempt(lab, student, payload, result, is_submission=False):
         return LabAttempt.objects.create(
             lab=lab,
             student=student,
-            sql_code=sql_code,
+            sql_code=payload.get("sql_code", ""),
+            diagram=payload.get("diagram"),
             is_correct=result["is_correct"],
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
@@ -131,14 +184,14 @@ class LabViewSet(viewsets.ModelViewSet):
     def run(self, request, pk=None):
         """Kodni ishga tushirib tekshiradi. Talabaning har bir ishga tushirishi urinish sifatida saqlanadi."""
         lab = self.get_object()
-        result, sql_code = self.check(request, lab)
-        if sql_code is None:
+        result, payload = self.check(request, lab)
+        if payload is None:
             return result
 
         result["attempt_id"] = None
         result["ai_available"] = False
         if request.user.is_student:
-            attempt = self.save_attempt(lab, request.user, sql_code, result)
+            attempt = self.save_attempt(lab, request.user, payload, result)
             result["attempt_id"] = attempt.pk
             result["ai_available"] = (
                 not result["is_correct"] and is_configured() and ai_advice_left(request.user) > 0
@@ -160,12 +213,17 @@ class LabViewSet(viewsets.ModelViewSet):
         if not request.user.is_student:
             raise PermissionDenied("Baholashga faqat talaba topshira oladi.")
         lab = self.get_object()
-        result, sql_code = self.check(request, lab)
-        if sql_code is None:
+        result, payload = self.check(request, lab)
+        if payload is None:
             return result
 
-        attempt = self.save_attempt(lab, request.user, sql_code, result, is_submission=True)
-        score, comment, source = grade_attempt(attempt)
+        attempt = self.save_attempt(lab, request.user, payload, result, is_submission=True)
+        if lab.kind == Lab.Kind.ER:
+            score, comment, source = grade_diagram_attempt(attempt, payload["ratio"])
+            # Noto'g'ri diagramma: tuzatilgan variant faqat topshirilgandan keyin ko'rsatiladi
+            result["fix"] = fix_payload(attempt)
+        else:
+            score, comment, source = grade_attempt(attempt)
         with transaction.atomic():
             best = LabGrade.objects.select_for_update().filter(lab=lab, student=request.user).first()
             if best is None:
@@ -237,6 +295,7 @@ class LabViewSet(viewsets.ModelViewSet):
                     "solved": bool(correct),
                     "last_attempt_at": attempts[-1].created_at if attempts else None,
                     "code": shown.sql_code if shown else "",
+                    "diagram": shown.diagram if shown else None,
                     "grade": grade_payload(grade) if grade else None,
                 }
             )

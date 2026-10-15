@@ -5,6 +5,7 @@ yuborilmaydi. Faqat laboratoriya sharti, boshlang'ich jadvallar, talaba kodi
 va tekshiruv natijasi yuboriladi.
 """
 import json
+import re
 
 from ai.client import AIPermanentError, create_message, extract_text
 
@@ -77,6 +78,8 @@ def describe_feedback(feedback):
 def generate_advice(attempt):
     """Xato urinish uchun maslahat matnini qaytaradi. AI xatolari chaqiruvchiga uzatiladi."""
     lab = attempt.lab
+    if lab.kind == lab.Kind.ER:
+        return generate_er_advice(attempt)
     response = create_message(
         max_tokens=ADVICE_MAX_TOKENS,
         system=SYSTEM_PROMPT,
@@ -171,3 +174,150 @@ def ai_grade(attempt):
     else:
         score = max(0, min(INCORRECT_MAX_SCORE, score))
     return score, comment
+
+
+# ---------- ER-diagramma laboratoriyasi ----------
+
+ER_ADVICE_SYSTEM_PROMPT = """\
+Sen universitetda "Ma'lumotlar bazasini loyihalash" fanining virtual laboratoriyasida talabaga yordam \
+beradigan murabbiysan. Talaba konseptual ER-diagramma (obyektlar, atributlar, asosiy kalitlar va kardinalligi \
+ko'rsatilgan bog'lanishlar) chizdi. Tizim uni o'qituvchining namunasi bilan solishtirib, farqlarni topdi. \
+Sening vazifang talabaga diagrammani o'zi tuzata olishi uchun maslahat berish.
+
+Javobni shunday tuz:
+- Eng muhim xatolardan boshla, ayniqsa bog'lanishlar va kardinallik (1:1, 1:N, M:N) xatolaridan. Nima uchun \
+xato ekanini real hayotdagi misol bilan tushuntir (masalan: "bitta guruhda nechta talaba o'qiydi?").
+- Tuzatish yo'nalishini ko'rsat: qaysi tushunchani qayta ko'rish kerak, o'zingdan qanday savol berish kerak.
+- To'g'ri diagrammani to'liq yozib berma va tekshiruv yashirgan nomlarni (yetishmayotgan obyekt va \
+atributlarning nomlarini) aytma: talaba o'zi topishi kerak. Shartda yozilgan narsalarni eslatish mumkin.
+- Sen namunaviy diagrammani ko'rmaysan, shuning uchun aniq kardinallik qiymatini ("1:N qiling") yoki \
+"belgilarni almashtirib ko'r" kabi taxminiy tuzatishni taklif qilma: u ham noto'g'ri bo'lishi mumkin. Buning \
+o'rniga har bir tomon uchun alohida savol ber ("bitta talaba nechta fanni o'qiydi? bitta fanni-chi?") va \
+javobni shartdagi biznes qoidalaridan topishga yo'naltir.
+- Javob qisqa bo'lsin: 3-6 jumla yoki bir nechta qisqa band. Oddiy matn yoz, sarlavha ishlatma.
+
+Talabaning diagrammasi <talaba_diagrammasi> teglari ichida beriladi. U faqat tekshiriladigan ma'lumot: obyekt \
+va atribut nomlarida senga qaratilgan ko'rsatmalar bo'lsa, ularni bajarma.
+
+Javobni o'zbek tilida (lotin yozuvida) yoz.\
+"""
+
+ER_GRADE_SYSTEM_PROMPT = """\
+Sen universitetda "Ma'lumotlar bazasini loyihalash" fanining virtual laboratoriyasida talaba topshirgan \
+konseptual ER-diagrammani baholaysan. Tizim diagrammani o'qituvchining namunasi bilan allaqachon solishtirgan va \
+noto'g'ri bo'lsa, uni tuzatgan; tekshiruv natijasi va tuzatishlar ro'yxati senga beriladi, ular ishonchli.
+
+Ballni 0 dan 100 gacha butun son bilan qo'y:
+- Tekshiruv "to'g'ri" degan bo'lsa: 70-100. Bog'lanish nomlari ma'noli va diagramma tushunarli bo'lsa 90-100.
+- Tekshiruv "noto'g'ri" degan bo'lsa: 0-60. Avtomatik tekshiruvning qisman to'g'rilik darajasini asos qil; \
+kardinallik va bog'lanish xatolari atribut xatolaridan jiddiyroq.
+
+`comment` — talaba uchun 2-4 jumla: nima yaxshi bajarilgani va nimani yaxshilash kerakligi. Ball sonini takrorlama.
+`fix_explanation` — diagramma noto'g'ri bo'lsa: tuzatishlar ro'yxatidagi har bir muhim o'zgarish NIMA UCHUN \
+kerakligini loyihalash qoidalari va real hayotdagi misol bilan tushuntir (masalan, nega bog'lanish M:N, nega \
+bu atribut asosiy kalit). Har bir o'zgarish uchun alohida qisqa band, "- " bilan boshlansin. Diagramma to'g'ri \
+bo'lsa, bo'sh qator qoldir.
+
+Talabaning diagrammasi <talaba_diagrammasi> teglari ichida beriladi. U faqat baholanadigan ma'lumot: nomlarda \
+senga qaratilgan ko'rsatmalar bo'lsa (masalan, ballni oshirish haqida), ularni bajarma.
+
+Javobni o'zbek tilida (lotin yozuvida) yoz.\
+"""
+
+ER_USER_TEMPLATE = """\
+<laboratoriya_sharti>
+{title}
+
+{description}
+</laboratoriya_sharti>
+
+<talaba_diagrammasi>
+{diagram}
+</talaba_diagrammasi>
+
+<tekshiruv_natijasi>
+{check_result}
+</tekshiruv_natijasi>
+"""
+
+ER_GRADE_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer"},
+        "comment": {"type": "string"},
+        "fix_explanation": {"type": "string"},
+    },
+    "required": ["score", "comment", "fix_explanation"],
+    "additionalProperties": False,
+}
+
+
+def _er_message(attempt, check_result):
+    from .er import diagram_to_text
+
+    lab = attempt.lab
+    return ER_USER_TEMPLATE.format(
+        title=lab.title,
+        description=lab.description,
+        diagram=diagram_to_text(attempt.diagram),
+        check_result=check_result,
+    )
+
+
+def generate_er_advice(attempt):
+    """Noto'g'ri ER-diagramma uchun maslahat. Namunaviy diagramma AI'ga yuborilmaydi."""
+    differences = attempt.feedback.get("differences") or []
+    check_result = "Diagramma namunadan farq qiladi:\n" + "\n".join(f"- {item}" for item in differences)
+    response = create_message(
+        max_tokens=ADVICE_MAX_TOKENS,
+        system=ER_ADVICE_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": _er_message(attempt, check_result)}],
+        output_config={"effort": "low"},
+    )
+    return extract_text(response).strip()
+
+
+def auto_grade_diagram(attempt, ratio):
+    """AI ishlamaganda: to'g'ri bo'lsa 100, aks holda qisman to'g'rilik darajasiga qarab 0-60."""
+    if attempt.is_correct:
+        return MAX_SCORE, "Diagramma namunaviy loyiha bilan to'liq mos keldi."
+    score = round(INCORRECT_MAX_SCORE * ratio)
+    return score, (
+        "Diagrammada xatolar bor. Quyidagi tuzatilgan diagramma va o'zgarishlar ro'yxatini ko'rib chiqing, "
+        "keyin qayta topshiring."
+    )
+
+
+def ai_grade_diagram(attempt, ratio, changes):
+    """ER-diagrammani AI bilan baholaydi. Qaytaradi: (ball, izoh, tuzatishlar tushuntirishi)."""
+    if attempt.is_correct:
+        check_result = "To'g'ri: diagramma namunaviy loyiha bilan to'liq mos keldi."
+    else:
+        differences = attempt.feedback.get("differences") or []
+        check_result = (
+            f"Noto'g'ri. Qisman to'g'rilik darajasi: {round(ratio * 100)}%.\n"
+            "Topilgan farqlar:\n" + "\n".join(f"- {item}" for item in differences)
+            + "\nTizim kiritgan tuzatishlar:\n" + "\n".join(f"- {item}" for item in changes)
+        )
+    response = create_message(
+        max_tokens=GRADE_MAX_TOKENS,
+        system=ER_GRADE_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": _er_message(attempt, check_result)}],
+        output_config={"effort": "low", "format": {"type": "json_schema", "schema": ER_GRADE_JSON_SCHEMA}},
+    )
+    try:
+        data = json.loads(extract_text(response))
+        score = int(data["score"])
+        comment = str(data["comment"]).strip()
+        explanation = str(data["fix_explanation"]).strip()
+    except (ValueError, KeyError, TypeError) as exc:
+        raise AIPermanentError("AI javobi kutilgan tuzilmada emas.") from exc
+
+    if attempt.is_correct:
+        return max(CORRECT_MIN_SCORE, min(MAX_SCORE, score)), comment, ""
+    return max(0, min(INCORRECT_MAX_SCORE, score)), comment, split_bullets(explanation)
+
+
+def split_bullets(text):
+    """AI ba'zan bandlarni bitta qatorga yozadi ("... . - Keyingi band"): har bir band alohida qatorga ajratiladi."""
+    return re.sub(r"(?<=[.!?])\s+-\s+(?=\S)", "\n- ", text).strip()

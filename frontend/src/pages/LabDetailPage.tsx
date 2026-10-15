@@ -5,6 +5,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { ErEditor } from '@/components/ErEditor'
+import { ErLabRunner } from '@/components/ErLabRunner'
 import { LabDialog } from '@/components/LabDialog'
 import { LabRunner } from '@/components/LabRunner'
 import { PageHeader } from '@/components/PageHeader'
@@ -18,7 +20,14 @@ import { api, ApiError, errorMessage } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
-import { GRADE_SOURCE_LABELS, MAX_SCORE, type Lab, type LabRunResult, type LabStudentProgress } from '@/lib/types'
+import {
+  GRADE_SOURCE_LABELS,
+  MAX_SCORE,
+  type ErDiagram,
+  type Lab,
+  type LabRunResult,
+  type LabStudentProgress,
+} from '@/lib/types'
 import { LabProgressBadge } from '@/pages/LabsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -42,7 +51,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
-        {lab.setup_sql.trim() ? (
+        {lab.kind === 'er' ? null : lab.setup_sql.trim() ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Tayyor jadvallar</h3>
             <p className="mb-2 text-xs text-muted-foreground">
@@ -113,9 +122,9 @@ function ProgressCard({ lab }: { lab: Lab }) {
               </TableCell>
               <TableCell>{formatDateTime(student.last_attempt_at)}</TableCell>
               <TableCell className="text-right">
-                {student.code ? (
+                {student.code || student.diagram ? (
                   <Button variant="outline" size="lg" onClick={() => setViewing(student)}>
-                    Kodni ko'rish
+                    {lab.kind === 'er' ? "Diagrammani ko'rish" : "Kodni ko'rish"}
                   </Button>
                 ) : null}
               </TableCell>
@@ -139,11 +148,13 @@ function ProgressCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent>{content}</CardContent>
       <Dialog open={Boolean(viewing)} onOpenChange={(open) => (!open ? setViewing(null) : undefined)}>
-        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className={lab.kind === 'er' ? 'max-h-[92svh] overflow-y-auto sm:max-w-5xl' : 'max-h-[92svh] overflow-y-auto sm:max-w-2xl'}>
           <DialogHeader>
             <DialogTitle>{viewing ? fullName(viewing) : ''}</DialogTitle>
             <DialogDescription>
-              {viewing?.solved ? "Talabaning to'g'ri deb topilgan kodi." : 'Talabaning oxirgi urinishi (hali bajarilmagan).'}
+              {viewing?.solved
+                ? `Talabaning to'g'ri deb topilgan ${lab.kind === 'er' ? 'diagrammasi' : 'kodi'}.`
+                : 'Talabaning oxirgi urinishi (hali bajarilmagan).'}
             </DialogDescription>
           </DialogHeader>
           {viewing?.grade ? (
@@ -156,7 +167,7 @@ function ProgressCard({ lab }: { lab: Lab }) {
               ) : null}
             </div>
           ) : null}
-          {viewing ? <SqlCode code={viewing.code} /> : null}
+          {viewing?.diagram ? <ErEditor value={viewing.diagram} /> : viewing ? <SqlCode code={viewing.code} /> : null}
         </DialogContent>
       </Dialog>
     </Card>
@@ -204,33 +215,7 @@ function StaffView({ lab }: { lab: Lab }) {
       />
       <div className="grid gap-4">
         <ConditionCard lab={lab} />
-        <Card>
-          <CardHeader>
-            <CardTitle>Namunaviy yechim</CardTitle>
-            <CardDescription>Talabaga ko'rinmaydi. Talaba natijasi shu kod natijasi bilan solishtiriladi.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {lab.solution_sql?.trim() ? (
-              <SqlCode code={lab.solution_sql.trim()} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Kiritilmagan: xatosiz ishlagan har qanday kod to'g'ri hisoblanadi.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Sinab ko'rish</CardTitle>
-            <CardDescription>
-              Laboratoriyani talaba ko'rgandek tekshirib ko'ring. Bu yerdagi ishga tushirishlar saqlanmaydi.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Laboratoriya tahrirlansa, muharrir yangi namunaviy yechim bilan qayta ochiladi */}
-            <LabRunner key={lab.solution_sql} labId={lab.id} initialCode={lab.solution_sql ?? ''} />
-          </CardContent>
-        </Card>
+        {lab.kind === 'er' ? <ErStaffCards lab={lab} /> : <SqlStaffCards lab={lab} />}
         <ProgressCard lab={lab} />
       </div>
 
@@ -248,24 +233,124 @@ function StaffView({ lab }: { lab: Lab }) {
   )
 }
 
+function ErStaffCards({ lab }: { lab: Lab }) {
+  const reference = lab.reference_diagram ?? { entities: [], relationships: [] }
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Namunaviy ER-diagramma</CardTitle>
+          <CardDescription>Talabaga ko'rinmaydi. Talaba diagrammasi shu diagramma bilan solishtiriladi.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ErEditor value={reference} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Sinab ko'rish</CardTitle>
+          <CardDescription>
+            Namunani o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Bu yerdagi tekshirishlar saqlanmaydi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Laboratoriya tahrirlansa, muharrir yangi namuna bilan qayta ochiladi */}
+          <ErLabRunner key={JSON.stringify(reference)} labId={lab.id} initialDiagram={reference} />
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+function SqlStaffCards({ lab }: { lab: Lab }) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Namunaviy yechim</CardTitle>
+          <CardDescription>Talabaga ko'rinmaydi. Talaba natijasi shu kod natijasi bilan solishtiriladi.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {lab.solution_sql?.trim() ? (
+            <SqlCode code={lab.solution_sql.trim()} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Kiritilmagan: xatosiz ishlagan har qanday kod to'g'ri hisoblanadi.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Sinab ko'rish</CardTitle>
+          <CardDescription>
+            Laboratoriyani talaba ko'rgandek tekshirib ko'ring. Bu yerdagi ishga tushirishlar saqlanmaydi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Laboratoriya tahrirlansa, muharrir yangi namunaviy yechim bilan qayta ochiladi */}
+          <LabRunner key={lab.solution_sql} labId={lab.id} initialCode={lab.solution_sql ?? ''} />
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
 // ---------- Talaba ----------
 
 function StudentView({ lab }: { lab: Lab }) {
   const queryClient = useQueryClient()
   const progress = lab.my_progress ?? { attempts: 0, solved: false }
 
-  function handleResult(result: LabRunResult, code: string) {
-    // Holat va oxirgi kod keshda yangilanadi: sahifaga qaytilganda ham to'g'ri ko'rinadi
+  function handleResult(result: LabRunResult, work: { code?: string; diagram?: ErDiagram }) {
+    // Holat va oxirgi ish keshda yangilanadi: sahifaga qaytilganda ham to'g'ri ko'rinadi
     queryClient.setQueryData<Lab>(['lab', lab.id], {
       ...lab,
       my_progress: {
+        ...progress,
         attempts: progress.attempts + 1,
         solved: progress.solved || result.is_correct,
         grade: result.best_grade ?? progress.grade,
-        last_code: code,
+        last_code: work.code ?? '',
+        last_diagram: work.diagram ?? null,
+        last_fix: 'fix' in result ? result.fix : progress.last_fix,
       },
     })
     void queryClient.invalidateQueries({ queryKey: ['labs'] })
+  }
+
+  if (lab.kind === 'er') {
+    return (
+      <>
+        <BackLink />
+        <PageHeader
+          title={lab.title}
+          description={`O'qituvchi: ${fullName(lab.author)}`}
+          actions={<LabProgressBadge progress={progress} />}
+        />
+        <div className="grid gap-4">
+          <ConditionCard lab={lab} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Mening ER-diagrammam</CardTitle>
+              <CardDescription>
+                Obyektlar, atributlar va bog'lanishlarni chizing. Xohlagancha tekshirish mumkin; tayyor bo'lgach
+                baholashga topshiring.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ErLabRunner
+                labId={lab.id}
+                initialDiagram={progress.last_diagram}
+                initialFix={progress.last_fix}
+                gradable
+                onResult={(result, diagram) => handleResult(result, { diagram })}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -290,7 +375,7 @@ function StudentView({ lab }: { lab: Lab }) {
               labId={lab.id}
               initialCode={lab.my_progress?.last_code ?? ''}
               gradable
-              onResult={handleResult}
+              onResult={(result, code) => handleResult(result, { code })}
             />
           </CardContent>
         </Card>

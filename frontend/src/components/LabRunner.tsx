@@ -51,7 +51,7 @@ function ResultTable({ table }: { table: LabRunTable }) {
 }
 
 /** Xato urinish uchun AI maslahati: natija kelishi bilan o'zi so'raladi. */
-function AiAdvice({ attemptId }: { attemptId: number }) {
+export function AiAdvice({ attemptId }: { attemptId: number }) {
   const advice = useQuery({
     queryKey: ['lab-advice', attemptId],
     queryFn: () => api<{ advice: string }>(`/labs/attempts/${attemptId}/advice/`, { method: 'POST' }),
@@ -136,7 +136,7 @@ function Verdict({ result }: { result: LabRunResult }) {
   )
 }
 
-function GradeCard({ grade, best }: { grade: LabGrade; best?: LabGrade }) {
+export function GradeCard({ grade, best }: { grade: LabGrade; best?: LabGrade }) {
   return (
     <div className="rounded-lg border bg-card p-3" role="status">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

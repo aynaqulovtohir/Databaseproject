@@ -2,6 +2,7 @@
 
 Bu testlar haqiqiy "qum quti" bazasida (LAB_SANDBOX_DB) SQL bajaradi.
 """
+import json
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -526,6 +527,17 @@ class DesignLabsTests(BaseTestCase):
             result = check_code(Lab(**lab_data), lab_data["solution_sql"])
             self.assertTrue(result["is_correct"], (lab_data["title"], result))
 
+    def test_er_labs_accept_their_reference(self):
+        from .design_labs import ER_LABS
+        from .er import compare, validate_diagram
+
+        for lab_data in ER_LABS:
+            reference = validate_diagram(lab_data["reference_diagram"])
+            self.assertEqual(compare(reference, reference)["differences"], [], lab_data["title"])
+            # Shartda har bir obyekt nomi tilga olingan
+            for entity in reference["entities"]:
+                self.assertIn(entity["name"], lab_data["description"], lab_data["title"])
+
     def test_typical_mistakes_are_explained(self):
         from .checker import check_code
         from .design_labs import DESIGN_LABS
@@ -564,8 +576,13 @@ class DesignLabsTests(BaseTestCase):
         labs = Lab.objects.filter(author=self.teacher_a, title__startswith="Loyihalash")
         self.assertEqual(labs.count(), len(DESIGN_LABS))
         self.assertTrue(all(lab.groups.filter(pk=self.group_a.pk).exists() for lab in labs))
-        # Ro'yxatda 1-laboratoriya birinchi turadi
-        self.assertTrue(labs.order_by("-created_at", "-id").first().title.startswith("Loyihalash 1."))
+        # Ro'yxatda birinchi laboratoriya (ER-model 1) yuqorida turadi
+        from .design_labs import ALL_LABS, ER_LABS
+
+        all_labs = Lab.objects.filter(author=self.teacher_a, title__in=[item["title"] for item in ALL_LABS])
+        self.assertEqual(all_labs.count(), len(ALL_LABS))
+        self.assertEqual(all_labs.order_by("-created_at", "-id").first().title, ALL_LABS[0]["title"])
+        self.assertEqual(all_labs.filter(kind="er").count(), len(ER_LABS))
 
         with self.assertRaises(CommandError):
             call_command("seed_design_labs", author="student_a1", stdout=StringIO())
@@ -667,3 +684,170 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         _, (_, tables) = self.export(self.admin, lab=str(self.lab.pk + 1000))
         self.assertEqual(tables["urinishlar.csv"], [])
+
+
+ER_REFERENCE = {
+    "entities": [
+        {"id": "t", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}, {"name": "ism"}]},
+        {"id": "g", "name": "Guruh", "x": 300, "y": 0, "attributes": [{"name": "id", "key": "pk"}, {"name": "nomi"}]},
+        {"id": "f", "name": "Fan", "x": 0, "y": 300, "attributes": [{"name": "id", "key": "pk"}, {"name": "nomi"}]},
+    ],
+    "relationships": [
+        {"id": "r1", "name": "a'zo", "source": "t", "target": "g", "source_card": "N", "target_card": "1"},
+        {"id": "r2", "name": "o'qiydi", "source": "t", "target": "f", "source_card": "N", "target_card": "N"},
+    ],
+}
+# Xatolari bor diagramma: Fan yo'q, Talabada PK yo'q, kardinallik teskari
+ER_WRONG = {
+    "entities": [
+        {"id": "1", "name": "talaba", "x": 10, "y": 10, "attributes": [{"name": "ism", "key": ""}]},
+        {"id": "2", "name": "Guruh", "x": 200, "y": 10, "attributes": [{"name": "id", "key": "pk"}, {"name": "nomi"}]},
+    ],
+    "relationships": [{"id": "x", "name": "", "source": "1", "target": "2", "source_card": "1", "target_card": "N"}],
+}
+
+
+# .env dagi haqiqiy kalit testlarda ishlatilmasin: AI faqat mock bilan sinaladi
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="")
+class ErLabTests(BaseTestCase):
+    """ER-diagramma laboratoriyasi: tekshirish, maslahat, topshirish va tuzatish."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.er_lab = Lab.objects.create(
+            kind=Lab.Kind.ER,
+            title="Universitet ER",
+            description="Talaba, Guruh va Fan obyektlarini chizing",
+            reference_diagram=ER_REFERENCE,
+            author=cls.teacher_a,
+        )
+        cls.er_lab.groups.add(cls.group_a)
+
+    def post(self, action, diagram):
+        return self.client.post(f"/api/labs/{self.er_lab.pk}/{action}/", {"diagram": diagram}, format="json")
+
+    def test_reference_is_hidden_from_student(self):
+        self.auth_as(self.student_a1)
+        response = self.client.get(f"/api/labs/{self.er_lab.pk}/")
+        self.assertEqual(response.data["kind"], "er")
+        self.assertNotIn("reference_diagram", response.data)
+        self.assertNotIn("o'qiydi", str(response.data))
+
+    def test_correct_diagram(self):
+        self.auth_as(self.student_a1)
+        response = self.post("run", ER_REFERENCE)
+        self.assertTrue(response.data["is_correct"], response.data)
+        attempt = LabAttempt.objects.get(pk=response.data["attempt_id"])
+        self.assertEqual(attempt.diagram["entities"][0]["name"], "Talaba")
+        self.assertEqual(attempt.sql_code, "")
+
+    def test_differences_do_not_reveal_answer(self):
+        self.auth_as(self.student_a1)
+        response = self.post("run", ER_WRONG)
+        self.assertFalse(response.data["is_correct"])
+        text = " | ".join(response.data["differences"])
+        self.assertIn("1 ta obyekt yetishmaydi", text)
+        self.assertIn("asosiy kalit (PK) belgilanmagan", text)
+        self.assertIn("kardinalligi noto'g'ri (sizda 1:N)", text)
+        self.assertNotIn("Fan", text)
+        self.assertNotIn("fix", response.data)
+
+    def test_invalid_diagram_rejected(self):
+        self.auth_as(self.student_a1)
+        bad = {"entities": [{"id": "1", "name": "A"}, {"id": "2", "name": "a"}], "relationships": []}
+        response = self.post("run", bad)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ikki marta", str(response.data["diagram"]))
+        self.assertEqual(self.post("run", "matn").status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_submit_wrong_diagram_returns_fix(self):
+        self.auth_as(self.student_a1)
+        response = self.post("submit", ER_WRONG)
+        self.assertEqual(response.data["grade"]["source"], "auto")
+        self.assertLessEqual(response.data["grade"]["score"], 60)
+        fix = response.data["fix"]
+        changes = " | ".join(fix["diagram"]["changes"])
+        self.assertIn("«Fan» obyekti qo'shildi", changes)
+        self.assertIn("1:N dan N:1 ga", changes)
+        statuses = {entity["name"]: entity["status"] for entity in fix["diagram"]["entities"]}
+        self.assertEqual(statuses["Fan"], "added")
+        # Talaba sahifani qayta ochganda ham tuzatish ko'rinadi
+        lab = self.client.get(f"/api/labs/{self.er_lab.pk}/").data
+        self.assertEqual(lab["my_progress"]["last_fix"]["diagram"]["changes"], fix["diagram"]["changes"])
+        self.assertEqual(lab["my_progress"]["last_diagram"]["entities"][0]["name"], "talaba")
+
+    def test_submit_correct_diagram_has_no_fix(self):
+        self.auth_as(self.student_a1)
+        response = self.post("submit", ER_REFERENCE)
+        self.assertEqual(response.data["grade"]["score"], 100)
+        self.assertIsNone(response.data["fix"])
+
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="sinov-kaliti")
+    def test_ai_grade_explains_fix_without_identity(self):
+        reply = {"score": 95, "comment": "izoh", "fix_explanation": "- Fan kerak, chunki ..."}
+        with patch("labs.advice.create_message") as create_message:
+            create_message.return_value.content = [type("Block", (), {"type": "text", "text": json.dumps(reply)})()]
+            self.auth_as(self.student_a1)
+            response = self.post("submit", ER_WRONG)
+        self.assertEqual(response.data["grade"]["source"], "ai")
+        self.assertEqual(response.data["grade"]["score"], 60)  # noto'g'ri diagramma 60 dan oshmaydi
+        self.assertEqual(response.data["fix"]["explanation"], "- Fan kerak, chunki ...")
+        payload = json.dumps(create_message.call_args.kwargs, ensure_ascii=False)
+        self.assertIn("«Fan» obyekti qo'shildi", payload)
+        for secret in ("student_a1", "Zuhriddin"):
+            self.assertNotIn(secret, payload)
+
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="sinov-kaliti")
+    def test_advice_does_not_send_reference(self):
+        self.auth_as(self.student_a1)
+        attempt_id = self.post("run", ER_WRONG).data["attempt_id"]
+        with patch("labs.advice.create_message") as create_message:
+            create_message.return_value.content = [type("Block", (), {"type": "text", "text": "maslahat"})()]
+            response = self.client.post(f"/api/labs/attempts/{attempt_id}/advice/")
+        self.assertEqual(response.data["advice"], "maslahat")
+        kwargs = create_message.call_args.kwargs
+        self.assertIn("ER-diagramma", kwargs["system"])
+        message = kwargs["messages"][0]["content"]
+        # Namunadagi obyekt (Fan) va bog'lanish nomi (o'qiydi) AI'ga yuborilmaydi
+        self.assertNotIn("Fan", message.replace("Fan obyektlarini", ""))
+        self.assertNotIn("o'qiydi", message)
+
+    def test_explanation_bullets_are_split(self):
+        from .advice import split_bullets
+
+        self.assertEqual(split_bullets("- Bir. - Ikki: a - b. - Uch!"), "- Bir.\n- Ikki: a - b.\n- Uch!")
+
+    def test_teacher_creates_er_lab_and_kind_is_fixed(self):
+        self.auth_as(self.teacher_a)
+        data = {"kind": "er", "title": "ER", "description": "shart", "groups": [self.group_a.pk]}
+        response = self.client.post("/api/labs/", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reference_diagram", response.data)
+
+        data["reference_diagram"] = ER_REFERENCE
+        data["solution_sql"] = "SELECT 1;"
+        response = self.client.post("/api/labs/", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["solution_sql"], "")
+        response = self.client.patch(f"/api/labs/{response.data['id']}/", {"kind": "sql"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_progress_and_export_include_er(self):
+        self.auth_as(self.student_a1)
+        self.post("run", ER_WRONG)
+        self.auth_as(self.teacher_a)
+        rows = self.client.get(f"/api/labs/{self.er_lab.pk}/progress/").data
+        mine = next(row for row in rows if row["id"] == self.student_a1.pk)
+        self.assertEqual(mine["diagram"]["entities"][1]["name"], "Guruh")
+
+        import csv
+        import io
+        import zipfile
+
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+        rows = list(csv.DictReader(io.StringIO(archive.read("urinishlar.csv").decode("utf-8-sig")), delimiter=";"))
+        er_rows = [row for row in rows if row["laboratoriya_turi"] == "er"]
+        self.assertEqual(len(er_rows), 1)
+        self.assertIn("er_obyekt_yetishmaydi", er_rows[0]["xato_turlari"])
+        self.assertIn("er_kardinallik", er_rows[0]["xato_turlari"])

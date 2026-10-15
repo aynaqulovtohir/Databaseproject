@@ -327,3 +327,146 @@ CREATE TABLE ijara (
 );""",
     },
 ]
+
+
+ER_NOTE = """\
+Diagrammani chizish qoidalari:
+- Obyekt va atribut nomlarini shartdagidek yozing (katta-kichik harf farqi yo'q).
+- Har bir obyektda asosiy kalitni (PK) belgilang.
+- Tashqi kalit (FK) atributlarini yozish shart emas: bog'lanishning o'zi ularni ifodalaydi.
+- Har bir bog'lanishning ikki uchida kardinallikni tanlang: «1» yoki «N».
+- Ko'p-ko'p (M:N) bog'lanishni ikki obyekt orasida to'g'ridan-to'g'ri (N — N) chizing."""
+
+
+def _entity(entity_id, name, x, y, key, *attributes):
+    return {
+        "id": entity_id,
+        "name": name,
+        "x": x,
+        "y": y,
+        "attributes": [{"name": key, "key": "pk"}] + [{"name": item, "key": ""} for item in attributes],
+    }
+
+
+def _relationship(relationship_id, name, source, source_card, target, target_card):
+    return {
+        "id": relationship_id,
+        "name": name,
+        "source": source,
+        "target": target,
+        "source_card": source_card,
+        "target_card": target_card,
+    }
+
+
+ER_LABS = [
+    {
+        "kind": "er",
+        "title": "ER-model 1. Universitet: talaba, guruh va fan",
+        "description": f"""\
+Universitet uchun konseptual ER-diagramma chizing.
+
+Obyektlar va ularning atributlari:
+- Talaba: id, ism, tugilgan_sana
+- Guruh: id, nomi
+- Fan: id, nomi, kredit
+
+Biznes qoidalari:
+- Har bir talaba bitta guruhda o'qiydi, bitta guruhda esa ko'p talaba bo'ladi.
+- Talaba bir nechta fanni o'qiydi, bitta fanni esa ko'p talaba o'qiydi.
+
+O'zingiz aniqlaysiz: qaysi obyektlar orasida bog'lanish bor, har bir bog'lanishning kardinalligi va har bir \
+obyektning asosiy kaliti.
+
+{ER_NOTE}""",
+        "reference_diagram": {
+            "entities": [
+                _entity("talaba", "Talaba", 40, 160, "id", "ism", "tugilgan_sana"),
+                _entity("guruh", "Guruh", 420, 40, "id", "nomi"),
+                _entity("fan", "Fan", 420, 300, "id", "nomi", "kredit"),
+            ],
+            "relationships": [
+                _relationship("r1", "a'zo", "talaba", "N", "guruh", "1"),
+                _relationship("r2", "o'qiydi", "talaba", "N", "fan", "N"),
+            ],
+        },
+    },
+    {
+        "kind": "er",
+        "title": "ER-model 2. Kutubxona",
+        "description": f"""\
+Kutubxona uchun konseptual ER-diagramma chizing.
+
+Obyektlar va ularning atributlari:
+- Kitob: isbn, nomi, yil
+- Muallif: id, ism
+- Kitobxon: id, ism, telefon
+- Ijara: id, olingan_sana, qaytarilgan_sana
+
+Biznes qoidalari:
+- Har bir kitob o'zining ISBN raqami bilan aniqlanadi.
+- Bitta kitobni bir nechta muallif birga yozishi, bitta muallif esa ko'p kitob yozishi mumkin.
+- Kitobxon kitobni ijaraga oladi. Har bir ijara yozuvi aynan bitta kitob va aynan bitta kitobxonga tegishli; \
+bitta kitob va bitta kitobxonning ko'p ijarasi bo'lishi mumkin.
+
+O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning asosiy kaliti.
+
+{ER_NOTE}""",
+        "reference_diagram": {
+            "entities": [
+                _entity("kitob", "Kitob", 40, 40, "isbn", "nomi", "yil"),
+                _entity("muallif", "Muallif", 440, 40, "id", "ism"),
+                _entity("kitobxon", "Kitobxon", 440, 320, "id", "ism", "telefon"),
+                _entity("ijara", "Ijara", 40, 320, "id", "olingan_sana", "qaytarilgan_sana"),
+            ],
+            "relationships": [
+                _relationship("r1", "yozgan", "muallif", "N", "kitob", "N"),
+                _relationship("r2", "ijaraga beriladi", "kitob", "1", "ijara", "N"),
+                _relationship("r3", "ijaraga oladi", "kitobxon", "1", "ijara", "N"),
+            ],
+        },
+    },
+    {
+        "kind": "er",
+        "title": "ER-model 3. Shifoxona: 1:1, 1:N va M:N bog'lanishlar",
+        "description": f"""\
+Shifoxona uchun konseptual ER-diagramma chizing.
+
+Obyektlar va ularning atributlari:
+- Bolim: id, nomi
+- Shifokor: id, ism, mutaxassislik
+- Bemor: id, ism, tugilgan_sana
+- Qabul: id, sana, tashxis
+- Dori: id, nomi
+
+Biznes qoidalari:
+- Har bir shifokor bitta bo'limda ishlaydi, bo'limda esa ko'p shifokor ishlaydi.
+- Har bir bo'limni aynan bitta shifokor boshqaradi va bitta shifokor faqat bitta bo'limni boshqara oladi \
+(bu «ishlaydi» bog'lanishidan alohida bog'lanish).
+- Qabul — bitta bemorning bitta shifokor qabuliga borishi. Bemor ham, shifokor ham ko'p qabulga ega bo'lishi mumkin.
+- Bitta qabulda bir nechta dori yozilishi, bitta dori esa ko'p qabulda yozilishi mumkin.
+
+O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning asosiy kaliti.
+
+{ER_NOTE}""",
+        "reference_diagram": {
+            "entities": [
+                _entity("bolim", "Bolim", 40, 40, "id", "nomi"),
+                _entity("shifokor", "Shifokor", 420, 40, "id", "ism", "mutaxassislik"),
+                _entity("bemor", "Bemor", 800, 300, "id", "ism", "tugilgan_sana"),
+                _entity("qabul", "Qabul", 420, 300, "id", "sana", "tashxis"),
+                _entity("dori", "Dori", 420, 560, "id", "nomi"),
+            ],
+            "relationships": [
+                _relationship("r1", "ishlaydi", "shifokor", "N", "bolim", "1"),
+                _relationship("r2", "boshqaradi", "shifokor", "1", "bolim", "1"),
+                _relationship("r3", "qabul qiladi", "shifokor", "1", "qabul", "N"),
+                _relationship("r4", "qabulga keladi", "bemor", "1", "qabul", "N"),
+                _relationship("r5", "yoziladi", "qabul", "N", "dori", "N"),
+            ],
+        },
+    },
+]
+
+# Seed buyrug'i shu tartibda qo'shadi: avval konseptual (ER), keyin fizik (SQL) loyihalash
+ALL_LABS = ER_LABS + DESIGN_LABS
