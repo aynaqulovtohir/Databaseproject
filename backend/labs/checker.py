@@ -66,6 +66,8 @@ def format_error(error):
 def _error_payload(error):
     return {
         "message": error.message,
+        # Tadqiqot eksportida xato turini aniqlash uchun saqlanadi
+        "sqlstate": error.sqlstate,
         "detail": error.detail,
         "hint": error.hint,
         "line": error.line,
@@ -151,10 +153,16 @@ def _compare_tables(student, expected):
             )
 
         if not missing_columns and not extra_columns and mine.rows != wanted.rows:
-            differences.append(
-                f"«{table}» jadvalidagi ma'lumotlar kutilganidan farq qiladi "
-                f"(sizda {len(mine.rows)} qator, kutilgan {len(wanted.rows)} qator)."
-            )
+            if len(mine.rows) == len(wanted.rows):
+                differences.append(
+                    f"«{table}» jadvalida qatorlar soni to'g'ri, lekin ayrim qiymatlar kutilganidan farq qiladi "
+                    "(ortiqcha bo'sh joy, harf yoki raqam xatosi bo'lishi mumkin)."
+                )
+            else:
+                differences.append(
+                    f"«{table}» jadvalidagi ma'lumotlar kutilganidan farq qiladi "
+                    f"(sizda {len(mine.rows)} qator, kutilgan {len(wanted.rows)} qator)."
+                )
     return differences
 
 

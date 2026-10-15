@@ -5,6 +5,7 @@ from datetime import datetime, time
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Prefetch
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -23,6 +24,7 @@ from .access import visible_labs
 from .advice import ai_grade, auto_grade, generate_advice
 from .checker import LabSetupError, check_code
 from .models import LabAttempt, LabGrade
+from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import LabSerializer, RunSerializer, StudentLabSerializer, grade_payload
 
@@ -181,6 +183,25 @@ class LabViewSet(viewsets.ModelViewSet):
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
         return Response(result)
+
+    @action(detail=False, methods=["get"], url_path="research-export")
+    def research_export(self, request):
+        """Ilmiy tadqiqot uchun anonim ma'lumotlar (ZIP: urinishlar.csv, xulosa.csv, README.txt).
+
+        Admin — barcha, o'qituvchi — o'z laboratoriyalari. ?lab=<id> bilan alohida laboratoriyalarni tanlash mumkin.
+        """
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        labs = visible_labs(request.user)
+        lab_ids = request.query_params.getlist("lab")
+        if lab_ids:
+            if not all(lab_id.isdigit() for lab_id in lab_ids):
+                raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+            labs = labs.filter(pk__in=lab_ids)
+        filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
+        response = HttpResponse(build_export(labs), content_type="application/zip")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
