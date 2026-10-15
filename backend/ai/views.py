@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 CHAT_HISTORY_LIMIT = 20
 
 
+AI_DISABLED_MESSAGE = "Guruhingizda AI yordamchisi o'chirilgan."
+
 def get_visible_analysis(user, submission_pk):
     submission = get_object_or_404(visible_submissions(user), pk=submission_pk)
     return get_object_or_404(AIAnalysis, submission=submission)
@@ -40,6 +42,8 @@ class SubmissionAnalysisView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, submission_pk):
+        if not request.user.ai_allowed:
+            raise PermissionDenied(AI_DISABLED_MESSAGE)
         analysis = get_visible_analysis(request.user, submission_pk)
         if request.user.is_student:
             serializer = StudentAnalysisSerializer(analysis)
@@ -75,6 +79,8 @@ class AssignmentChatView(APIView):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
             raise PermissionDenied("Chat-yordamchi faqat talaba uchun.")
+        if not request.user.ai_allowed:
+            raise PermissionDenied(AI_DISABLED_MESSAGE)
         self.assignment = get_object_or_404(visible_assignments(request.user), pk=kwargs["assignment_pk"])
 
     def own_messages(self):

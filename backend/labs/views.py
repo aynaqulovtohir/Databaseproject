@@ -54,9 +54,14 @@ def ai_grades_left(student):
     return settings.LAB_AI_GRADES_DAILY_LIMIT - used + 1
 
 
+def ai_usable(student):
+    """AI shu talabaga ishlatiladimi: sozlangan va guruhida o'chirilmagan."""
+    return is_configured() and student.ai_allowed
+
+
 def grade_attempt(attempt):
     """Topshirilgan urinishni baholaydi: AI ishlasa AI, aks holda avtomatik. Qaytaradi: (ball, izoh, manba)."""
-    if is_configured() and ai_grades_left(attempt.student) > 0:
+    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment = ai_grade(attempt)
             return score, comment, LabGrade.Source.AI
@@ -73,7 +78,7 @@ def grade_diagram_attempt(attempt, ratio):
     fixed = None if attempt.is_correct else build_fixed(attempt.diagram, attempt.lab.reference_diagram)
     changes = fixed["changes"] if fixed else []
     result = None
-    if is_configured() and ai_grades_left(attempt.student) > 0:
+    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment, explanation = ai_grade_diagram(attempt, ratio, changes)
             result = score, comment, LabGrade.Source.AI
@@ -172,6 +177,7 @@ class LabViewSet(viewsets.ModelViewSet):
             is_correct=result["is_correct"],
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
+            ai_enabled=student.ai_allowed,
         )
 
     @action(
@@ -194,7 +200,7 @@ class LabViewSet(viewsets.ModelViewSet):
             attempt = self.save_attempt(lab, request.user, payload, result)
             result["attempt_id"] = attempt.pk
             result["ai_available"] = (
-                not result["is_correct"] and is_configured() and ai_advice_left(request.user) > 0
+                not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
             )
         return Response(result)
 
@@ -236,7 +242,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
         result["attempt_id"] = attempt.pk
         result["ai_available"] = (
-            not result["is_correct"] and is_configured() and ai_advice_left(request.user) > 0
+            not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
         )
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
@@ -313,6 +319,8 @@ class LabAttemptAdviceView(APIView):
         attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
         if attempt.is_correct:
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
+        if not request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
         if attempt.ai_advice:
             return Response({"advice": attempt.ai_advice})
         if not is_configured():

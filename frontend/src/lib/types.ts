@@ -15,6 +15,8 @@ export interface Me {
   role: Role
   group: GroupShort | null
   teaching_groups: GroupShort[]
+  /** Talabaga AI yordamchisi ko'rsatiladimi (tajribada nazorat guruhida o'chiriladi) */
+  ai_enabled: boolean
 }
 
 export interface TelegramStatus {
@@ -56,6 +58,8 @@ export interface Group {
   id: number
   name: string
   teachers: number[]
+  /** Tajriba: false bo'lsa, guruh talabalariga AI yordamchisi ko'rsatilmaydi */
+  ai_enabled: boolean
   student_count: number
   created_at: string
 }

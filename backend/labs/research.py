@@ -29,6 +29,7 @@ QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_sta
 QUIZ_COLUMNS = [
     "talaba",
     "guruh",
+    "ai_yoqilgan",
     "test_id",
     "test",
     "test_turi",
@@ -123,6 +124,7 @@ DIFFERENCE_CATEGORIES = [
 ATTEMPT_COLUMNS = [
     "talaba",
     "guruh",
+    "ai_yoqilgan",
     "laboratoriya_id",
     "laboratoriya",
     "laboratoriya_turi",
@@ -141,6 +143,7 @@ ATTEMPT_COLUMNS = [
 SUMMARY_COLUMNS = [
     "talaba",
     "guruh",
+    "ai_yoqilgan",
     "laboratoriya_id",
     "laboratoriya",
     "laboratoriya_turi",
@@ -166,6 +169,8 @@ Virtual laboratoriya: tadqiqot ma'lumotlari
 Fayllar CSV formatida, ajratuvchi — nuqtali vergul (;), kodlash — UTF-8.
 Excel'da ikki marta bosib ochiladi. Python: pandas.read_csv("urinishlar.csv", sep=";")
 Vaqtlar: {timezone} vaqt mintaqasida. Ha/yo'q qiymatlari: 1 / 0.
+ai_yoqilgan: talabaning guruhida AI yordamchisi yoqilganmi (1 — tajriba guruhi, 0 — nazorat guruhi).
+urinishlar.csv da urinish paytidagi holat, qolgan fayllarda eksport paytidagi guruh sozlamasi.
 Eksport qilingan vaqt: {exported_at}
 
 Anonimlik
@@ -294,10 +299,15 @@ def _csv(columns, rows):
     return "﻿" + buffer.getvalue()
 
 
-def _summary_row(student_id, group, lab, attempts, grade):
+def _group_ai(student):
+    return _flag(student.group.ai_enabled) if student.group else ""
+
+
+def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
     row = {
         "talaba": pseudonym(student_id),
         "guruh": group,
+        "ai_yoqilgan": ai_enabled,
         "laboratoriya_id": lab.pk,
         "laboratoriya": lab.title,
         "laboratoriya_turi": lab.kind,
@@ -341,8 +351,10 @@ def _quiz_rows(quizzes):
             role=User.Role.STUDENT, is_active=True, group__in=quiz.groups.all()
         ).select_related("group")
         students = {student.pk: student.group.name for student in members}
+        ai_of = {student.pk: _group_ai(student) for student in members}
         for student_id, attempt in attempts.items():
             students.setdefault(student_id, attempt.student.group.name if attempt.student.group else "")
+            ai_of.setdefault(student_id, _group_ai(attempt.student))
         kind = QUIZ_KINDS.get(quiz.kind, quiz.kind)
         questions = list(quiz.questions.all())
         for student_id in sorted(students, key=pseudonym):
@@ -352,6 +364,7 @@ def _quiz_rows(quizzes):
                 [
                     pseudonym(student_id),
                     students[student_id],
+                    ai_of[student_id],
                     quiz.pk,
                     quiz.title,
                     kind,
@@ -393,10 +406,11 @@ def build_export(labs, quizzes=None):
         .order_by("created_at", "id")
     )
     by_pair = defaultdict(list)
-    groups_of = {}
+    groups_of, ai_of = {}, {}
     for attempt in attempts:
         by_pair[(attempt.lab_id, attempt.student_id)].append(attempt)
         groups_of[attempt.student_id] = attempt.student.group.name if attempt.student.group else ""
+        ai_of[attempt.student_id] = _group_ai(attempt.student)
     grades = {(grade.lab_id, grade.student_id): grade for grade in LabGrade.objects.filter(lab__in=labs)}
 
     attempt_rows = []
@@ -407,6 +421,8 @@ def build_export(labs, quizzes=None):
             role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all()
         ).select_related("group")
         students = {student.pk: student.group.name for student in members}
+        for student in members:
+            ai_of.setdefault(student.pk, _group_ai(student))
         for (lab_id, student_id) in by_pair:
             if lab_id == lab.pk:
                 students.setdefault(student_id, groups_of[student_id])
@@ -419,6 +435,7 @@ def build_export(labs, quizzes=None):
                     [
                         pseudonym(student_id),
                         group,
+                        _flag(attempt.ai_enabled),
                         lab.pk,
                         lab.title,
                         lab.kind,
@@ -435,7 +452,9 @@ def build_export(labs, quizzes=None):
                     ]
                 )
             summary_rows.append(
-                _summary_row(student_id, group, lab, student_attempts, grades.get((lab.pk, student_id)))
+                _summary_row(
+                    student_id, group, ai_of[student_id], lab, student_attempts, grades.get((lab.pk, student_id))
+                )
             )
 
     readme = README.format(
