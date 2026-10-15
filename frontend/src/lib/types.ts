@@ -145,6 +145,51 @@ export const GRADE_SOURCE_LABELS: Record<LabGrade['source'], string> = {
   auto: 'Avtomatik baho',
 }
 
+/** ER-diagramma: obyektlar (atributlari bilan) va bog'lanishlar. Kardinallik har bir uchida "1" yoki "N". */
+export type ErKey = 'pk' | 'fk' | ''
+export type ErCardinality = '1' | 'N'
+/** Tuzatilgan diagrammada: o'zgarmagan, qo'shilgan, olib tashlangan yoki o'zgartirilgan */
+export type ErStatus = 'ok' | 'added' | 'removed' | 'changed'
+
+export interface ErAttribute {
+  name: string
+  key: ErKey
+  status?: ErStatus
+}
+
+export interface ErEntity {
+  id: string
+  name: string
+  x: number
+  y: number
+  attributes: ErAttribute[]
+  status?: ErStatus
+}
+
+export interface ErRelationship {
+  id: string
+  name: string
+  source: string
+  target: string
+  source_card: ErCardinality
+  target_card: ErCardinality
+  status?: ErStatus
+}
+
+export interface ErDiagram {
+  entities: ErEntity[]
+  relationships: ErRelationship[]
+}
+
+/** Baholashga topshirilgan noto'g'ri diagrammaning tuzatilgan varianti */
+export interface ErFix {
+  diagram: ErDiagram & { changes: string[] }
+  /** AI tushuntirishi (AI ishlamasa bo'sh) */
+  explanation: string
+}
+
+export type LabKind = 'sql' | 'er'
+
 /** Talabaning laboratoriyadagi holati */
 export interface LabProgress {
   attempts: number
@@ -153,16 +198,22 @@ export interface LabProgress {
   grade?: LabGrade | null
   /** Faqat bitta laboratoriya ochilganda keladi */
   last_code?: string
+  /** ER laboratoriyasida: oxirgi chizilgan diagramma va oxirgi topshirishning tuzatilgan varianti */
+  last_diagram?: ErDiagram | null
+  last_fix?: ErFix | null
 }
 
 export interface Lab {
   id: number
+  kind: LabKind
   title: string
   description: string
   /** Har bir ishga tushirishdan oldin bajariladigan tayyor jadvallar */
   setup_sql: string
   /** Talabaga yuborilmaydi */
   solution_sql?: string
+  /** ER laboratoriyasining namunaviy diagrammasi. Talabaga yuborilmaydi */
+  reference_diagram?: ErDiagram | null
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
@@ -203,6 +254,8 @@ export interface LabRunResult {
   /** Faqat baholashga topshirilganda: shu topshirishning bahosi va eng yuqori baho */
   grade?: LabGrade
   best_grade?: LabGrade
+  /** ER laboratoriyasi, baholashga topshirilganda: noto'g'ri bo'lsa tuzatilgan diagramma, aks holda null */
+  fix?: ErFix | null
 }
 
 /** O'qituvchi ko'radigan talaba holati */
@@ -212,6 +265,7 @@ export interface LabStudentProgress extends PersonShort {
   solved: boolean
   last_attempt_at: string | null
   code: string
+  diagram: ErDiagram | null
   grade: LabGrade | null
 }
 

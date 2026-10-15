@@ -6,12 +6,19 @@ MAX_SQL_LENGTH = 50_000
 
 
 class Lab(models.Model):
+    class Kind(models.TextChoices):
+        SQL = "sql", "SQL kod"
+        ER = "er", "ER-diagramma"
+
+    kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.SQL)
     title = models.CharField("sarlavha", max_length=200)
     description = models.TextField("laboratoriya sharti")
     # Har bir ishga tushirishdan oldin bajariladi: tayyor jadvallar va ma'lumotlar
     setup_sql = models.TextField("boshlang'ich jadvallar (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # Talabaga ko'rinmaydi; talaba natijasi shu yechim natijasi bilan solishtiriladi
     solution_sql = models.TextField("namunaviy yechim (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
+    # ER-diagramma laboratoriyasi uchun namunaviy diagramma (labs/er.py dagi format); talabaga ko'rinmaydi
+    reference_diagram = models.JSONField("namunaviy ER-diagramma", null=True, blank=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="muallif",
@@ -40,7 +47,12 @@ class LabAttempt(models.Model):
         on_delete=models.CASCADE,
         related_name="lab_attempts",
     )
-    sql_code = models.TextField("SQL kod", max_length=MAX_SQL_LENGTH)
+    sql_code = models.TextField("SQL kod", max_length=MAX_SQL_LENGTH, blank=True)
+    # ER-diagramma laboratoriyasida: talaba chizgan diagramma
+    diagram = models.JSONField("ER-diagramma", null=True, blank=True)
+    # Baholashga topshirilgan noto'g'ri diagramma uchun: tuzatilgan diagramma va AI tushuntirishi
+    fixed_diagram = models.JSONField("tuzatilgan diagramma", null=True, blank=True)
+    fix_explanation = models.TextField("tuzatish tushuntirishi", blank=True)
     is_correct = models.BooleanField("to'g'ri")
     # Baza xatosi va namunadan farqlar (AI maslahati uchun saqlanadi)
     feedback = models.JSONField("tekshiruv natijasi", default=dict)

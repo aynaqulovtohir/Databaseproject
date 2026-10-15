@@ -1,10 +1,11 @@
-"""Loyihalash bo'yicha tayyor laboratoriyalarni bazaga qo'shadi (design_labs.py).
+"""Loyihalash bo'yicha tayyor laboratoriyalarni (ER-model va SQL) bazaga qo'shadi (design_labs.py).
 
 Ishga tushirish:
     python manage.py seed_design_labs --author <o'qituvchi logini> --group <guruh nomi> [--group ...] [--update]
 
 Qayta ishga tushirilsa, bor laboratoriyalar takrorlanmaydi; --update berilsa, ularning
-sharti va SQL kodi yangilanadi. Har bir laboratoriya saqlashdan oldin qum qutida tekshiriladi.
+sharti va yechimi yangilanadi. SQL laboratoriyalari saqlashdan oldin qum qutida, ER laboratoriyalari
+diagramma qoidalari bo'yicha tekshiriladi.
 """
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -12,7 +13,8 @@ from django.db import transaction
 from users.models import StudentGroup, User
 
 from ...checker import LabSetupError, validate_lab_sql
-from ...design_labs import DESIGN_LABS
+from ...design_labs import ALL_LABS
+from ...er import DiagramError, validate_diagram
 from ...models import Lab
 
 
@@ -37,16 +39,21 @@ class Command(BaseCommand):
         if missing:
             raise CommandError(f"Bunday guruh yo'q: {', '.join(sorted(missing))}")
 
-        for lab_data in DESIGN_LABS:
+        for lab_data in ALL_LABS:
             try:
-                validate_lab_sql(lab_data["setup_sql"], lab_data["solution_sql"])
+                if lab_data.get("kind") == Lab.Kind.ER:
+                    validate_diagram(lab_data["reference_diagram"])
+                else:
+                    validate_lab_sql(lab_data["setup_sql"], lab_data["solution_sql"])
             except LabSetupError as exc:
                 raise CommandError(f"«{lab_data['title']}» ({exc.field}) xato: {exc}")
+            except DiagramError as exc:
+                raise CommandError(f"«{lab_data['title']}» diagrammasida xato: {exc}")
 
         created = updated = 0
         with transaction.atomic():
             # Ro'yxat eng yangisidan boshlab ko'rsatiladi: 1-laboratoriya yuqorida turishi uchun oxirida qo'shiladi
-            for lab_data in reversed(DESIGN_LABS):
+            for lab_data in reversed(ALL_LABS):
                 lab = Lab.objects.filter(title=lab_data["title"], author=author).first()
                 if lab is None:
                     lab = Lab.objects.create(author=author, **lab_data)
@@ -58,5 +65,5 @@ class Command(BaseCommand):
                     updated += 1
                 lab.groups.add(*groups)
 
-        skipped = len(DESIGN_LABS) - created - updated
+        skipped = len(ALL_LABS) - created - updated
         self.stdout.write(self.style.SUCCESS(f"Qo'shildi: {created}, yangilandi: {updated}, o'zgarishsiz: {skipped}."))

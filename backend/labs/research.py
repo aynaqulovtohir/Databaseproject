@@ -56,6 +56,18 @@ ERROR_CATEGORIES = {
 
 # Namunadan farq matni -> toifa. Birinchi mos kelgani olinadi, shuning uchun aniqrog'i oldinda turadi.
 DIFFERENCE_CATEGORIES = [
+    # ER-diagramma laboratoriyasi
+    ("obyekt yetishmaydi", "er_obyekt_yetishmaydi"),
+    ("Ortiqcha obyekt", "er_ortiqcha_obyekt"),
+    ("atribut yetishmaydi", "er_atribut_yetishmaydi"),
+    ("ortiqcha atribut", "er_ortiqcha_atribut"),
+    ("asosiy kalit (PK)", "er_asosiy_kalit"),
+    ("oraliq obyekti orqali", "er_mn_oraliq_obyekt"),
+    ("kardinalligi noto'g'ri", "er_kardinallik"),
+    ("orasida bog'lanish yetishmaydi", "er_boglanish_yetishmaydi"),
+    ("ortiqcha bog'lanish", "er_ortiqcha_boglanish"),
+    ("Diagramma bo'sh", "er_bosh_diagramma"),
+    # SQL laboratoriyasi
     ("PRIMARY KEY cheklovi", "pk_yetishmaydi"),
     ("FOREIGN KEY cheklovi", "fk_yetishmaydi"),
     ("UNIQUE cheklovi", "unique_yetishmaydi"),
@@ -82,6 +94,7 @@ ATTEMPT_COLUMNS = [
     "guruh",
     "laboratoriya_id",
     "laboratoriya",
+    "laboratoriya_turi",
     "urinish_raqami",
     "vaqt",
     "birinchi_urinishdan_daqiqa",
@@ -99,6 +112,7 @@ SUMMARY_COLUMNS = [
     "guruh",
     "laboratoriya_id",
     "laboratoriya",
+    "laboratoriya_turi",
     "urinishlar",
     "yechildi",
     "togri_gacha_urinishlar",
@@ -136,6 +150,7 @@ urinishlar.csv — har bir ishga tushirish
 talaba                      talaba taxallusi
 guruh                       talabaning hozirgi guruhi
 laboratoriya_id, laboratoriya
+laboratoriya_turi           sql (SQL kod yozish) yoki er (ER-diagramma chizish)
 urinish_raqami              shu talabaning shu laboratoriyadagi nechanchi urinishi (1 dan)
 vaqt                        urinish vaqti
 birinchi_urinishdan_daqiqa  shu laboratoriyadagi birinchi urinishdan beri o'tgan vaqt
@@ -145,7 +160,7 @@ natija                      togri | baza_xatosi (kod xato berdi) | natija_farqli
 togri                       1 / 0
 xato_turlari                xato toifalari, vergul bilan (pastdagi ro'yxatga qarang)
 ai_maslahat                 talaba shu urinish uchun AI maslahatini olganmi: 1 / 0
-kod_qatorlari, kod_belgilari  yozilgan kod hajmi
+kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
 
 xulosa.csv — har bir talaba va laboratoriya
 --------------------------------------------
@@ -236,6 +251,7 @@ def _summary_row(student_id, group, lab, attempts, grade):
         "guruh": group,
         "laboratoriya_id": lab.pk,
         "laboratoriya": lab.title,
+        "laboratoriya_turi": lab.kind,
         "urinishlar": len(attempts),
         "yechildi": 0,
         "togri_gacha_urinishlar": "",
@@ -298,6 +314,7 @@ def build_export(labs):
                         group,
                         lab.pk,
                         lab.title,
+                        lab.kind,
                         number,
                         _local(attempt.created_at),
                         _minutes(student_attempts[0].created_at, attempt.created_at),

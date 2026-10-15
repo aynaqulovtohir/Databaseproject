@@ -4,6 +4,7 @@ from learning.serializers import AuthorSerializer, GroupsValidationMixin
 from users.models import StudentGroup
 
 from .checker import LabSetupError, format_error, validate_lab_sql
+from .er import DiagramError, validate_diagram
 from .models import MAX_SQL_LENGTH, Lab
 from .sandbox import SandboxUnavailable
 
@@ -32,10 +33,47 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ["id", "title", "description", "setup_sql", "solution_sql", "author", "groups", "created_at"]
+        fields = [
+            "id",
+            "kind",
+            "title",
+            "description",
+            "setup_sql",
+            "solution_sql",
+            "reference_diagram",
+            "author",
+            "groups",
+            "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
 
     def validate(self, attrs):
+        current = self.instance
+        kind = attrs.get("kind", current.kind if current else Lab.Kind.SQL)
+        if current and kind != current.kind:
+            raise serializers.ValidationError({"kind": "Laboratoriya turini o'zgartirib bo'lmaydi."})
+        if kind == Lab.Kind.ER:
+            return self.validate_er(attrs)
+        attrs["reference_diagram"] = None
+        return self.validate_sql(attrs)
+
+    def validate_er(self, attrs):
+        current = self.instance
+        diagram = attrs.get("reference_diagram", current.reference_diagram if current else None)
+        if diagram is None:
+            raise serializers.ValidationError({"reference_diagram": "Namunaviy ER-diagrammani chizing."})
+        try:
+            diagram = validate_diagram(diagram)
+        except DiagramError as exc:
+            raise serializers.ValidationError({"reference_diagram": str(exc)})
+        if not diagram["entities"]:
+            raise serializers.ValidationError({"reference_diagram": "Namunaviy diagrammada kamida bitta obyekt bo'lsin."})
+        attrs["reference_diagram"] = diagram
+        # ER laboratoriyasida SQL ishlatilmaydi
+        attrs["setup_sql"] = attrs["solution_sql"] = ""
+        return attrs
+
+    def validate_sql(self, attrs):
         # SQL o'zgargan bo'lsa, u haqiqatan ishlashi tekshiriladi: xato laboratoriya talabaga yetib bormasin
         current = self.instance
         setup_sql = attrs.get("setup_sql", current.setup_sql if current else "")
@@ -70,7 +108,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ["id", "title", "description", "setup_sql", "author", "created_at", "my_progress"]
+        fields = ["id", "kind", "title", "description", "setup_sql", "author", "created_at", "my_progress"]
         read_only_fields = fields
 
     def get_my_progress(self, lab):
@@ -85,7 +123,28 @@ class StudentLabSerializer(serializers.ModelSerializer):
         if self.context.get("include_last_code"):
             # Talaba sahifani qayta ochganda oxirgi yozgan kodi tiklanadi
             progress["last_code"] = attempts[0].sql_code if attempts else ""
+            if lab.kind == Lab.Kind.ER:
+                progress["last_diagram"] = attempts[0].diagram if attempts else None
+                # Oxirgi topshirilgan noto'g'ri diagrammaning tuzatilgan varianti
+                submitted = next((attempt for attempt in attempts if attempt.is_submission), None)
+                progress["last_fix"] = fix_payload(submitted) if submitted else None
         return progress
+
+
+def fix_payload(attempt):
+    if not attempt.fixed_diagram:
+        return None
+    return {"diagram": attempt.fixed_diagram, "explanation": attempt.fix_explanation}
+
+
+class DiagramRunSerializer(serializers.Serializer):
+    diagram = serializers.JSONField(error_messages={"required": "Diagramma yuborilmadi."})
+
+    def validate_diagram(self, value):
+        try:
+            return validate_diagram(value)
+        except DiagramError as exc:
+            raise serializers.ValidationError(str(exc))
 
 
 class RunSerializer(serializers.Serializer):

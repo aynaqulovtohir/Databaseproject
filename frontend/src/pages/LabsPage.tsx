@@ -103,7 +103,14 @@ export function LabsPage() {
               className="block rounded-xl border bg-card p-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <h2 className="min-w-0 font-medium">{lab.title}</h2>
+                <h2 className="min-w-0 font-medium">
+                  {lab.title}
+                  {lab.kind === 'er' ? (
+                    <Badge variant="outline" className="ml-2 align-middle">
+                      ER-diagramma
+                    </Badge>
+                  ) : null}
+                </h2>
                 {lab.my_progress ? <LabProgressBadge progress={lab.my_progress} /> : null}
               </div>
               <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{lab.description}</p>
