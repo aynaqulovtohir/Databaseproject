@@ -30,7 +30,8 @@ function StatTile({ label, value, hint }: { label: string; value: string; hint?:
 
 /** Gorizontal ustun: uzunligi qiymatga mutanosib, qiymat yonida yoziladi (rangga tayanmaydi) */
 function HorizontalBar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
-  const width = max ? Math.max(2, (value / max) * 100) : 0
+  // Nol qiymat chizilmaydi (aks holda kichik ustun "bor" bo'lib ko'rinadi); kichik musbat qiymat ko'rinadigan qilinadi
+  const width = max && value > 0 ? Math.max(2, (value / max) * 100) : 0
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2" title={label}>
       <div className="h-3.5 min-w-0 flex-1">
