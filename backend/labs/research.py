@@ -1,7 +1,8 @@
 """Ilmiy tadqiqot uchun laboratoriya ma'lumotlarini anonim eksport qilish.
 
 Natija — ZIP arxiv: urinishlar.csv (har bir ishga tushirish), xulosa.csv (har bir
-talaba va laboratoriya bo'yicha) va ustunlar tavsifi (README.txt).
+talaba va laboratoriya bo'yicha), testlar.csv va test_javoblari.csv (kirish/chiqish
+testlari) hamda ustunlar tavsifi (README.txt).
 
 Anonimlik: talabaning ismi, logini va SQL kodi eksportga kirmaydi. Talaba o'rniga
 doimiy taxallus (masalan, T-1A2B3C4D) yoziladi: u SECRET_KEY dan hosil qilinadi,
@@ -21,6 +22,36 @@ from users.models import User
 
 from .checker import ERROR_TIPS
 from .models import LabAttempt, LabGrade
+
+QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy"}
+QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_started": "boshlamagan"}
+
+QUIZ_COLUMNS = [
+    "talaba",
+    "guruh",
+    "test_id",
+    "test",
+    "test_turi",
+    "holat",
+    "ball",
+    "maksimal_ball",
+    "foiz",
+    "boshlangan",
+    "topshirilgan",
+    "davomiylik_daqiqa",
+]
+
+ANSWER_COLUMNS = [
+    "talaba",
+    "guruh",
+    "test_id",
+    "test_turi",
+    "savol_raqami",
+    "savol_turi",
+    "ball",
+    "maksimal_ball",
+    "togri",
+]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
 DELIMITER = ";"
@@ -179,6 +210,24 @@ eng_yuqori_baho             0-100 (topshirmagan bo'lsa bo'sh)
 baho_manbasi                ai (sun'iy intellekt) yoki auto (avtomatik tekshiruv)
 birinchi_urinish, oxirgi_urinish
 
+testlar.csv — har bir talaba va test (kirish/chiqish testlari)
+-------------------------------------------------------------
+Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
+test_id, test
+test_turi                   kirish | chiqish | oddiy
+holat                       topshirgan | boshlagan | boshlamagan
+ball, maksimal_ball, foiz   topshirmagan bo'lsa bo'sh
+boshlangan, topshirilgan
+davomiylik_daqiqa           boshlangandan topshirilgangacha
+
+test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar tahlili uchun)
+------------------------------------------------------------------------------------------
+test_id, test_turi
+savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
+savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob)
+ball, maksimal_ball         savol bo'yicha
+togri                       to'liq ball olganmi: 1 / 0
+
 Xato toifalari
 --------------
 Baza xatolari (kod ishlamadi):
@@ -277,8 +326,66 @@ def _summary_row(student_id, group, lab, attempts, grade):
     return [row[column] for column in SUMMARY_COLUMNS]
 
 
-def build_export(labs):
-    """Berilgan laboratoriyalar bo'yicha ZIP arxiv (bytes) qaytaradi."""
+def _quiz_rows(quizzes):
+    """testlar.csv va test_javoblari.csv qatorlari."""
+    from quizzes.models import QuizAttempt
+    from quizzes.services import attempt_status, finalize_if_expired, percent
+
+    quiz_rows, answer_rows = [], []
+    for quiz in sorted(quizzes.prefetch_related("groups", "questions"), key=lambda item: item.pk):
+        attempts = {
+            attempt.student_id: finalize_if_expired(attempt)
+            for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
+        }
+        members = User.objects.filter(
+            role=User.Role.STUDENT, is_active=True, group__in=quiz.groups.all()
+        ).select_related("group")
+        students = {student.pk: student.group.name for student in members}
+        for student_id, attempt in attempts.items():
+            students.setdefault(student_id, attempt.student.group.name if attempt.student.group else "")
+        kind = QUIZ_KINDS.get(quiz.kind, quiz.kind)
+        questions = list(quiz.questions.all())
+        for student_id in sorted(students, key=pseudonym):
+            attempt = attempts.get(student_id)
+            submitted = bool(attempt and attempt.submitted_at)
+            quiz_rows.append(
+                [
+                    pseudonym(student_id),
+                    students[student_id],
+                    quiz.pk,
+                    quiz.title,
+                    kind,
+                    QUIZ_STATUSES[attempt_status(attempt)],
+                    attempt.score if submitted else "",
+                    attempt.max_score if submitted else "",
+                    percent(attempt) if submitted else "",
+                    _local(attempt.started_at) if attempt else "",
+                    _local(attempt.submitted_at) if submitted else "",
+                    _minutes(attempt.started_at, attempt.submitted_at) if submitted else "",
+                ]
+            )
+            if not submitted:
+                continue
+            for question in questions:
+                earned = attempt.results.get(str(question.pk), 0)
+                answer_rows.append(
+                    [
+                        pseudonym(student_id),
+                        students[student_id],
+                        quiz.pk,
+                        kind,
+                        question.order,
+                        "bitta" if question.kind == "single" else "kop",
+                        earned,
+                        question.points,
+                        _flag(earned >= question.points),
+                    ]
+                )
+    return quiz_rows, answer_rows
+
+
+def build_export(labs, quizzes=None):
+    """Berilgan laboratoriyalar va testlar bo'yicha ZIP arxiv (bytes) qaytaradi."""
     labs = list(labs.prefetch_related("groups"))
     attempts = (
         LabAttempt.objects.filter(lab__in=labs)
@@ -343,5 +450,9 @@ def build_export(labs):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
+        if quizzes is not None:
+            quiz_rows, answer_rows = _quiz_rows(quizzes)
+            zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))
+            zip_file.writestr("test_javoblari.csv", _csv(ANSWER_COLUMNS, answer_rows))
         zip_file.writestr("README.txt", readme)
     return archive.getvalue()

@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, FlaskConical, Home, UserRound, Users, UsersRound, type LucideIcon } from 'lucide-react'
+import { BookOpen, ClipboardCheck, ClipboardList, FlaskConical, Home, UserRound, Users, UsersRound, type LucideIcon } from 'lucide-react'
 
 import type { Role } from '@/lib/types'
 
@@ -15,6 +15,7 @@ const LEARNING_ITEMS: NavItem[] = [
   { to: '/materials', label: 'Materiallar', icon: BookOpen },
   { to: '/assignments', label: 'Topshiriqlar', icon: ClipboardList },
   { to: '/labs', label: 'Virtual laboratoriya', icon: FlaskConical },
+  { to: '/quizzes', label: 'Testlar', icon: ClipboardCheck },
 ]
 const COMMON_ITEMS: NavItem[] = [{ to: '/profile', label: 'Profil', icon: UserRound }]
 

@@ -311,3 +311,100 @@ export interface ChatReply {
 }
 
 export const MAX_SCORE = 100
+
+// ---------- Testlar ----------
+
+export type QuizKind = 'pre' | 'post' | 'practice'
+
+export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
+  pre: 'Kirish testi',
+  post: 'Chiqish testi',
+  practice: 'Oddiy test',
+}
+
+export type QuestionKind = 'single' | 'multiple'
+
+export interface QuizChoice {
+  id?: number
+  text: string
+  is_correct: boolean
+}
+
+export interface QuizQuestion {
+  id?: number
+  text: string
+  kind: QuestionKind
+  points: number
+  choices: QuizChoice[]
+}
+
+export type QuizAttemptStatus = 'not_started' | 'in_progress' | 'submitted'
+
+export interface MyQuizAttempt {
+  status: QuizAttemptStatus
+  score?: number
+  max_score?: number
+  percent?: number
+  submitted_at?: string
+  /** Faqat boshlangan testda: javoblar qabul qilinadigan oxirgi vaqt */
+  deadline?: string | null
+}
+
+export interface Quiz {
+  id: number
+  kind: QuizKind
+  title: string
+  description: string
+  opens_at: string | null
+  closes_at: string | null
+  time_limit_minutes: number | null
+  author: PersonShort
+  created_at: string
+  question_count: number
+  /** Faqat admin va o'qituvchiga */
+  show_answers?: boolean
+  groups?: number[]
+  questions?: QuizQuestion[]
+  attempt_count?: number
+  /** Faqat talabaga */
+  is_open?: boolean
+  my_attempt?: MyQuizAttempt
+}
+
+/** Talaba testni yechayotganda: to'g'ri javoblarsiz savollar */
+export interface QuizTaking {
+  questions: { id: number; text: string; kind: QuestionKind; points: number; choices: { id: number; text: string }[] }[]
+  /** {"savol_id": [variant id'lari]} */
+  answers: Record<string, number[]>
+  started_at: string
+  deadline: string | null
+  server_now: string
+}
+
+export interface QuizResult {
+  score: number
+  max_score: number
+  percent: number
+  submitted_at: string
+  /** O'qituvchi to'g'ri javoblarni ko'rsatishga ruxsat bergan bo'lsa */
+  questions:
+    | {
+        id: number
+        text: string
+        kind: QuestionKind
+        points: number
+        earned: number
+        choices: { id: number; text: string; is_correct: boolean; selected: boolean }[]
+      }[]
+    | null
+}
+
+export interface QuizStudentResult extends PersonShort {
+  group: string
+  status: QuizAttemptStatus
+  score: number | null
+  max_score: number | null
+  percent: number | null
+  started_at: string | null
+  submitted_at: string | null
+}

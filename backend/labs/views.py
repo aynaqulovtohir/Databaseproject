@@ -244,7 +244,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="research-export")
     def research_export(self, request):
-        """Ilmiy tadqiqot uchun anonim ma'lumotlar (ZIP: urinishlar.csv, xulosa.csv, README.txt).
+        """Ilmiy tadqiqot uchun anonim ma'lumotlar (ZIP: laboratoriyalar va testlar natijalari, README.txt).
 
         Admin — barcha, o'qituvchi — o'z laboratoriyalari. ?lab=<id> bilan alohida laboratoriyalarni tanlash mumkin.
         """
@@ -256,8 +256,10 @@ class LabViewSet(viewsets.ModelViewSet):
             if not all(lab_id.isdigit() for lab_id in lab_ids):
                 raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
             labs = labs.filter(pk__in=lab_ids)
+        from quizzes.views import visible_quizzes
+
         filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
-        response = HttpResponse(build_export(labs), content_type="application/zip")
+        response = HttpResponse(build_export(labs, visible_quizzes(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 

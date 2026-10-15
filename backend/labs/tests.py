@@ -637,7 +637,9 @@ class ResearchExportTests(BaseTestCase):
     def test_export_is_anonymous(self):
         response, (files, tables) = self.export(self.admin)
         self.assertIn("attachment;", response["Content-Disposition"])
-        self.assertEqual(set(files), {"urinishlar.csv", "xulosa.csv", "README.txt"})
+        self.assertEqual(
+            set(files), {"urinishlar.csv", "xulosa.csv", "testlar.csv", "test_javoblari.csv", "README.txt"}
+        )
         everything = "".join(files.values())
         for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):
             self.assertNotIn(secret, everything)

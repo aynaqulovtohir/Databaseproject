@@ -12,6 +12,8 @@ import { HomePage } from '@/pages/HomePage'
 import { LabDetailPage } from '@/pages/LabDetailPage'
 import { LabsPage } from '@/pages/LabsPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { QuizDetailPage } from '@/pages/QuizDetailPage'
+import { QuizzesPage } from '@/pages/QuizzesPage'
 import { MaterialsPage } from '@/pages/MaterialsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ProfilePage } from '@/pages/ProfilePage'
@@ -60,6 +62,8 @@ export const router = createBrowserRouter([
       { path: '/assignments/:id', element: <AssignmentDetailPage /> },
       { path: '/labs', element: <LabsPage /> },
       { path: '/labs/:id', element: <LabDetailPage /> },
+      { path: '/quizzes', element: <QuizzesPage /> },
+      { path: '/quizzes/:id', element: <QuizDetailPage /> },
       {
         element: <RequireRole roles={['admin']} />,
         children: [

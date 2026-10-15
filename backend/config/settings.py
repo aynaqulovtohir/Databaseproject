@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "grading",
     "notifications",
     "labs",
+    "quizzes",
 ]
 
 MIDDLEWARE = [
@@ -120,6 +121,8 @@ REST_FRAMEWORK = {
         "lab_run": "30/min",
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
+        # Testda javoblarni oraliq saqlash
+        "quiz_save": "120/min",
     },
 }
 
