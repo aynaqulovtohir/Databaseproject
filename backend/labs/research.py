@@ -1,7 +1,8 @@
 """Ilmiy tadqiqot uchun laboratoriya ma'lumotlarini anonim eksport qilish.
 
 Natija — ZIP arxiv: urinishlar.csv (har bir ishga tushirish), xulosa.csv (har bir
-talaba va laboratoriya bo'yicha) va ustunlar tavsifi (README.txt).
+talaba va laboratoriya bo'yicha), testlar.csv va test_javoblari.csv (kirish/chiqish
+testlari) hamda ustunlar tavsifi (README.txt).
 
 Anonimlik: talabaning ismi, logini va SQL kodi eksportga kirmaydi. Talaba o'rniga
 doimiy taxallus (masalan, T-1A2B3C4D) yoziladi: u SECRET_KEY dan hosil qilinadi,
@@ -21,6 +22,37 @@ from users.models import User
 
 from .checker import ERROR_TIPS
 from .models import LabAttempt, LabGrade
+
+QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy"}
+QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_started": "boshlamagan"}
+
+QUIZ_COLUMNS = [
+    "talaba",
+    "guruh",
+    "ai_yoqilgan",
+    "test_id",
+    "test",
+    "test_turi",
+    "holat",
+    "ball",
+    "maksimal_ball",
+    "foiz",
+    "boshlangan",
+    "topshirilgan",
+    "davomiylik_daqiqa",
+]
+
+ANSWER_COLUMNS = [
+    "talaba",
+    "guruh",
+    "test_id",
+    "test_turi",
+    "savol_raqami",
+    "savol_turi",
+    "ball",
+    "maksimal_ball",
+    "togri",
+]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
 DELIMITER = ";"
@@ -92,6 +124,7 @@ DIFFERENCE_CATEGORIES = [
 ATTEMPT_COLUMNS = [
     "talaba",
     "guruh",
+    "ai_yoqilgan",
     "laboratoriya_id",
     "laboratoriya",
     "laboratoriya_turi",
@@ -110,6 +143,7 @@ ATTEMPT_COLUMNS = [
 SUMMARY_COLUMNS = [
     "talaba",
     "guruh",
+    "ai_yoqilgan",
     "laboratoriya_id",
     "laboratoriya",
     "laboratoriya_turi",
@@ -135,6 +169,8 @@ Virtual laboratoriya: tadqiqot ma'lumotlari
 Fayllar CSV formatida, ajratuvchi — nuqtali vergul (;), kodlash — UTF-8.
 Excel'da ikki marta bosib ochiladi. Python: pandas.read_csv("urinishlar.csv", sep=";")
 Vaqtlar: {timezone} vaqt mintaqasida. Ha/yo'q qiymatlari: 1 / 0.
+ai_yoqilgan: talabaning guruhida AI yordamchisi yoqilganmi (1 — tajriba guruhi, 0 — nazorat guruhi).
+urinishlar.csv da urinish paytidagi holat, qolgan fayllarda eksport paytidagi guruh sozlamasi.
 Eksport qilingan vaqt: {exported_at}
 
 Anonimlik
@@ -178,6 +214,24 @@ topshirishlar               baholashga topshirishlar soni
 eng_yuqori_baho             0-100 (topshirmagan bo'lsa bo'sh)
 baho_manbasi                ai (sun'iy intellekt) yoki auto (avtomatik tekshiruv)
 birinchi_urinish, oxirgi_urinish
+
+testlar.csv — har bir talaba va test (kirish/chiqish testlari)
+-------------------------------------------------------------
+Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
+test_id, test
+test_turi                   kirish | chiqish | oddiy
+holat                       topshirgan | boshlagan | boshlamagan
+ball, maksimal_ball, foiz   topshirmagan bo'lsa bo'sh
+boshlangan, topshirilgan
+davomiylik_daqiqa           boshlangandan topshirilgangacha
+
+test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar tahlili uchun)
+------------------------------------------------------------------------------------------
+test_id, test_turi
+savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
+savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob)
+ball, maksimal_ball         savol bo'yicha
+togri                       to'liq ball olganmi: 1 / 0
 
 Xato toifalari
 --------------
@@ -245,10 +299,15 @@ def _csv(columns, rows):
     return "﻿" + buffer.getvalue()
 
 
-def _summary_row(student_id, group, lab, attempts, grade):
+def _group_ai(student):
+    return _flag(student.group.ai_enabled) if student.group else ""
+
+
+def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
     row = {
         "talaba": pseudonym(student_id),
         "guruh": group,
+        "ai_yoqilgan": ai_enabled,
         "laboratoriya_id": lab.pk,
         "laboratoriya": lab.title,
         "laboratoriya_turi": lab.kind,
@@ -277,8 +336,69 @@ def _summary_row(student_id, group, lab, attempts, grade):
     return [row[column] for column in SUMMARY_COLUMNS]
 
 
-def build_export(labs):
-    """Berilgan laboratoriyalar bo'yicha ZIP arxiv (bytes) qaytaradi."""
+def _quiz_rows(quizzes):
+    """testlar.csv va test_javoblari.csv qatorlari."""
+    from quizzes.models import QuizAttempt
+    from quizzes.services import attempt_status, finalize_if_expired, percent
+
+    quiz_rows, answer_rows = [], []
+    for quiz in sorted(quizzes.prefetch_related("groups", "questions"), key=lambda item: item.pk):
+        attempts = {
+            attempt.student_id: finalize_if_expired(attempt)
+            for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
+        }
+        members = User.objects.filter(
+            role=User.Role.STUDENT, is_active=True, group__in=quiz.groups.all()
+        ).select_related("group")
+        students = {student.pk: student.group.name for student in members}
+        ai_of = {student.pk: _group_ai(student) for student in members}
+        for student_id, attempt in attempts.items():
+            students.setdefault(student_id, attempt.student.group.name if attempt.student.group else "")
+            ai_of.setdefault(student_id, _group_ai(attempt.student))
+        kind = QUIZ_KINDS.get(quiz.kind, quiz.kind)
+        questions = list(quiz.questions.all())
+        for student_id in sorted(students, key=pseudonym):
+            attempt = attempts.get(student_id)
+            submitted = bool(attempt and attempt.submitted_at)
+            quiz_rows.append(
+                [
+                    pseudonym(student_id),
+                    students[student_id],
+                    ai_of[student_id],
+                    quiz.pk,
+                    quiz.title,
+                    kind,
+                    QUIZ_STATUSES[attempt_status(attempt)],
+                    attempt.score if submitted else "",
+                    attempt.max_score if submitted else "",
+                    percent(attempt) if submitted else "",
+                    _local(attempt.started_at) if attempt else "",
+                    _local(attempt.submitted_at) if submitted else "",
+                    _minutes(attempt.started_at, attempt.submitted_at) if submitted else "",
+                ]
+            )
+            if not submitted:
+                continue
+            for question in questions:
+                earned = attempt.results.get(str(question.pk), 0)
+                answer_rows.append(
+                    [
+                        pseudonym(student_id),
+                        students[student_id],
+                        quiz.pk,
+                        kind,
+                        question.order,
+                        "bitta" if question.kind == "single" else "kop",
+                        earned,
+                        question.points,
+                        _flag(earned >= question.points),
+                    ]
+                )
+    return quiz_rows, answer_rows
+
+
+def build_export(labs, quizzes=None):
+    """Berilgan laboratoriyalar va testlar bo'yicha ZIP arxiv (bytes) qaytaradi."""
     labs = list(labs.prefetch_related("groups"))
     attempts = (
         LabAttempt.objects.filter(lab__in=labs)
@@ -286,10 +406,11 @@ def build_export(labs):
         .order_by("created_at", "id")
     )
     by_pair = defaultdict(list)
-    groups_of = {}
+    groups_of, ai_of = {}, {}
     for attempt in attempts:
         by_pair[(attempt.lab_id, attempt.student_id)].append(attempt)
         groups_of[attempt.student_id] = attempt.student.group.name if attempt.student.group else ""
+        ai_of[attempt.student_id] = _group_ai(attempt.student)
     grades = {(grade.lab_id, grade.student_id): grade for grade in LabGrade.objects.filter(lab__in=labs)}
 
     attempt_rows = []
@@ -300,6 +421,8 @@ def build_export(labs):
             role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all()
         ).select_related("group")
         students = {student.pk: student.group.name for student in members}
+        for student in members:
+            ai_of.setdefault(student.pk, _group_ai(student))
         for (lab_id, student_id) in by_pair:
             if lab_id == lab.pk:
                 students.setdefault(student_id, groups_of[student_id])
@@ -312,6 +435,7 @@ def build_export(labs):
                     [
                         pseudonym(student_id),
                         group,
+                        _flag(attempt.ai_enabled),
                         lab.pk,
                         lab.title,
                         lab.kind,
@@ -328,7 +452,9 @@ def build_export(labs):
                     ]
                 )
             summary_rows.append(
-                _summary_row(student_id, group, lab, student_attempts, grades.get((lab.pk, student_id)))
+                _summary_row(
+                    student_id, group, ai_of[student_id], lab, student_attempts, grades.get((lab.pk, student_id))
+                )
             )
 
     readme = README.format(
@@ -343,5 +469,9 @@ def build_export(labs):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
+        if quizzes is not None:
+            quiz_rows, answer_rows = _quiz_rows(quizzes)
+            zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))
+            zip_file.writestr("test_javoblari.csv", _csv(ANSWER_COLUMNS, answer_rows))
         zip_file.writestr("README.txt", readme)
     return archive.getvalue()

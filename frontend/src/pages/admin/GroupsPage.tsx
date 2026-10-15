@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FormField } from '@/components/FormField'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -18,7 +19,7 @@ import { fullName } from '@/lib/auth'
 import { applyFormError } from '@/lib/forms'
 import type { AdminUser, Group } from '@/lib/types'
 
-const GROUP_FIELDS = ['name', 'teachers'] as const
+const GROUP_FIELDS = ['name', 'teachers', 'ai_enabled'] as const
 
 interface GroupDialogProps {
   group?: Group
@@ -30,11 +31,12 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(group?.name ?? '')
   const [teacherIds, setTeacherIds] = useState<number[]>(group?.teachers ?? [])
+  const [aiEnabled, setAiEnabled] = useState(group?.ai_enabled ?? true)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
     mutationFn: () => {
-      const body = { name: name.trim(), teachers: teacherIds }
+      const body = { name: name.trim(), teachers: teacherIds, ai_enabled: aiEnabled }
       return group
         ? api<Group>(`/groups/${group.id}/`, { method: 'PATCH', body })
         : api<Group>('/groups/', { method: 'POST', body })
@@ -84,6 +86,21 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
               invalid={Boolean(errors.teachers)}
             />
           </FormField>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              checked={aiEnabled}
+              onChange={(event) => setAiEnabled(event.target.checked)}
+            />
+            <span>
+              AI yordamchisi yoqilgan
+              <span className="block text-xs text-muted-foreground">
+                Tajriba uchun nazorat guruhida o'chiring: talabalar AI maslahati, AI bahosi, AI chat va AI tahlilini
+                ko'rmaydi (baho avtomatik tekshiruv bilan qo'yiladi). O'qituvchiga AI tahlili ko'rinaveradi.
+              </span>
+            </span>
+          </label>
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
               Bekor qilish
@@ -164,6 +181,7 @@ export function GroupsPage() {
             <TableRow>
               <TableHead>Guruh</TableHead>
               <TableHead>O'qituvchilar</TableHead>
+              <TableHead>AI</TableHead>
               <TableHead className="text-right">Talabalar</TableHead>
               <TableHead className="text-right">Amallar</TableHead>
             </TableRow>
@@ -173,6 +191,13 @@ export function GroupsPage() {
               <TableRow key={group.id}>
                 <TableCell className="font-medium">{group.name}</TableCell>
                 <TableCell className="max-w-80 truncate">{teacherNames(group.teachers)}</TableCell>
+                <TableCell>
+                  {group.ai_enabled ? (
+                    <Badge variant="outline">Yoqilgan</Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800">O'chirilgan</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{group.student_count}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">

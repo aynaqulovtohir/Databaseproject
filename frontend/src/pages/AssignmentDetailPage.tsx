@@ -247,6 +247,7 @@ function ResultBanner({ submission }: { submission: Submission }) {
 }
 
 function AttemptItem({ submission, defaultOpen }: { submission: Submission; defaultOpen: boolean }) {
+  const user = useUser()
   const [open, setOpen] = useState(defaultOpen)
   return (
     <li className="rounded-lg border">
@@ -265,10 +266,13 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
       {open ? (
         <div className="grid gap-4 border-t p-3">
           <SqlCode code={submission.sql_code} />
-          <div>
-            <h3 className="mb-2 text-sm font-medium">AI tahlili</h3>
-            <AnalysisPanel submissionId={submission.id} />
-          </div>
+          {/* Tajribaning nazorat guruhida AI ko'rsatilmaydi */}
+          {user.ai_enabled ? (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">AI tahlili</h3>
+              <AnalysisPanel submissionId={submission.id} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -346,6 +350,7 @@ function SubmitForm({ assignment, isRetry }: { assignment: Assignment; isRetry: 
 }
 
 function StudentView({ assignment }: { assignment: Assignment }) {
+  const user = useUser()
   const submissions = useQuery({
     queryKey: ['submissions', assignment.id],
     queryFn: () => api<Submission[]>(`/assignments/${assignment.id}/submissions/`),
@@ -395,15 +400,17 @@ function StudentView({ assignment }: { assignment: Assignment }) {
             <CardContent>{work}</CardContent>
           </Card>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>AI yordamchi</CardTitle>
-            <CardDescription>Yozishmani faqat siz ko'rasiz.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChatPanel assignmentId={assignment.id} />
-          </CardContent>
-        </Card>
+        {user.ai_enabled ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>AI yordamchi</CardTitle>
+              <CardDescription>Yozishmani faqat siz ko'rasiz.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChatPanel assignmentId={assignment.id} />
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </>
   )

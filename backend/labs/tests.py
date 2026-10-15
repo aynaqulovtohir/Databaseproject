@@ -637,7 +637,9 @@ class ResearchExportTests(BaseTestCase):
     def test_export_is_anonymous(self):
         response, (files, tables) = self.export(self.admin)
         self.assertIn("attachment;", response["Content-Disposition"])
-        self.assertEqual(set(files), {"urinishlar.csv", "xulosa.csv", "README.txt"})
+        self.assertEqual(
+            set(files), {"urinishlar.csv", "xulosa.csv", "testlar.csv", "test_javoblari.csv", "README.txt"}
+        )
         everything = "".join(files.values())
         for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):
             self.assertNotIn(secret, everything)
@@ -851,3 +853,131 @@ class ErLabTests(BaseTestCase):
         self.assertEqual(len(er_rows), 1)
         self.assertIn("er_obyekt_yetishmaydi", er_rows[0]["xato_turlari"])
         self.assertIn("er_kardinallik", er_rows[0]["xato_turlari"])
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="sinov-kaliti")
+class AiDisabledGroupTests(BaseTestCase):
+    """Tajriba: nazorat guruhida AI talabaga hech qayerda ko'rinmaydi (kalit sozlangan bo'lsa ham)."""
+
+    def setUp(self):
+        super().setUp()
+        self.group_a.ai_enabled = False
+        self.group_a.save(update_fields=["ai_enabled"])
+        self.auth_as(self.student_a1)
+
+    def test_me_reports_ai_disabled(self):
+        self.assertFalse(self.client.get("/api/auth/me/").data["ai_enabled"])
+        self.auth_as(self.teacher_a)
+        self.assertTrue(self.client.get("/api/auth/me/").data["ai_enabled"])
+
+    def test_lab_advice_and_ai_grade_are_off(self):
+        with patch("labs.advice.create_message") as create_message:
+            run = self.run_code("SELECT 1;")
+            self.assertFalse(run.data["ai_available"])
+            response = self.client.post(f"/api/labs/attempts/{run.data['attempt_id']}/advice/")
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            submit = self.client.post(f"/api/labs/{self.lab.pk}/submit/", {"sql_code": SOLUTION}, format="json")
+            self.assertEqual(submit.data["grade"]["source"], "auto")
+        create_message.assert_not_called()
+        self.assertFalse(LabAttempt.objects.filter(student=self.student_a1).first().ai_enabled)
+
+    def test_er_fix_has_no_ai_explanation(self):
+        lab = Lab.objects.create(
+            kind=Lab.Kind.ER, title="ER", description="d", reference_diagram=ER_REFERENCE, author=self.teacher_a
+        )
+        lab.groups.add(self.group_a)
+        with patch("labs.advice.create_message") as create_message:
+            response = self.client.post(f"/api/labs/{lab.pk}/submit/", {"diagram": ER_WRONG}, format="json")
+        create_message.assert_not_called()
+        # Tuzatilgan diagramma (AI emas, tizim quradi) ko'rsatiladi, AI tushuntirishi yo'q
+        self.assertTrue(response.data["fix"]["diagram"]["changes"])
+        self.assertEqual(response.data["fix"]["explanation"], "")
+
+    def test_assignment_chat_and_analysis_are_closed(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from learning.models import Assignment
+        from submissions.models import Submission
+
+        assignment = Assignment.objects.create(
+            title="T", description="d", author=self.teacher_a, deadline=timezone.now() + timedelta(days=1)
+        )
+        assignment.groups.add(self.group_a)
+        submission = Submission.objects.create(
+            assignment=assignment, student=self.student_a1, sql_code="SELECT 1;", attempt_number=1
+        )
+        self.assertEqual(self.client.get(f"/api/assignments/{assignment.pk}/chat/").status_code, 403)
+        self.assertEqual(
+            self.client.post(f"/api/assignments/{assignment.pk}/chat/", {"content": "savol"}).status_code, 403
+        )
+        self.assertEqual(self.client.get(f"/api/submissions/{submission.pk}/analysis/").status_code, 403)
+        # O'qituvchi tahlilni ko'raveradi
+        self.auth_as(self.teacher_a)
+        self.assertNotEqual(self.client.get(f"/api/submissions/{submission.pk}/analysis/").status_code, 403)
+
+    def test_export_marks_control_group(self):
+        import csv
+        import io
+        import zipfile
+
+        self.run_code("SELECT 1;")
+        self.group_a.ai_enabled = True  # keyin yoqilsa ham, urinish paytidagi holat saqlanadi
+        self.group_a.save(update_fields=["ai_enabled"])
+        self.auth_as(self.teacher_a)
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+        read = lambda name: list(  # noqa: E731
+            csv.DictReader(io.StringIO(archive.read(name).decode("utf-8-sig")), delimiter=";")
+        )
+        self.assertEqual(read("urinishlar.csv")[0]["ai_yoqilgan"], "0")
+        self.assertEqual({row["ai_yoqilgan"] for row in read("xulosa.csv")}, {"1"})
+
+    def test_admin_toggles_group_ai(self):
+        self.auth_as(self.admin)
+        response = self.client.patch(f"/api/groups/{self.group_a.pk}/", {"ai_enabled": True}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["ai_enabled"])
+        self.auth_as(self.teacher_a)
+        response = self.client.patch(f"/api/groups/{self.group_a.pk}/", {"ai_enabled": False}, format="json")
+        self.assertIn(response.status_code, (403, 404))
+
+
+class StatisticsTests(BaseTestCase):
+    stats_url = "/api/statistics/"
+
+    def test_numbers(self):
+        self.auth_as(self.student_a1)
+        self.run_code("SELEC 1;")  # sintaksis
+        wrong = self.run_code("SELECT 1;").data["attempt_id"]
+        LabAttempt.objects.filter(pk=wrong).update(ai_advice="maslahat")
+        self.run_code(SOLUTION)  # maslahatdan keyin yechdi
+        self.auth_as(self.student_a2)
+        self.run_code("SELECT 1;")  # yechmadi, maslahatsiz
+
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.stats_url).data
+        self.assertEqual(data["overview"]["students"], 2)
+        self.assertEqual(data["overview"]["attempts"], 4)
+        self.assertEqual(data["overview"]["solved_rate"], 50.0)
+        categories = {item["category"]: item["count"] for item in data["top_errors"]}
+        self.assertEqual(categories["sintaksis"], 1)
+        self.assertEqual(categories["natija_ustunlari_soni"], 2)
+        lab = data["labs"][0]
+        self.assertEqual((lab["students"], lab["solved"], lab["attempts_to_solve"]), (2, 1, 3.0))
+        self.assertEqual(data["ai_effect"]["with_advice"], {"pairs": 1, "solved": 1, "rate": 100.0})
+        self.assertEqual(data["ai_effect"]["without_advice"], {"pairs": 1, "solved": 0, "rate": 0.0})
+        self.assertEqual([group["name"] for group in data["groups"]], ["A-guruh"])
+
+    def test_permissions_and_group_filter(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.stats_url).status_code, 403)
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.client.get(self.stats_url, {"group": self.group_b.pk}).status_code, 404)
+        self.assertEqual(self.client.get(self.stats_url, {"group": "x"}).status_code, 400)
+        self.assertEqual(self.client.get(self.stats_url, {"group": self.group_a.pk}).data["overview"]["students"], 2)
+        # Boshqa o'qituvchi A-guruh laboratoriyasini ko'rmaydi
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.get(self.stats_url).data["overview"]["labs"], 0)
+        self.auth_as(self.admin)
+        self.assertEqual(len(self.client.get(self.stats_url).data["groups_available"]), 2)

@@ -46,6 +46,16 @@ class User(AbstractUser):
     def is_student(self):
         return self.role == self.Role.STUDENT
 
+    @property
+    def ai_allowed(self):
+        """Talabaga AI yordamchisi (maslahat, AI bahosi, chat, tahlil) ko'rsatiladimi.
+
+        Tajriba uchun nazorat guruhida AI o'chiriladi; xodimlar uchun har doim yoqilgan.
+        """
+        if not self.is_student:
+            return True
+        return bool(self.group and self.group.ai_enabled)
+
 
 class StudentGroup(models.Model):
     name = models.CharField("nomi", max_length=100, unique=True)
@@ -57,6 +67,8 @@ class StudentGroup(models.Model):
         related_name="teaching_groups",
         limit_choices_to={"role": User.Role.TEACHER},
     )
+    # Tajriba: nazorat guruhida o'chiriladi, shunda AI ta'sirini alohida o'lchash mumkin
+    ai_enabled = models.BooleanField("AI yordamchisi yoqilgan", default=True)
     created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
 
     class Meta:

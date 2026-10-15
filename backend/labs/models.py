@@ -61,6 +61,8 @@ class LabAttempt(models.Model):
     ai_requested_at = models.DateTimeField("AI maslahati so'ralgan vaqti", null=True, blank=True)
     # True - talaba bu urinishni baholashga topshirgan (oddiy ishga tushirish emas)
     is_submission = models.BooleanField("baholashga topshirilgan", default=False)
+    # Urinish vaqtida talabaning guruhida AI yoqilganmi (tajriba tahlili uchun saqlanadi)
+    ai_enabled = models.BooleanField("AI yoqilgan edi", default=True)
     created_at = models.DateTimeField("vaqti", auto_now_add=True)
 
     class Meta:

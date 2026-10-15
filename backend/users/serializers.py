@@ -24,7 +24,7 @@ class StudentGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentGroup
-        fields = ["id", "name", "teachers", "student_count", "created_at"]
+        fields = ["id", "name", "teachers", "ai_enabled", "student_count", "created_at"]
         read_only_fields = ["id", "created_at"]
 
 
@@ -125,10 +125,11 @@ class MeSerializer(serializers.ModelSerializer):
 
     group = GroupShortSerializer(read_only=True)
     teaching_groups = GroupShortSerializer(many=True, read_only=True)
+    ai_enabled = serializers.BooleanField(source="ai_allowed", read_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "username", "first_name", "last_name", "role", "group", "teaching_groups"]
+        fields = ["id", "username", "first_name", "last_name", "role", "group", "teaching_groups", "ai_enabled"]
         read_only_fields = fields
 
 

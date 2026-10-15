@@ -15,6 +15,8 @@ export interface Me {
   role: Role
   group: GroupShort | null
   teaching_groups: GroupShort[]
+  /** Talabaga AI yordamchisi ko'rsatiladimi (tajribada nazorat guruhida o'chiriladi) */
+  ai_enabled: boolean
 }
 
 export interface TelegramStatus {
@@ -56,6 +58,8 @@ export interface Group {
   id: number
   name: string
   teachers: number[]
+  /** Tajriba: false bo'lsa, guruh talabalariga AI yordamchisi ko'rsatilmaydi */
+  ai_enabled: boolean
   student_count: number
   created_at: string
 }
@@ -311,3 +315,143 @@ export interface ChatReply {
 }
 
 export const MAX_SCORE = 100
+
+// ---------- Testlar ----------
+
+export type QuizKind = 'pre' | 'post' | 'practice'
+
+export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
+  pre: 'Kirish testi',
+  post: 'Chiqish testi',
+  practice: 'Oddiy test',
+}
+
+export type QuestionKind = 'single' | 'multiple'
+
+export interface QuizChoice {
+  id?: number
+  text: string
+  is_correct: boolean
+}
+
+export interface QuizQuestion {
+  id?: number
+  text: string
+  kind: QuestionKind
+  points: number
+  choices: QuizChoice[]
+}
+
+export type QuizAttemptStatus = 'not_started' | 'in_progress' | 'submitted'
+
+export interface MyQuizAttempt {
+  status: QuizAttemptStatus
+  score?: number
+  max_score?: number
+  percent?: number
+  submitted_at?: string
+  /** Faqat boshlangan testda: javoblar qabul qilinadigan oxirgi vaqt */
+  deadline?: string | null
+}
+
+export interface Quiz {
+  id: number
+  kind: QuizKind
+  title: string
+  description: string
+  opens_at: string | null
+  closes_at: string | null
+  time_limit_minutes: number | null
+  author: PersonShort
+  created_at: string
+  question_count: number
+  /** Faqat admin va o'qituvchiga */
+  show_answers?: boolean
+  groups?: number[]
+  questions?: QuizQuestion[]
+  attempt_count?: number
+  /** Faqat talabaga */
+  is_open?: boolean
+  my_attempt?: MyQuizAttempt
+}
+
+/** Talaba testni yechayotganda: to'g'ri javoblarsiz savollar */
+export interface QuizTaking {
+  questions: { id: number; text: string; kind: QuestionKind; points: number; choices: { id: number; text: string }[] }[]
+  /** {"savol_id": [variant id'lari]} */
+  answers: Record<string, number[]>
+  started_at: string
+  deadline: string | null
+  server_now: string
+}
+
+export interface QuizResult {
+  score: number
+  max_score: number
+  percent: number
+  submitted_at: string
+  /** O'qituvchi to'g'ri javoblarni ko'rsatishga ruxsat bergan bo'lsa */
+  questions:
+    | {
+        id: number
+        text: string
+        kind: QuestionKind
+        points: number
+        earned: number
+        choices: { id: number; text: string; is_correct: boolean; selected: boolean }[]
+      }[]
+    | null
+}
+
+export interface QuizStudentResult extends PersonShort {
+  group: string
+  status: QuizAttemptStatus
+  score: number | null
+  max_score: number | null
+  percent: number | null
+  started_at: string | null
+  submitted_at: string | null
+}
+
+// ---------- Statistika ----------
+
+export interface StatisticsLab {
+  id: number
+  title: string
+  kind: LabKind
+  students: number
+  started: number
+  solved: number
+  solved_rate: number | null
+  attempts_to_solve: number | null
+  average_grade: number | null
+}
+
+export interface StatisticsGroup {
+  id: number
+  name: string
+  ai_enabled: boolean
+  students: number
+  solved_rate: number | null
+  average_grade: number | null
+  pre_test: number | null
+  post_test: number | null
+  pre_count: number
+  post_count: number
+  gain: number | null
+}
+
+export interface AiEffectBucket {
+  pairs: number
+  solved: number
+  rate: number | null
+}
+
+export interface Statistics {
+  groups_available: GroupShort[]
+  overview: { students: number; labs: number; attempts: number; solved_rate: number | null; average_grade: number | null }
+  top_errors: { category: string; label: string; count: number }[]
+  labs: StatisticsLab[]
+  ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
+  groups: StatisticsGroup[]
+}

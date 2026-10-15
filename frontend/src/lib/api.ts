@@ -136,11 +136,11 @@ const KNOWN_MESSAGES: Record<string, string> = {
 
 function firstString(value: unknown): string | null {
   if (typeof value === 'string') return value
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = firstString(item)
-      if (found) return found
-    }
+  // Ichma-ich xatolar ham o'qiladi, masalan: {"questions": [{}, {"choices": ["..."]}]}
+  const items = Array.isArray(value) ? value : value && typeof value === 'object' ? Object.values(value) : []
+  for (const item of items) {
+    const found = firstString(item)
+    if (found) return found
   }
   return null
 }

@@ -54,9 +54,14 @@ def ai_grades_left(student):
     return settings.LAB_AI_GRADES_DAILY_LIMIT - used + 1
 
 
+def ai_usable(student):
+    """AI shu talabaga ishlatiladimi: sozlangan va guruhida o'chirilmagan."""
+    return is_configured() and student.ai_allowed
+
+
 def grade_attempt(attempt):
     """Topshirilgan urinishni baholaydi: AI ishlasa AI, aks holda avtomatik. Qaytaradi: (ball, izoh, manba)."""
-    if is_configured() and ai_grades_left(attempt.student) > 0:
+    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment = ai_grade(attempt)
             return score, comment, LabGrade.Source.AI
@@ -73,7 +78,7 @@ def grade_diagram_attempt(attempt, ratio):
     fixed = None if attempt.is_correct else build_fixed(attempt.diagram, attempt.lab.reference_diagram)
     changes = fixed["changes"] if fixed else []
     result = None
-    if is_configured() and ai_grades_left(attempt.student) > 0:
+    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment, explanation = ai_grade_diagram(attempt, ratio, changes)
             result = score, comment, LabGrade.Source.AI
@@ -172,6 +177,7 @@ class LabViewSet(viewsets.ModelViewSet):
             is_correct=result["is_correct"],
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
+            ai_enabled=student.ai_allowed,
         )
 
     @action(
@@ -194,7 +200,7 @@ class LabViewSet(viewsets.ModelViewSet):
             attempt = self.save_attempt(lab, request.user, payload, result)
             result["attempt_id"] = attempt.pk
             result["ai_available"] = (
-                not result["is_correct"] and is_configured() and ai_advice_left(request.user) > 0
+                not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
             )
         return Response(result)
 
@@ -236,7 +242,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
         result["attempt_id"] = attempt.pk
         result["ai_available"] = (
-            not result["is_correct"] and is_configured() and ai_advice_left(request.user) > 0
+            not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
         )
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
@@ -244,7 +250,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="research-export")
     def research_export(self, request):
-        """Ilmiy tadqiqot uchun anonim ma'lumotlar (ZIP: urinishlar.csv, xulosa.csv, README.txt).
+        """Ilmiy tadqiqot uchun anonim ma'lumotlar (ZIP: laboratoriyalar va testlar natijalari, README.txt).
 
         Admin — barcha, o'qituvchi — o'z laboratoriyalari. ?lab=<id> bilan alohida laboratoriyalarni tanlash mumkin.
         """
@@ -256,8 +262,10 @@ class LabViewSet(viewsets.ModelViewSet):
             if not all(lab_id.isdigit() for lab_id in lab_ids):
                 raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
             labs = labs.filter(pk__in=lab_ids)
+        from quizzes.views import visible_quizzes
+
         filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
-        response = HttpResponse(build_export(labs), content_type="application/zip")
+        response = HttpResponse(build_export(labs, visible_quizzes(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
@@ -311,6 +319,8 @@ class LabAttemptAdviceView(APIView):
         attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
         if attempt.is_correct:
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
+        if not request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
         if attempt.ai_advice:
             return Response({"advice": attempt.ai_advice})
         if not is_configured():
@@ -341,3 +351,22 @@ class LabAttemptAdviceView(APIView):
         attempt.ai_requested_at = timezone.now()
         attempt.save(update_fields=["ai_advice", "ai_requested_at"])
         return Response({"advice": advice})
+
+
+class StatisticsView(APIView):
+    """O'qituvchi statistikasi: ?group=<id> bilan bitta guruh, aks holda barcha ruxsat etilgan guruhlar."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .statistics import allowed_groups, build_statistics
+
+        if request.user.is_student:
+            raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
+        group = None
+        group_id = request.query_params.get("group")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            group = get_object_or_404(allowed_groups(request.user), pk=group_id)
+        return Response(build_statistics(request.user, group))
