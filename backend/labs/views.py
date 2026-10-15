@@ -4,7 +4,7 @@ from datetime import datetime, time
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -21,7 +21,7 @@ from learning.permissions import IsStaffRoleOrReadOnly
 from users.models import User
 
 from .access import visible_labs
-from .advice import ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
+from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code
 from .er import build_fixed, compare
 from .models import Lab, LabAttempt, LabGrade
@@ -40,10 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 def ai_advice_left(student):
-    """Talaba bugun yana nechta AI maslahati olishi mumkin."""
+    """Talaba bugun yana nechta AI maslahati olishi mumkin (har bir daraja alohida sanaladi)."""
     today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).count()
-    return max(0, settings.LAB_AI_DAILY_LIMIT - used)
+    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).aggregate(
+        total=Sum("ai_hint_level")
+    )["total"]
+    return max(0, settings.LAB_AI_DAILY_LIMIT - (used or 0))
 
 
 def ai_grades_left(student):
@@ -335,7 +337,11 @@ class LabViewSet(viewsets.ModelViewSet):
 
 
 class LabAttemptAdviceView(APIView):
-    """Xato urinish uchun AI maslahati. Faqat urinish egasi (talaba) so'ray oladi."""
+    """Xato urinish uchun bosqichma-bosqich AI maslahati. Faqat urinish egasi (talaba) so'ray oladi.
+
+    {"level": n} bilan n-darajali maslahat so'raladi (darajalar ketma-ket olinadi); level berilmasa,
+    olingan maslahatlar qaytariladi (hali bo'lmasa — 1-daraja).
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -345,8 +351,15 @@ class LabAttemptAdviceView(APIView):
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
         if not request.user.ai_allowed:
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
-        if attempt.ai_advice:
-            return Response({"advice": attempt.ai_advice})
+        # Darajalar joriy etilishidan oldingi urinishlarda bitta maslahat saqlangan
+        hints = list(attempt.ai_hints) or ([attempt.ai_advice] if attempt.ai_advice else [])
+        level = request.data.get("level", max(1, len(hints)))
+        if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= MAX_HINT_LEVEL:
+            raise ValidationError({"level": f"Daraja 1 dan {MAX_HINT_LEVEL} gacha bo'lishi kerak."})
+        if level <= len(hints):
+            return Response(self.payload(hints))
+        if level > len(hints) + 1:
+            raise ValidationError({"level": "Avval oldingi darajadagi maslahatni oling."})
         if not is_configured():
             return Response(
                 {"detail": "AI maslahatchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE
@@ -358,7 +371,7 @@ class LabAttemptAdviceView(APIView):
             )
 
         try:
-            advice = generate_advice(attempt)
+            advice = generate_advice(attempt, level, list(hints))
         except AITransientError:
             return Response(
                 {"detail": "AI maslahatchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
@@ -371,10 +384,17 @@ class LabAttemptAdviceView(APIView):
             )
 
         # Faqat muvaffaqiyatli maslahat kunlik limitdan yechiladi
+        hints.append(advice)
+        attempt.ai_hints = hints
+        attempt.ai_hint_level = len(hints)
         attempt.ai_advice = advice
         attempt.ai_requested_at = timezone.now()
-        attempt.save(update_fields=["ai_advice", "ai_requested_at"])
-        return Response({"advice": advice})
+        attempt.save(update_fields=["ai_hints", "ai_hint_level", "ai_advice", "ai_requested_at"])
+        return Response(self.payload(hints))
+
+    @staticmethod
+    def payload(hints):
+        return {"advice": hints[-1], "hints": hints, "level": len(hints), "max_level": MAX_HINT_LEVEL}
 
 
 class StatisticsView(APIView):

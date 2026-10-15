@@ -56,7 +56,11 @@ class LabAttempt(models.Model):
     is_correct = models.BooleanField("to'g'ri")
     # Baza xatosi va namunadan farqlar (AI maslahati uchun saqlanadi)
     feedback = models.JSONField("tekshiruv natijasi", default=dict)
+    # Oxirgi (eng batafsil) olingan maslahat; bo'sh bo'lmasa — talaba AI maslahatidan foydalangan
     ai_advice = models.TextField("AI maslahati", blank=True)
+    # Bosqichma-bosqich maslahatlar: 1 — yo'naltiruvchi savol, 2 — tushuncha, 3 — aniq ko'rsatma
+    ai_hints = models.JSONField("AI maslahatlari (darajalar bo'yicha)", default=list, blank=True)
+    ai_hint_level = models.PositiveSmallIntegerField("olingan maslahat darajasi", default=0)
     # AI maslahati so'ralgan vaqt (kunlik limitni hisoblash uchun)
     ai_requested_at = models.DateTimeField("AI maslahati so'ralgan vaqti", null=True, blank=True)
     # True - talaba bu urinishni baholashga topshirgan (oddiy ishga tushirish emas)

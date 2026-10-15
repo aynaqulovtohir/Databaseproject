@@ -377,9 +377,32 @@ class AdviceTests(BaseTestCase):
 
     @patch("labs.views.generate_advice", return_value="FROM so'zini tekshiring.")
     def test_advice_is_saved_and_not_requested_twice(self, generate):
-        self.assertEqual(self.client.post(self.advice_url).data, {"advice": "FROM so'zini tekshiring."})
-        self.assertEqual(self.client.post(self.advice_url).data, {"advice": "FROM so'zini tekshiring."})
+        self.assertEqual(self.client.post(self.advice_url).data["hints"], ["FROM so'zini tekshiring."])
+        self.assertEqual(self.client.post(self.advice_url).data["advice"], "FROM so'zini tekshiring.")
         generate.assert_called_once()
+
+    @patch("labs.views.generate_advice", side_effect=["savol", "tushuncha", "ko'rsatma"])
+    def test_hint_levels_are_sequential(self, generate):
+        first = self.client.post(self.advice_url).data
+        self.assertEqual((first["level"], first["max_level"], first["hints"]), (1, 3, ["savol"]))
+        self.assertEqual(self.client.post(self.advice_url, {"level": 3}, format="json").status_code, 400)
+        second = self.client.post(self.advice_url, {"level": 2}, format="json").data
+        self.assertEqual(second["hints"], ["savol", "tushuncha"])
+        # 2-daraja uchun AI'ga avvalgi maslahat ham berildi
+        self.assertEqual(generate.call_args.args[1:], (2, ["savol"]))
+        third = self.client.post(self.advice_url, {"level": 3}, format="json").data
+        self.assertEqual(third["advice"], "ko'rsatma")
+        self.assertEqual(self.client.post(self.advice_url, {"level": 4}, format="json").status_code, 400)
+        attempt = LabAttempt.objects.get(pk=self.advice_url.split("/")[-3])
+        self.assertEqual((attempt.ai_hint_level, attempt.ai_advice), (3, "ko'rsatma"))
+
+    @patch("labs.advice.create_message")
+    def test_level_instruction_is_sent(self, create_message):
+        create_message.return_value.content = [type("Block", (), {"type": "text", "text": "savol"})()]
+        self.client.post(self.advice_url)
+        message = create_message.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("1-daraja", message)
+        self.assertNotIn("<oldingi_maslahatlar>", message)
 
     @patch("labs.advice.create_message")
     def test_solution_and_student_identity_are_not_sent_to_ai(self, create_message):
@@ -397,10 +420,12 @@ class AdviceTests(BaseTestCase):
         self.assertEqual(self.client.post(self.advice_url).status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertIsNone(LabAttempt.objects.get().ai_requested_at)
 
-    @override_settings(LAB_AI_DAILY_LIMIT=1)
+    @override_settings(LAB_AI_DAILY_LIMIT=2)
     @patch("labs.views.generate_advice", return_value="Maslahat")
     def test_daily_limit(self, generate):
+        # Har bir daraja limitdan alohida yechiladi
         self.assertEqual(self.client.post(self.advice_url).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.post(self.advice_url, {"level": 2}, format="json").status_code, 200)
         second = self.run_code("SELECT nomi FORM kitob;")
         self.assertFalse(second.data["ai_available"])
         response = self.client.post(f"/api/labs/attempts/{second.data['attempt_id']}/advice/")

@@ -10,6 +10,21 @@ import re
 from ai.client import AIPermanentError, create_message, extract_text
 
 ADVICE_MAX_TOKENS = 4000
+MAX_HINT_LEVEL = 3
+# Bosqichma-bosqich maslahat: talaba avval eng yengil yordamni oladi, kerak bo'lsa keyingisini so'raydi
+HINT_LEVELS = {
+    1: "Faqat bitta yo'naltiruvchi savol yoki ishora yoz (1-2 jumla). Xato qayerda ekanini (qator, qism) va "
+    "tegishli tushuncha nomini AYTMA: talaba o'zi topishi kerak.",
+    2: "Xato qaysi tushunchaga yoki qoidaga tegishli ekanini nomla va uni qisqa tushuntir (2-4 jumla). Xato "
+    "joyini aniq ko'rsatma va tuzatilgan kodni yozma.",
+    3: "Aniq ko'rsatma ber: qaysi qism (qator, obyekt yoki bog'lanish) va nima o'zgarishi kerak (3-6 jumla). To'liq "
+    "yechimni yozma; boshqa nomlar bilan qisqa namuna keltirish mumkin.",
+}
+LEVEL_RULE = (
+    "\n\nFoydalanuvchi xabaridagi <maslahat_darajasi> javob qanchalik batafsil bo'lishini belgilaydi va u yuqoridagi "
+    "uzunlik talablaridan ustun. <oldingi_maslahatlar> berilgan bo'lsa, ularni takrorlama: davom ettirib, bir qadam "
+    "aniqroq yordam ber."
+)
 GRADE_MAX_TOKENS = 4000
 MAX_SCORE = 100
 # AI bahosi avtomatik tekshiruv natijasiga zid bo'lmasligi uchun chegaralar:
@@ -75,14 +90,23 @@ def describe_feedback(feedback):
     )
 
 
-def generate_advice(attempt):
-    """Xato urinish uchun maslahat matnini qaytaradi. AI xatolari chaqiruvchiga uzatiladi."""
+def level_block(level, previous):
+    """Foydalanuvchi xabariga qo'shiladigan maslahat darajasi va oldingi maslahatlar."""
+    text = f"\n<maslahat_darajasi>\n{level}-daraja ({MAX_HINT_LEVEL} tadan): {HINT_LEVELS[level]}\n</maslahat_darajasi>\n"
+    if previous:
+        items = "\n\n".join(f"{index}-daraja: {hint}" for index, hint in enumerate(previous, start=1))
+        text += f"\n<oldingi_maslahatlar>\n{items}\n</oldingi_maslahatlar>\n"
+    return text
+
+
+def generate_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
+    """Xato urinish uchun berilgan darajadagi maslahat matnini qaytaradi. AI xatolari chaqiruvchiga uzatiladi."""
     lab = attempt.lab
     if lab.kind == lab.Kind.ER:
-        return generate_er_advice(attempt)
+        return generate_er_advice(attempt, level, previous)
     response = create_message(
         max_tokens=ADVICE_MAX_TOKENS,
-        system=SYSTEM_PROMPT,
+        system=SYSTEM_PROMPT + LEVEL_RULE,
         messages=[
             {
                 "role": "user",
@@ -92,7 +116,8 @@ def generate_advice(attempt):
                     setup_sql=lab.setup_sql.strip() or "(yo'q: talaba jadvallarni o'zi yaratadi)",
                     sql_code=attempt.sql_code,
                     check_result=describe_feedback(attempt.feedback),
-                ),
+                )
+                + level_block(level, previous),
             }
         ],
         output_config={"effort": "low"},
@@ -264,14 +289,14 @@ def _er_message(attempt, check_result):
     )
 
 
-def generate_er_advice(attempt):
+def generate_er_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
     """Noto'g'ri ER-diagramma uchun maslahat. Namunaviy diagramma AI'ga yuborilmaydi."""
     differences = attempt.feedback.get("differences") or []
     check_result = "Diagramma namunadan farq qiladi:\n" + "\n".join(f"- {item}" for item in differences)
     response = create_message(
         max_tokens=ADVICE_MAX_TOKENS,
-        system=ER_ADVICE_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _er_message(attempt, check_result)}],
+        system=ER_ADVICE_SYSTEM_PROMPT + LEVEL_RULE,
+        messages=[{"role": "user", "content": _er_message(attempt, check_result) + level_block(level, previous)}],
         output_config={"effort": "low"},
     )
     return extract_text(response).strip()
