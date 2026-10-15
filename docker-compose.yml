@@ -10,17 +10,55 @@ services:
       timeout: 5s
       retries: 10
 
+  # Virtual laboratoriya uchun alohida Postgres: talabalar SQL kodi faqat shu yerda bajariladi.
+  # Platforma ma'lumotlari bu serverda yo'q; xotira, CPU va disk cheklangan, shuning uchun
+  # og'ir so'rov faqat laboratoriyani sekinlashtiradi, asosiy bazaga ta'sir qilmaydi.
+  # Ma'lumotlar RAM'da saqlanadi (qum quti vaqtinchalik), tashqariga port ochilmaydi.
+  lab_db:
+    image: docker.io/library/postgres:17
+    environment:
+      POSTGRES_USER: ${LAB_DB_USER:-lab_admin}
+      POSTGRES_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}
+      POSTGRES_DB: ${LAB_SANDBOX_DB:-lab_sandbox}
+    command: >-
+      postgres -c max_connections=60 -c shared_buffers=64MB -c temp_file_limit=256MB
+      -c max_parallel_workers_per_gather=0 -c log_min_duration_statement=-1
+    tmpfs:
+      - /var/lib/postgresql/data:size=512m
+    shm_size: 128m
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 200
+    networks:
+      - lab
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build: ./backend
     env_file: .env
+    environment:
+      LAB_DB_HOST: lab_db
+      LAB_DB_PORT: "5432"
+      LAB_DB_USER: ${LAB_DB_USER:-lab_admin}
+      LAB_DB_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
       - media_data:/app/media
     ports:
       - "127.0.0.1:8000:8000"
+    networks:
+      - default
+      - lab
     depends_on:
       db:
+        condition: service_healthy
+      lab_db:
         condition: service_healthy
 
   ai_worker:
@@ -55,6 +93,12 @@ services:
       - "127.0.0.1:5173:5173"
     depends_on:
       - backend
+
+networks:
+  default:
+  # Faqat backend va lab_db ulangan, internetga chiqishi yo'q
+  lab:
+    internal: true
 
 volumes:
   postgres_data:

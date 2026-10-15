@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "ai",
     "grading",
     "notifications",
+    "labs",
 ]
 
 MIDDLEWARE = [
@@ -112,6 +113,10 @@ REST_FRAMEWORK = {
     # Bitta IP manzildan login'ga urinishlar soni
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
+        # Bitta foydalanuvchi laboratoriyada kodni ishga tushirish soni
+        "lab_run": "30/min",
+        # Bitta talaba laboratoriyani baholashga topshirish soni
+        "lab_submit": "6/min",
     },
 }
 
@@ -126,12 +131,39 @@ REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/auth/"
 # HTTPS'da (DEBUG=False) cookie faqat shifrlangan ulanish orqali yuboriladi
 REFRESH_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# HTTPS majburiyligi: sayt faqat HTTPS orqali ishlashi aniq bo'lgandan keyin .env da yoqiladi
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
 
-# Sun'iy intellekt (Anthropic API). Kalit bo'sh bo'lsa, AI funksiyalari kutish holatida turadi.
+# Sun'iy intellekt. AI_PROVIDER qaysi xizmat ishlatilishini belgilaydi: "anthropic" yoki "gemini".
+# Tanlangan xizmat kaliti bo'sh bo'lsa, AI funksiyalari kutish holatida turadi.
+AI_PROVIDER = env("AI_PROVIDER", default="anthropic").strip().lower()
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 AI_MODEL = env("AI_MODEL", default="claude-sonnet-5-5")
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.8-flash")
 # Bitta talaba kuniga yubora oladigan chat xabarlari soni
 AI_CHAT_DAILY_LIMIT = env.int("AI_CHAT_DAILY_LIMIT", default=30)
+
+# Virtual laboratoriya: talaba SQL kodi shu alohida bazada bajariladi (o'zi yaratiladi)
+LAB_SANDBOX_DB = env("LAB_SANDBOX_DB", default="lab_sandbox")
+# Qum quti joylashgan Postgres serveri. Xavfsizlik uchun asosiy bazadan alohida server
+# (docker-compose'dagi lab_db) tavsiya etiladi: talaba kodi serverni band qilsa ham
+# platforma ishlayveradi. LAB_DB_HOST bo'sh bo'lsa, asosiy baza serveri ishlatiladi.
+LAB_DB = {
+    "HOST": env("LAB_DB_HOST", default="") or DATABASES["default"]["HOST"],
+    "PORT": env("LAB_DB_PORT", default="") or DATABASES["default"]["PORT"],
+    "USER": env("LAB_DB_USER", default="") or DATABASES["default"]["USER"],
+    "PASSWORD": env("LAB_DB_PASSWORD", default="") or DATABASES["default"]["PASSWORD"],
+    # Qum quti bazasi hali yo'q bo'lsa, uni yaratish uchun ulaniladigan baza
+    "MAINTENANCE_DB": "postgres" if env("LAB_DB_HOST", default="") else DATABASES["default"]["NAME"],
+}
+# Bitta talaba kuniga oladigan AI maslahatlari soni
+LAB_AI_DAILY_LIMIT = env.int("LAB_AI_DAILY_LIMIT", default=40)
+# Bitta talabaning kuniga AI baholaydigan topshirishlari soni (undan keyin avtomatik baho qo'yiladi)
+LAB_AI_GRADES_DAILY_LIMIT = env.int("LAB_AI_GRADES_DAILY_LIMIT", default=20)
 
 # Telegram bildirishnomalari. Ikkalasi ham bo'sh bo'lmasa, bot ishlaydi.
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")

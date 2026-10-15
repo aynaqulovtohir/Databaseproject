@@ -12,16 +12,19 @@ const DESCRIPTIONS: Record<Role, Record<string, string>> = {
     '/groups': "Guruhlar va ularga o'qituvchilarni biriktirish.",
     '/materials': "Barcha o'quv materiallari.",
     '/assignments': 'Barcha topshiriqlar va yechimlar.',
+    '/labs': 'Barcha laboratoriyalar va talabalar natijalari.',
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
   teacher: {
     '/materials': "Guruhlaringiz uchun material qo'shish.",
     '/assignments': 'Topshiriq berish, yechimlarni tekshirish va baholash.',
+    '/labs': "SQL laboratoriyalari yaratish va kim bajarganini ko'rish.",
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
   student: {
     '/materials': "Guruhingizga berilgan o'quv materiallari.",
     '/assignments': "Yechim topshirish, AI tahlili va baholarni ko'rish.",
+    '/labs': 'SQL kod yozib ishga tushirish, xato bo\'lsa maslahat olish.',
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
 }

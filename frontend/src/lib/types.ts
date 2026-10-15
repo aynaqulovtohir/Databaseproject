@@ -132,6 +132,87 @@ export interface Submission {
   submitted_at: string
 }
 
+/** Laboratoriya bahosi: AI yoki (AI ishlamasa) avtomatik tekshiruv qo'yadi */
+export interface LabGrade {
+  score: number
+  comment: string
+  source: 'ai' | 'auto'
+  graded_at: string
+}
+
+export const GRADE_SOURCE_LABELS: Record<LabGrade['source'], string> = {
+  ai: 'AI bahosi',
+  auto: 'Avtomatik baho',
+}
+
+/** Talabaning laboratoriyadagi holati */
+export interface LabProgress {
+  attempts: number
+  solved: boolean
+  /** Eng yuqori baho; hali baholashga topshirmagan bo'lsa null */
+  grade?: LabGrade | null
+  /** Faqat bitta laboratoriya ochilganda keladi */
+  last_code?: string
+}
+
+export interface Lab {
+  id: number
+  title: string
+  description: string
+  /** Har bir ishga tushirishdan oldin bajariladigan tayyor jadvallar */
+  setup_sql: string
+  /** Talabaga yuborilmaydi */
+  solution_sql?: string
+  author: PersonShort
+  /** Talabaga yuborilmaydi */
+  groups?: number[]
+  created_at: string
+  /** Faqat talabaga keladi */
+  my_progress?: LabProgress
+}
+
+export interface LabRunError {
+  message: string
+  detail: string
+  hint: string
+  line: number | null
+  /** Xatoning o'zbekcha tushuntirishi (bo'sh bo'lishi mumkin) */
+  tip: string
+}
+
+export interface LabRunTable {
+  columns: string[]
+  rows: (string | null)[][]
+  row_count: number
+  truncated: boolean
+}
+
+export interface LabRunResult {
+  is_correct: boolean
+  error: LabRunError | null
+  result: LabRunTable | null
+  status_message: string
+  /** Namunaviy yechimdan farqlar */
+  differences: string[]
+  checked_against_solution: boolean
+  /** Faqat talabada: saqlangan urinish id'si */
+  attempt_id: number | null
+  ai_available: boolean
+  /** Faqat baholashga topshirilganda: shu topshirishning bahosi va eng yuqori baho */
+  grade?: LabGrade
+  best_grade?: LabGrade
+}
+
+/** O'qituvchi ko'radigan talaba holati */
+export interface LabStudentProgress extends PersonShort {
+  group: string
+  attempts: number
+  solved: boolean
+  last_attempt_at: string | null
+  code: string
+  grade: LabGrade | null
+}
+
 export type AnalysisStatus = 'pending' | 'processing' | 'done' | 'failed'
 
 export interface AnalysisIssue {

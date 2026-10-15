@@ -2,11 +2,10 @@
 import logging
 from datetime import timedelta
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .client import AIError, AITransientError
+from .client import AIError, AITransientError, current_model
 from .models import AIAnalysis
 from .services import analyze_submission
 
@@ -76,7 +75,7 @@ def process_next():
     analysis.suggested_score = result.suggested_score
     analysis.score_rationale = result.score_rationale
     analysis.error_message = ""
-    analysis.model_name = settings.AI_MODEL
+    analysis.model_name = current_model()
     analysis.input_tokens = input_tokens
     analysis.output_tokens = output_tokens
     analysis.completed_at = timezone.now()

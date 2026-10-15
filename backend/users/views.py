@@ -109,7 +109,7 @@ class UserViewSet(viewsets.ModelViewSet):
         except ProtectedError:
             raise ValidationError(
                 {
-                    "detail": "Bu foydalanuvchining material yoki topshiriqlari bor. "
+                    "detail": "Bu foydalanuvchining material, topshiriq yoki laboratoriyalari bor. "
                     "O'chirish o'rniga uni bloklang."
                 }
             )
