@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { FlaskConical, Plus } from 'lucide-react'
+import { Download, FlaskConical, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { LabDialog } from '@/components/LabDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
+import { downloadFile } from '@/lib/download'
 import { groupNames, useGroupOptions } from '@/lib/groups'
 import { MAX_SCORE, type Lab, type LabProgress } from '@/lib/types'
 
@@ -24,6 +26,36 @@ export function LabProgressBadge({ progress }: { progress: Pick<LabProgress, 'at
   if (progress.solved) return <Badge className="bg-emerald-100 text-emerald-800">Bajarilgan</Badge>
   if (progress.attempts) return <Badge className="bg-amber-100 text-amber-800">{progress.attempts} ta urinish</Badge>
   return <Badge variant="outline">Boshlanmagan</Badge>
+}
+
+/** Ilmiy tadqiqot uchun anonim ma'lumotlar: urinishlar, xato turlari va baholar (ZIP ichida CSV) */
+function ResearchExportButton() {
+  const [downloading, setDownloading] = useState(false)
+
+  async function download() {
+    setDownloading(true)
+    try {
+      const today = new Date().toLocaleDateString('sv')
+      await downloadFile('/labs/research-export/', `laboratoriya-tadqiqot-${today}.zip`)
+    } catch (error) {
+      toast.error(errorMessage(error))
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Button
+      size="lg"
+      variant="outline"
+      disabled={downloading}
+      onClick={() => void download()}
+      title="Anonim ma'lumotlar: talaba ismi va kodi kirmaydi"
+    >
+      <Download aria-hidden="true" />
+      {downloading ? 'Tayyorlanmoqda…' : "Tadqiqot ma'lumotlari"}
+    </Button>
+  )
 }
 
 export function LabsPage() {
@@ -95,7 +127,14 @@ export function LabsPage() {
             ? 'SQL laboratoriyalari va talabalar natijalari.'
             : "SQL kod yozing va ishga tushiring: to'g'ri bo'lsa yashil, xato bo'lsa maslahat chiqadi."
         }
-        actions={labs.data?.length ? addButton : null}
+        actions={
+          isStaff && labs.data?.length ? (
+            <>
+              <ResearchExportButton />
+              {addButton}
+            </>
+          ) : null
+        }
       />
       {content}
       {creating ? <LabDialog onClose={() => setCreating(false)} /> : null}

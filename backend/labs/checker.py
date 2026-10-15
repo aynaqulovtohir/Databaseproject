@@ -66,6 +66,8 @@ def format_error(error):
 def _error_payload(error):
     return {
         "message": error.message,
+        # Tadqiqot eksportida xato turini aniqlash uchun saqlanadi
+        "sqlstate": error.sqlstate,
         "detail": error.detail,
         "hint": error.hint,
         "line": error.line,

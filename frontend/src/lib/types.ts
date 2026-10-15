@@ -173,6 +173,8 @@ export interface Lab {
 
 export interface LabRunError {
   message: string
+  /** PostgreSQL xato kodi (SQLSTATE) */
+  sqlstate: string
   detail: string
   hint: string
   line: number | null

@@ -571,3 +571,99 @@ class DesignLabsTests(BaseTestCase):
             call_command("seed_design_labs", author="student_a1", stdout=StringIO())
         with self.assertRaises(CommandError):
             call_command("seed_design_labs", author="teacher_a", group=["Yo'q-guruh"], stdout=StringIO())
+
+
+class ResearchExportTests(BaseTestCase):
+    """Tadqiqot uchun anonim eksport: ruxsatlar, anonimlik va hisoblangan ko'rsatkichlar."""
+
+    export_url = "/api/labs/research-export/"
+
+    def setUp(self):
+        super().setUp()
+        self.auth_as(self.student_a1)
+        self.run_code("SELEC narx FROM kitob;")  # baza xatosi (sintaksis)
+        self.run_code("SELECT 1;")  # natija farqli
+        self.run_code(SOLUTION)  # to'g'ri
+        second = LabAttempt.objects.filter(student=self.student_a1).order_by("id")[1]
+        second.ai_advice = "maslahat"
+        second.save(update_fields=["ai_advice"])
+        self.client.credentials()
+
+    def export(self, user, **params):
+        import csv
+        import io
+        import zipfile
+
+        self.auth_as(user)
+        response = self.client.get(self.export_url, params)
+        if response.status_code != status.HTTP_200_OK:
+            return response, None
+        archive = zipfile.ZipFile(io.BytesIO(response.content))
+        files = {name: archive.read(name).decode("utf-8-sig") for name in archive.namelist()}
+        tables = {
+            name: list(csv.DictReader(io.StringIO(content), delimiter=";"))
+            for name, content in files.items()
+            if name.endswith(".csv")
+        }
+        return response, (files, tables)
+
+    def test_student_cannot_export(self):
+        response, _ = self.export(self.student_a1)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_teacher_sees_only_own_labs(self):
+        _, (_, tables) = self.export(self.teacher_b)
+        self.assertEqual(tables["urinishlar.csv"], [])
+        _, (_, tables) = self.export(self.teacher_a)
+        self.assertEqual(len(tables["urinishlar.csv"]), 3)
+
+    def test_export_is_anonymous(self):
+        response, (files, tables) = self.export(self.admin)
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertEqual(set(files), {"urinishlar.csv", "xulosa.csv", "README.txt"})
+        everything = "".join(files.values())
+        for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):
+            self.assertNotIn(secret, everything)
+        pseudonyms = {row["talaba"] for row in tables["urinishlar.csv"]}
+        self.assertEqual(len(pseudonyms), 1)
+        self.assertRegex(pseudonyms.pop(), r"^T-[0-9A-F]{8}$")
+        # Taxallus keyingi eksportda ham o'zgarmaydi
+        _, (_, again) = self.export(self.admin)
+        self.assertEqual(tables["urinishlar.csv"][0]["talaba"], again["urinishlar.csv"][0]["talaba"])
+
+    def test_attempt_rows_and_categories(self):
+        _, (_, tables) = self.export(self.teacher_a)
+        rows = tables["urinishlar.csv"]
+        self.assertEqual([row["urinish_raqami"] for row in rows], ["1", "2", "3"])
+        self.assertEqual([row["natija"] for row in rows], ["baza_xatosi", "natija_farqli", "togri"])
+        self.assertEqual(rows[0]["xato_turlari"], "sintaksis")
+        self.assertEqual(rows[1]["xato_turlari"], "natija_ustunlari_soni")
+        self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
+        self.assertEqual(rows[0]["guruh"], "A-guruh")
+
+    def test_summary_includes_students_who_did_not_start(self):
+        _, (_, tables) = self.export(self.teacher_a)
+        summary = {row["urinishlar"]: row for row in tables["xulosa.csv"]}
+        self.assertEqual(set(summary), {"3", "0"})  # student_a1 va boshlamagan student_a2
+        solved = summary["3"]
+        self.assertEqual(solved["yechildi"], "1")
+        self.assertEqual(solved["togri_gacha_urinishlar"], "3")
+        self.assertEqual(solved["baza_xatolari"], "1")
+        self.assertEqual(solved["natija_farqlari"], "1")
+        self.assertEqual(solved["ai_maslahatlar"], "1")
+        self.assertEqual(solved["maslahatdan_keyin_yechdi"], "1")
+        idle = summary["0"]
+        self.assertEqual((idle["yechildi"], idle["maslahatdan_keyin_yechdi"]), ("0", ""))
+
+    def test_old_attempts_without_sqlstate_are_categorized(self):
+        from .research import attempt_categories
+        from .checker import ERROR_TIPS
+
+        old = LabAttempt(feedback={"error": {"message": "x", "tip": ERROR_TIPS["23505"]}, "differences": []})
+        self.assertEqual(attempt_categories(old), ["unique_buzildi"])
+
+    def test_lab_filter(self):
+        response, _ = self.export(self.admin, lab="abc")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        _, (_, tables) = self.export(self.admin, lab=str(self.lab.pk + 1000))
+        self.assertEqual(tables["urinishlar.csv"], [])
