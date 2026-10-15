@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, Copy, Pencil, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -181,6 +181,17 @@ function StaffView({ lab }: { lab: Lab }) {
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  const duplicate = useMutation({
+    mutationFn: () => api<Lab>(`/labs/${lab.id}/duplicate/`, { method: 'POST' }),
+    onSuccess: (copy) => {
+      toast.success('Nusxa yaratildi: endi uni tahrirlang')
+      queryClient.setQueryData(['lab', copy.id], copy)
+      void queryClient.invalidateQueries({ queryKey: ['labs'] })
+      void navigate(`/labs/${copy.id}`)
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
   const remove = useMutation({
     mutationFn: () => api(`/labs/${lab.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -205,6 +216,10 @@ function StaffView({ lab }: { lab: Lab }) {
             <Button variant="outline" size="lg" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
               Tahrirlash
+            </Button>
+            <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>
+              <Copy aria-hidden="true" />
+              Nusxa olish
             </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />

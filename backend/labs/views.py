@@ -269,6 +269,30 @@ class LabViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        """Laboratoriyaning nusxasi: shart, SQL va namunaviy diagramma ko'chiriladi, urinishlar emas.
+
+        O'qituvchining nusxasiga faqat o'zi o'qitadigan guruhlar o'tadi.
+        """
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        groups = lab.groups.all()
+        if request.user.is_teacher:
+            groups = groups.filter(teachers=request.user)
+        copy = Lab.objects.create(
+            kind=lab.kind,
+            title=f"{lab.title} (nusxa)"[: Lab._meta.get_field("title").max_length],
+            description=lab.description,
+            setup_sql=lab.setup_sql,
+            solution_sql=lab.solution_sql,
+            reference_diagram=lab.reference_diagram,
+            author=request.user,
+        )
+        copy.groups.set(groups)
+        return Response(LabSerializer(copy, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         """O'qituvchi uchun: laboratoriya berilgan guruhlardagi har bir talabaning holati."""

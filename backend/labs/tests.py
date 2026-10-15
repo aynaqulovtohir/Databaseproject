@@ -981,3 +981,22 @@ class StatisticsTests(BaseTestCase):
         self.assertEqual(self.client.get(self.stats_url).data["overview"]["labs"], 0)
         self.auth_as(self.admin)
         self.assertEqual(len(self.client.get(self.stats_url).data["groups_available"]), 2)
+
+
+class DuplicateLabTests(BaseTestCase):
+    def test_teacher_duplicates_own_lab(self):
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="x", is_correct=False)
+        self.auth_as(self.teacher_a)
+        response = self.client.post(f"/api/labs/{self.lab.pk}/duplicate/")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        copy = Lab.objects.get(pk=response.data["id"])
+        self.assertEqual(copy.title, "Qimmat kitoblar (nusxa)")
+        self.assertEqual((copy.setup_sql, copy.solution_sql), (self.lab.setup_sql, self.lab.solution_sql))
+        self.assertEqual(list(copy.groups.all()), [self.group_a])
+        self.assertEqual(copy.attempts.count(), 0)
+
+    def test_others_cannot_duplicate(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 403)
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 404)
