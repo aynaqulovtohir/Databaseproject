@@ -427,7 +427,9 @@ class ChatServiceTests(DataMixin, TestCase):
         self.assertEqual(kwargs["output_config"], {"effort": "low"})
 
 
-@override_settings(AI_PROVIDER="gemini", GEMINI_API_KEY="gemini-kalit", GEMINI_MODEL="gemini-sinov")
+@override_settings(
+    AI_PROVIDER="gemini", GEMINI_API_KEY="gemini-kalit", GEMINI_MODEL="gemini-sinov", GEMINI_FALLBACK_MODELS=[]
+)
 class GeminiProviderTests(DataMixin, TestCase):
     """AI_PROVIDER=gemini bo'lganda so'rov Google Gemini API'ga boradi."""
 
@@ -491,6 +493,37 @@ class GeminiProviderTests(DataMixin, TestCase):
         with patch("ai.client.requests.post", side_effect=requests.ConnectionError()):
             with self.assertRaises(AITransientError):
                 create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1", "gemini-sinov", "zaxira-2"])
+    def test_busy_model_falls_back_to_next(self):
+        from .client import create_message, extract_text
+
+        busy = self.gemini_response(status_code=503)
+        with patch("ai.client.requests.post", side_effect=[busy, busy, self.gemini_response("zaxira javob")]) as post:
+            response = create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+        self.assertEqual(extract_text(response), "zaxira javob")
+        # Asosiy model takroran sinalmaydi
+        urls = [call.args[0] for call in post.call_args_list]
+        self.assertEqual([url.split("models/")[1].split(":")[0] for url in urls], ["gemini-sinov", "zaxira-1", "zaxira-2"])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1"])
+    def test_all_models_busy_is_transient(self):
+        import requests
+
+        from .client import create_message
+
+        with patch("ai.client.requests.post", side_effect=[requests.Timeout(), self.gemini_response(status_code=503)]):
+            with self.assertRaises(AITransientError):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+
+    @override_settings(GEMINI_FALLBACK_MODELS=["zaxira-1"])
+    def test_bad_key_does_not_fall_back(self):
+        from .client import create_message
+
+        with patch("ai.client.requests.post", return_value=self.gemini_response(status_code=403)) as post:
+            with self.assertRaises(AIPermanentError):
+                create_message(max_tokens=100, system="s", messages=[{"role": "user", "content": "x"}])
+        self.assertEqual(post.call_count, 1)
 
     @override_settings(GEMINI_API_KEY="")
     def test_not_configured_without_gemini_key(self):

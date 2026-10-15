@@ -143,7 +143,9 @@ AI_PROVIDER = env("AI_PROVIDER", default="anthropic").strip().lower()
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 AI_MODEL = env("AI_MODEL", default="claude-sonnet-5-5")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
-GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.8-flash")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.5-flash")
+# Asosiy model band bo'lsa (bepul tarifda tez-tez uchraydi), navbat bilan sinaladigan modellar
+GEMINI_FALLBACK_MODELS = env.list("GEMINI_FALLBACK_MODELS", default=["gemini-3.5-flash-lite", "gemini-3.7-flash"])
 # Bitta talaba kuniga yubora oladigan chat xabarlari soni
 AI_CHAT_DAILY_LIMIT = env.int("AI_CHAT_DAILY_LIMIT", default=30)
 

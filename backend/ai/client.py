@@ -5,15 +5,21 @@ Ikki xizmat qo'llab-quvvatlanadi, qaysi biri ishlatilishi .env dagi AI_PROVIDER 
 - "gemini" - Google Gemini API.
 Loyihaning qolgan qismi faqat `create_message` va `extract_text` ni chaqiradi.
 """
+import logging
 from types import SimpleNamespace
 
 import anthropic
 import requests
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
+
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# Bu javoblarda keyingi zaxira model sinab ko'riladi: limit, server band yoki model olib tashlangan
+GEMINI_RETRY_STATUSES = {404, 429, 500, 502, 503, 504}
 
 REQUEST_TIMEOUT_SECONDS = 120.0
+FALLBACK_TIMEOUT_SECONDS = 40.0
 
 
 class AIError(Exception):
@@ -118,6 +124,39 @@ def _gemini_error_message(response):
         return response.text[:300]
 
 
+def _gemini_models():
+    """Navbat bilan sinaladigan modellar: asosiy model, keyin takrorlanmaydigan zaxiralar."""
+    models = [settings.GEMINI_MODEL]
+    models += [model for model in settings.GEMINI_FALLBACK_MODELS if model not in models]
+    return models
+
+
+def _post_gemini(body):
+    """So'rovni asosiy modelga yuboradi; model band yoki mavjud bo'lmasa, keyingi zaxira modelga.
+
+    Qaytaradi: (javob, model nomi). Oxirgi modelning javobi qanday bo'lsa, shunday qaytariladi.
+    """
+    models = _gemini_models()
+    for index, model in enumerate(models):
+        is_last = index == len(models) - 1
+        try:
+            response = requests.post(
+                GEMINI_URL.format(model=model),
+                headers={"x-goog-api-key": settings.GEMINI_API_KEY},
+                json=body,
+                # Zaxira bor bo'lsa, osilib qolgan modelni uzoq kutmasdan keyingisiga o'tiladi
+                timeout=REQUEST_TIMEOUT_SECONDS if is_last else FALLBACK_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            if is_last:
+                raise AITransientError("AI serveriga ulanib bo'lmadi.") from exc
+            logger.warning("Gemini %s javob bermadi, zaxira modelga o'tiladi: %s", model, exc)
+            continue
+        if is_last or response.status_code not in GEMINI_RETRY_STATUSES:
+            return response, model
+        logger.warning("Gemini %s band (%s), zaxira modelga o'tiladi.", model, response.status_code)
+
+
 def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
     if not is_configured():
         raise AINotConfigured("GEMINI_API_KEY .env faylida ko'rsatilmagan.")
@@ -139,22 +178,13 @@ def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
         "generationConfig": generation_config,
     }
 
-    try:
-        response = requests.post(
-            GEMINI_URL.format(model=settings.GEMINI_MODEL),
-            headers={"x-goog-api-key": settings.GEMINI_API_KEY},
-            json=body,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-    except requests.RequestException as exc:
-        raise AITransientError("AI serveriga ulanib bo'lmadi.") from exc
-
+    response, model = _post_gemini(body)
     if response.status_code == 429:
         raise AITransientError("AI so'rovlar limiti oshdi.")
     if response.status_code >= 500:
         raise AITransientError(f"AI serverida xato ({response.status_code}).")
     if response.status_code == 404:
-        raise AIPermanentError(f"AI modeli topilmadi: {settings.GEMINI_MODEL}")
+        raise AIPermanentError(f"AI modeli topilmadi: {model}")
     if response.status_code in (401, 403):
         raise AIPermanentError("API kalit noto'g'ri yoki bu amal uchun ruxsat yo'q.")
     if response.status_code != 200:
