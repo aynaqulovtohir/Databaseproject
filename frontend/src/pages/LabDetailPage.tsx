@@ -32,6 +32,7 @@ import {
   type SimilarWork,
 } from '@/lib/types'
 import { LabProgressBadge } from '@/pages/LabsPage'
+import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 function BackLink() {
@@ -64,6 +65,25 @@ function TheoryText({ text }: { text: string }) {
   )
 }
 
+/** ER → SQL: talabaga berilgan ER-model. Tor ustunda u o'qib bo'lmas darajada kichrayadi, shuning uchun
+ * alohida, to'liq kenglikdagi kartada ko'rsatiladi. */
+function GivenModelCard({ lab }: { lab: Lab }) {
+  if (lab.kind !== 'sql' || !lab.given_diagram?.entities.length) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Berilgan ER-model</CardTitle>
+        <CardDescription>
+          Shu model bo'yicha jadvallarni yarating. Diagrammani surib va kattalashtirib ko'rish mumkin.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ErEditor value={lab.given_diagram} />
+      </CardContent>
+    </Card>
+  )
+}
+
 function ConditionCard({ lab }: { lab: Lab }) {
   return (
     <Card>
@@ -79,15 +99,6 @@ function ConditionCard({ lab }: { lab: Lab }) {
               Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.
             </p>
             <SqlCode code={lab.plan_query.trim()} />
-          </div>
-        ) : null}
-        {lab.kind === 'sql' && lab.given_diagram?.entities.length ? (
-          <div>
-            <h3 className="mb-1 text-sm font-medium">Berilgan ER-model</h3>
-            <p className="mb-2 text-xs text-muted-foreground">
-              Shu model bo'yicha jadvallarni yarating. Diagrammani surib va kattalashtirib ko'rish mumkin.
-            </p>
-            <ErEditor value={lab.given_diagram} />
           </div>
         ) : null}
         {lab.theory.trim() ? (
@@ -393,6 +404,7 @@ function StaffView({ lab }: { lab: Lab }) {
       />
       <div className="grid gap-4">
         <ConditionCard lab={lab} />
+        <GivenModelCard lab={lab} />
         {lab.kind === 'er' ? <ErStaffCards lab={lab} /> : <SqlStaffCards lab={lab} />}
         <ProgressCard lab={lab} />
         <SimilarityCard lab={lab} />
@@ -540,7 +552,8 @@ function StudentView({ lab }: { lab: Lab }) {
         description={`O'qituvchi: ${fullName(lab.author)}`}
         actions={<LabProgressBadge progress={progress} />}
       />
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <GivenModelCard lab={lab} />
+      <div className={cn('grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]', lab.given_diagram?.entities.length && 'mt-4')}>
         <ConditionCard lab={lab} />
         <Card>
           <CardHeader>
