@@ -218,6 +218,8 @@ export interface Lab {
   setup_sql: string
   /** Talabaga yuborilmaydi */
   solution_sql?: string
+  /** Yashirin test ma'lumotlari. Talabaga yuborilmaydi */
+  hidden_setup_sql?: string
   /** ER laboratoriyasining namunaviy diagrammasi. Talabaga yuborilmaydi */
   reference_diagram?: ErDiagram | null
   author: PersonShort

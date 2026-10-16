@@ -13,6 +13,7 @@ from rest_framework.test import APITestCase
 from ai.client import AITransientError
 from users.models import StudentGroup, User
 
+from .checker import HIDDEN_MISMATCH
 from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .sandbox import run_sql
 
@@ -1439,3 +1440,207 @@ class TheoryTests(BaseTestCase):
         custom.refresh_from_db()
         self.assertEqual(empty.theory, THEORY[title])
         self.assertEqual(custom.theory, "O'qituvchi matni")
+
+
+HIDDEN_SETUP = """
+CREATE TABLE kitob (id INT PRIMARY KEY, nomi VARCHAR(100) NOT NULL, narx INT);
+INSERT INTO kitob VALUES (4, 'Yashirin-Dengiz', 50), (5, 'Yashirin-Tog', 15), (6, 'Yashirin-Osmon', 25);
+"""
+# Ko'rinadigan ma'lumotlardagi to'g'ri natijani qo'lda yozish
+HARDCODED = "SELECT 'Bahor' AS nomi, 30 AS narx UNION ALL SELECT 'Chaqmoq', 20 ORDER BY narx DESC;"
+
+
+class HiddenDataTests(BaseTestCase):
+    """Yashirin test ma'lumotlari: natijani qo'lda yozib aldab bo'lmaydi va yashirin ma'lumot sir qoladi."""
+
+    def setUp(self):
+        super().setUp()
+        Lab.objects.filter(pk=self.lab.pk).update(hidden_setup_sql=HIDDEN_SETUP)
+        self.auth_as(self.student_a1)
+
+    def assert_no_hidden_leak(self, response):
+        text = json.dumps(response.data, default=str)
+        self.assertNotIn("Yashirin", text)
+        self.assertNotIn("hidden_setup_sql", text)
+
+    def test_hardcoded_result_fails(self):
+        response = self.run_code(HARDCODED)
+        self.assertFalse(response.data["is_correct"])
+        self.assertIsNone(response.data["error"])
+        self.assertEqual(response.data["differences"], [HIDDEN_MISMATCH])
+        # Ko'rinadigan natija talabaga ko'rsatiladi, yashirini emas
+        self.assertEqual(response.data["result"]["rows"], [["Bahor", "30"], ["Chaqmoq", "20"]])
+        self.assert_no_hidden_leak(response)
+        self.assertFalse(LabAttempt.objects.get().is_correct)
+
+    def test_real_query_passes(self):
+        response = self.run_code("SELECT nomi, narx FROM kitob WHERE narx >= 20 ORDER BY narx DESC")
+        self.assertTrue(response.data["is_correct"], response.data)
+
+    def test_error_only_on_hidden_data_reveals_nothing(self):
+        # id=4 faqat yashirin ma'lumotda bor; xato matni yashirin qiymatni o'z ichiga oladi:
+        # invalid input syntax for type integer: "Yashirin-Dengiz" — u talabaga ko'rsatilmasligi kerak
+        code = (
+            "SELECT nomi, narx FROM kitob WHERE narx >= 20 "
+            "AND (CASE WHEN id = 4 THEN nomi::int ELSE 0 END) = 0 ORDER BY narx DESC"
+        )
+        response = self.run_code(code)
+        self.assertFalse(response.data["is_correct"])
+        self.assertIsNone(response.data["error"])
+        self.assertEqual(response.data["differences"], [HIDDEN_MISMATCH])
+        self.assert_no_hidden_leak(response)
+
+    def test_submit_is_graded_with_hidden_data(self):
+        with patch("labs.views.ai_usable", return_value=False):
+            response = self.client.post(f"{self.url}submit/", {"sql_code": HARDCODED}, format="json")
+        self.assertEqual(response.data["grade"]["score"], 0)
+        self.assert_no_hidden_leak(response)
+
+    def test_student_cannot_see_hidden_data_staff_can(self):
+        self.assertNotIn("hidden_setup_sql", self.client.get(self.url).data)
+        listing = self.client.get("/api/labs/").data
+        self.assertTrue(all("hidden_setup_sql" not in item for item in listing))
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.client.get(self.url).data["hidden_setup_sql"], HIDDEN_SETUP)
+
+    def test_try_mode_uses_only_visible_data(self):
+        with patch("labs.checker.run_sql", wraps=run_sql) as runner:
+            response = self.run_code("SELECT nomi FROM kitob ORDER BY id", url=f"{self.url}try/")
+        self.assertEqual([call.args[1] for call in runner.call_args_list], [self.lab.setup_sql])
+        self.assert_no_hidden_leak(response)
+
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="sinov-kaliti")
+    def test_ai_advice_gets_no_hidden_data(self):
+        attempt_id = self.run_code(HARDCODED).data["attempt_id"]
+        with patch("labs.advice.create_message") as create_message:
+            create_message.return_value.content = [type("Block", (), {"type": "text", "text": "savol"})()]
+            self.client.post(f"/api/labs/attempts/{attempt_id}/advice/")
+        self.assertNotIn("Yashirin", json.dumps(create_message.call_args.kwargs, default=str))
+
+    def test_duplicate_keeps_hidden_data(self):
+        self.auth_as(self.teacher_a)
+        copy = Lab.objects.get(pk=self.client.post(f"{self.url}duplicate/").data["id"])
+        self.assertEqual(copy.hidden_setup_sql, HIDDEN_SETUP)
+
+    def test_validation(self):
+        self.auth_as(self.teacher_a)
+        cases = {
+            # Boshqa jadval
+            "CREATE TABLE boshqa (id INT);": "hidden_setup_sql",
+            # Ustunlar boshqacha
+            "CREATE TABLE kitob (id INT, nomi TEXT);": "hidden_setup_sql",
+            # Sintaksis xatosi
+            "CREATE TABLE kitob (id INT,;": "hidden_setup_sql",
+        }
+        for hidden, field in cases.items():
+            response = self.client.patch(self.url, {"hidden_setup_sql": hidden}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, hidden)
+            self.assertIn(field, response.data, hidden)
+        # Yechimsiz laboratoriyada yashirin ma'lumot ma'nosiz
+        response = self.client.patch(self.url, {"solution_sql": "", "hidden_setup_sql": HIDDEN_SETUP}, format="json")
+        self.assertIn("hidden_setup_sql", response.data)
+        response = self.client.patch(self.url, {"hidden_setup_sql": HIDDEN_SETUP}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+
+class QueryLabsTests(TestCase):
+    """SELECT so'rovlari bo'yicha tayyor laboratoriyalar (query_labs.py)."""
+
+    @staticmethod
+    def check(lab_data, code):
+        from .checker import check_code
+
+        return check_code(Lab(**lab_data), code)
+
+    def test_solutions_pass_including_hidden_data(self):
+        from .query_labs import QUERY_LABS
+
+        for lab_data in QUERY_LABS:
+            self.assertTrue(self.check(lab_data, lab_data["solution_sql"])["is_correct"], lab_data["title"])
+
+    def test_hidden_results_differ_from_visible(self):
+        from .query_labs import QUERY_LABS
+
+        for lab_data in QUERY_LABS:
+            visible = run_sql(lab_data["solution_sql"], lab_data["setup_sql"]).result.rows
+            hidden = run_sql(lab_data["solution_sql"], lab_data["hidden_setup_sql"]).result.rows
+            self.assertTrue(visible and hidden, lab_data["title"])
+            self.assertNotEqual(visible, hidden, lab_data["title"])
+
+    def test_hardcoded_visible_result_fails_every_lab(self):
+        from psycopg import sql as psql
+
+        from .query_labs import QUERY_LABS
+
+        for lab_data in QUERY_LABS:
+            rows = run_sql(lab_data["solution_sql"], lab_data["setup_sql"]).result.rows
+            values = ", ".join(
+                "(" + ", ".join(psql.Literal(value).as_string() for value in row) + ")" for row in rows
+            )
+            columns = ", ".join(f"c{index}" for index in range(len(rows[0])))
+            # VALUES qatorlari yozilgan tartibda qaytadi: ko'rinadigan ma'lumotlarda bu to'g'ri natija
+            hardcoded = f"SELECT * FROM (VALUES {values}) AS v({columns})"
+            result = self.check(lab_data, hardcoded)
+            self.assertFalse(result["is_correct"], lab_data["title"])
+            self.assertEqual(result["differences"], [HIDDEN_MISMATCH], lab_data["title"])
+
+    def test_alternative_correct_solutions_pass(self):
+        from .query_labs import QUERY_LABS
+
+        by_number = {int(lab["title"].split(".")[0].split()[-1]): lab for lab in QUERY_LABS}
+        alternatives = {
+            1: "SELECT familiya, ism FROM talaba WHERE shahar IN ('Toshkent') ORDER BY 1, 2",
+            3: "SELECT ism, familiya FROM talaba WHERE coalesce(shahar, 'Buxoro') IN ('Buxoro', 'Namangan') ORDER BY id",
+            4: "SELECT count(ball), avg(ball)::numeric(10,2), max(ball), min(ball) FROM baho",
+            5: "SELECT familiya, ism, g.nomi FROM guruh g, talaba t WHERE t.guruh_id = g.id ORDER BY 3, 1",
+            6: """SELECT familiya, ism FROM talaba t
+                  WHERE NOT EXISTS (SELECT 1 FROM baho b WHERE b.talaba_id = t.id) ORDER BY familiya""",
+            7: """SELECT f.nomi, x.soni, x.ortacha FROM fan f JOIN (
+                    SELECT fan_id, count(*) AS soni, round(avg(ball), 2) AS ortacha FROM baho GROUP BY fan_id
+                  ) x ON x.fan_id = f.id WHERE x.soni >= 3 ORDER BY x.ortacha DESC""",
+            8: """WITH o AS (SELECT talaba_id, avg(ball) AS a FROM baho GROUP BY talaba_id)
+                  SELECT t.familiya, t.ism, round(o.a, 2) FROM o JOIN talaba t ON t.id = o.talaba_id
+                  WHERE o.a > (SELECT avg(ball) FROM baho) ORDER BY o.a DESC""",
+            10: """SELECT g.nomi, s.familiya, s.ism, round(s.a, 2) FROM (
+                     SELECT DISTINCT ON (t.guruh_id) t.guruh_id, t.familiya, t.ism, avg(b.ball) AS a
+                     FROM talaba t JOIN baho b ON b.talaba_id = t.id WHERE t.guruh_id IS NOT NULL
+                     GROUP BY t.id ORDER BY t.guruh_id, avg(b.ball) DESC, t.id
+                   ) s JOIN guruh g ON g.id = s.guruh_id ORDER BY g.nomi""",
+        }
+        for number, code in alternatives.items():
+            result = self.check(by_number[number], code)
+            self.assertTrue(result["is_correct"], (number, result["differences"], result["error"]))
+
+    def test_typical_mistakes_fail(self):
+        from .query_labs import QUERY_LABS
+
+        by_number = {int(lab["title"].split(".")[0].split()[-1]): lab for lab in QUERY_LABS}
+        mistakes = {
+            # NULL ni = bilan solishtirish
+            3: "SELECT ism, familiya FROM talaba WHERE shahar = NULL OR shahar IN ('Buxoro', 'Namangan') ORDER BY id",
+            # LEFT JOIN o'rniga JOIN: guruhsiz talaba yo'qoladi — bu 5-da to'g'ri, 6-da esa natija bo'sh
+            6: "SELECT t.familiya, t.ism FROM talaba t JOIN baho b ON b.talaba_id = t.id WHERE b.ball IS NULL",
+            # HAVING o'rniga hamma fanlar
+            7: "SELECT f.nomi, count(*), round(avg(b.ball), 2) FROM baho b JOIN fan f ON f.id = b.fan_id GROUP BY f.nomi ORDER BY 3 DESC",
+            # RANK o'rniga ROW_NUMBER: teng ballar turli o'rin oladi
+            9: """SELECT f.nomi, t.familiya, b.ball, row_number() OVER (PARTITION BY b.fan_id ORDER BY b.ball DESC, t.familiya)
+                  FROM baho b JOIN fan f ON f.id = b.fan_id JOIN talaba t ON t.id = b.talaba_id ORDER BY 1, 4, 2""",
+        }
+        for number, code in mistakes.items():
+            self.assertFalse(self.check(by_number[number], code)["is_correct"], number)
+
+    def test_theory_examples_run_and_hide_solutions(self):
+        import re
+
+        from .query_labs import EXAMPLE_SETUP_SQL, QUERY_LABS
+
+        for lab_data in QUERY_LABS:
+            self.assertNotIn(lab_data["solution_sql"].strip(), lab_data["theory"], lab_data["title"])
+            examples = re.findall(r"```sql\n(.*?)```", lab_data["theory"], re.DOTALL)
+            self.assertTrue(examples, lab_data["title"])
+            for code in examples:
+                outcome = run_sql(code, EXAMPLE_SETUP_SQL)
+                self.assertIsNone(outcome.error, (lab_data["title"], outcome.error))
+                self.assertTrue(outcome.result.rows, lab_data["title"])
+                # Namuna universitet jadvallariga emas, do'kon jadvallariga murojaat qiladi
+                self.assertIsNone(re.search(r"\b(talaba|baho|guruh|fan)\b", code), lab_data["title"])

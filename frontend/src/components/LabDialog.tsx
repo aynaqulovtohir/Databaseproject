@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'reference_diagram', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -42,6 +42,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [theory, setTheory] = useState(lab?.theory ?? '')
   const [setupSql, setSetupSql] = useState(lab?.setup_sql ?? '')
   const [solutionSql, setSolutionSql] = useState(lab?.solution_sql ?? '')
+  const [hiddenSql, setHiddenSql] = useState(lab?.hidden_setup_sql ?? '')
   const [groupIds, setGroupIds] = useState<number[]>(lab?.groups ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -51,7 +52,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
-          : { ...common, kind, setup_sql: setupSql, solution_sql: solutionSql }
+          : { ...common, kind, setup_sql: setupSql, solution_sql: solutionSql, hidden_setup_sql: hiddenSql }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
         : api<Lab>('/labs/', { method: 'POST', body })
@@ -196,6 +197,21 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   aria-invalid={Boolean(errors.solution_sql)}
                   value={solutionSql}
                   onChange={(event) => setSolutionSql(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              <FormField
+                id="lab_hidden"
+                label="Yashirin test ma'lumotlari (SQL, ixtiyoriy)"
+                error={errors.hidden_setup_sql}
+                hint="Talabaga ko'rinmaydi. Boshlang'ich jadvallar bilan bir xil jadvallar, lekin boshqa ma'lumotlar. To'g'ri chiqqan kod shu ma'lumotlarda ham tekshiriladi: natijani qo'lda yozib aldab bo'lmaydi."
+              >
+                <Textarea
+                  id="lab_hidden"
+                  className="max-h-64 min-h-28 font-mono text-sm md:text-xs"
+                  aria-invalid={Boolean(errors.hidden_setup_sql)}
+                  value={hiddenSql}
+                  onChange={(event) => setHiddenSql(event.target.value)}
                   {...SQL_PROPS}
                 />
               </FormField>

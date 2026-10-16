@@ -19,6 +19,9 @@ class Lab(models.Model):
     setup_sql = models.TextField("boshlang'ich jadvallar (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # Talabaga ko'rinmaydi; talaba natijasi shu yechim natijasi bilan solishtiriladi
     solution_sql = models.TextField("namunaviy yechim (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
+    # Talabaga ko'rinmaydi. To'g'ri chiqqan kod shu ma'lumotlarda ham namunaviy yechim bilan solishtiriladi:
+    # natijani qo'lda yozib (SELECT 'Ali', 5) tekshiruvni aldab bo'lmaydi. Jadvallar setup_sql dagidek, ma'lumot boshqa
+    hidden_setup_sql = models.TextField("yashirin test ma'lumotlari (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # ER-diagramma laboratoriyasi uchun namunaviy diagramma (labs/er.py dagi format); talabaga ko'rinmaydi
     reference_diagram = models.JSONField("namunaviy ER-diagramma", null=True, blank=True)
     author = models.ForeignKey(

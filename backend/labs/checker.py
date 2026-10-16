@@ -2,7 +2,7 @@
 import re
 from collections import Counter
 
-from .sandbox import run_sql
+from .sandbox import SqlError, run_sql
 
 MAX_DISPLAY_ROWS = 100
 MAX_DIFFERENCES = 8
@@ -166,11 +166,46 @@ def _compare_tables(student, expected):
     return differences
 
 
-def validate_lab_sql(setup_sql, solution_sql):
-    """Laboratoriyani saqlashdan oldin: boshlang'ich jadvallar va namunaviy yechim ishlashini tekshiradi."""
-    outcome = run_sql(solution_sql if solution_sql.strip() else "SELECT 1", setup_sql)
+# Yashirin ma'lumotlarda farq chiqqanda: qaysi qator yoki qiymat farq qilgani aytilmaydi (yashirin ma'lumot sir)
+HIDDEN_MISMATCH = (
+    "Kod ko'rinib turgan ma'lumotlarda to'g'ri natija berdi, lekin boshqa (yashirin) ma'lumotlarda natija "
+    "kutilganidan farq qildi. Natijani qo'lda yozmang: so'rov istalgan ma'lumotlar uchun to'g'ri ishlashi kerak "
+    "(shartlar, JOIN va guruhlashni tekshiring)."
+)
+
+
+def _table_columns(tables):
+    return {name: set(state.columns) for name, state in tables.items()}
+
+
+def validate_lab_sql(setup_sql, solution_sql, hidden_setup_sql=""):
+    """Laboratoriyani saqlashdan oldin: boshlang'ich jadvallar va namunaviy yechim ishlashini tekshiradi.
+
+    Yashirin ma'lumotlar berilgan bo'lsa: ular xatosiz ishlaydi, jadvallar tuzilishi ko'rinadigan bilan bir xil
+    va namunaviy yechim ularda ham ishlaydi.
+    """
+    solution = solution_sql if solution_sql.strip() else "SELECT 1"
+    outcome = run_sql(solution, setup_sql)
     if outcome.error:
         raise LabSetupError("setup_sql" if outcome.setup_failed else "solution_sql", outcome.error)
+    if not hidden_setup_sql.strip():
+        return
+    if not solution_sql.strip():
+        raise LabSetupError(
+            "hidden_setup_sql", SqlError("Yashirin ma'lumotlar faqat namunaviy yechim bor laboratoriyada ishlatiladi.")
+        )
+    visible = run_sql("SELECT 1", setup_sql)
+    hidden = run_sql("SELECT 1", hidden_setup_sql)
+    if hidden.error:
+        raise LabSetupError("hidden_setup_sql", hidden.error)
+    if _table_columns(hidden.tables) != _table_columns(visible.tables):
+        raise LabSetupError(
+            "hidden_setup_sql",
+            SqlError("Yashirin ma'lumotlar boshlang'ich jadvallar bilan bir xil jadval va ustunlarni yaratishi kerak."),
+        )
+    hidden_solution = run_sql(solution_sql, hidden_setup_sql)
+    if hidden_solution.error:
+        raise LabSetupError("solution_sql", hidden_solution.error)
 
 
 def _tables_payload(tables):
@@ -205,6 +240,24 @@ def try_code(lab, sql_code):
     }
 
 
+def _passes_hidden(lab, sql_code, ordered):
+    """Talaba kodini yashirin ma'lumotlarda namunaviy yechim bilan solishtiradi.
+
+    Talabaga faqat ha/yo'q qaytadi: xato matni ham yashirin qiymatlarni ochib qo'yishi mumkin (masalan,
+    "Key (id)=(7) already exists"), shuning uchun u ham ko'rsatilmaydi.
+    """
+    student = run_sql(sql_code, lab.hidden_setup_sql)
+    if student.setup_failed:
+        raise LabSetupError("hidden_setup_sql", student.error)
+    if student.error:
+        return False
+    expected = run_sql(lab.solution_sql, lab.hidden_setup_sql)
+    if expected.error:
+        raise LabSetupError("hidden_setup_sql" if expected.setup_failed else "solution_sql", expected.error)
+    differences = _compare_results(student.result, expected.result, ordered)
+    return not differences and not _compare_tables(student.tables, expected.tables)
+
+
 def check_code(lab, sql_code):
     """Kodni ishga tushiradi va tekshiruv natijasini lug'at ko'rinishida qaytaradi."""
     outcome = run_sql(sql_code, lab.setup_sql)
@@ -220,6 +273,8 @@ def check_code(lab, sql_code):
         ordered = bool(re.search(r"\border\s+by\b", lab.solution_sql, re.IGNORECASE))
         differences = _compare_results(outcome.result, expected.result, ordered)
         differences += _compare_tables(outcome.tables, expected.tables)
+        if not differences and lab.hidden_setup_sql.strip() and not _passes_hidden(lab, sql_code, ordered):
+            differences = [HIDDEN_MISMATCH]
 
     return {
         "is_correct": outcome.error is None and not differences,

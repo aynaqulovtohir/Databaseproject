@@ -30,6 +30,13 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         max_length=MAX_SQL_LENGTH,
         error_messages={"max_length": SQL_TOO_LONG},
     )
+    hidden_setup_sql = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        max_length=MAX_SQL_LENGTH,
+        error_messages={"max_length": SQL_TOO_LONG},
+    )
 
     class Meta:
         model = Lab
@@ -41,6 +48,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "theory",
             "setup_sql",
             "solution_sql",
+            "hidden_setup_sql",
             "reference_diagram",
             "author",
             "groups",
@@ -71,7 +79,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"reference_diagram": "Namunaviy diagrammada kamida bitta obyekt bo'lsin."})
         attrs["reference_diagram"] = diagram
         # ER laboratoriyasida SQL ishlatilmaydi
-        attrs["setup_sql"] = attrs["solution_sql"] = ""
+        attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = ""
         return attrs
 
     def validate_sql(self, attrs):
@@ -79,10 +87,15 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         current = self.instance
         setup_sql = attrs.get("setup_sql", current.setup_sql if current else "")
         solution_sql = attrs.get("solution_sql", current.solution_sql if current else "")
-        changed = current is None or (setup_sql, solution_sql) != (current.setup_sql, current.solution_sql)
-        if changed and (setup_sql.strip() or solution_sql.strip()):
+        hidden_sql = attrs.get("hidden_setup_sql", current.hidden_setup_sql if current else "")
+        changed = current is None or (setup_sql, solution_sql, hidden_sql) != (
+            current.setup_sql,
+            current.solution_sql,
+            current.hidden_setup_sql,
+        )
+        if changed and (setup_sql.strip() or solution_sql.strip() or hidden_sql.strip()):
             try:
-                validate_lab_sql(setup_sql, solution_sql)
+                validate_lab_sql(setup_sql, solution_sql, hidden_sql)
             except LabSetupError as exc:
                 raise serializers.ValidationError({exc.field: f"Kod xato berdi. {format_error(exc.error)}"})
             except SandboxUnavailable:

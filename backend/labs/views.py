@@ -381,6 +381,7 @@ class LabViewSet(viewsets.ModelViewSet):
             theory=lab.theory,
             setup_sql=lab.setup_sql,
             solution_sql=lab.solution_sql,
+            hidden_setup_sql=lab.hidden_setup_sql,
             reference_diagram=lab.reference_diagram,
             author=request.user,
         )
