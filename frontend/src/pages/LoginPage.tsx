@@ -41,7 +41,7 @@ export function LoginPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Ma'lumotlar bazasini loyihalash</h1>
-            <p className="text-sm text-muted-foreground">Sun'iy intellekt asosidagi ta'lim platformasi</p>
+            <p className="text-sm text-muted-foreground">Ta'lim platformasi</p>
           </div>
         </div>
 
