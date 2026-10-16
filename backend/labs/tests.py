@@ -1994,3 +1994,60 @@ class TransactionLabsTests(BaseTestCase):
         self.assertFalse(response.data["is_correct"])
         self.assertTrue(response.data["steps"])
         self.assertTrue(LabAttempt.objects.filter(student=self.student_a1, is_correct=False).exists())
+
+
+class MistakesReportTests(BaseTestCase):
+    """O'qituvchi uchun «eng ko'p uchraydigan xatolar» hisoboti."""
+
+    def setUp(self):
+        super().setUp()
+        self.mistakes_url = f"{self.url}mistakes/"
+
+    def attempt(self, student, code):
+        self.client.force_authenticate(student)
+        return self.run_code(code)
+
+    def test_groups_mistakes_by_kind_and_counts_students(self):
+        # a1: ustun nomida xato ikki marta va qatorlar soni noto'g'ri; a2: ustun nomida xato, keyin to'g'ri
+        self.attempt(self.student_a1, "SELECT nom FROM kitob")
+        self.attempt(self.student_a1, "SELECT narxi FROM kitob")
+        self.attempt(self.student_a1, "SELECT nomi, narx FROM kitob ORDER BY narx DESC")
+        self.attempt(self.student_a2, "SELECT nomlar FROM kitob")
+        self.attempt(self.student_a2, SOLUTION)
+
+        self.client.force_authenticate(self.teacher_a)
+        report = self.client.get(self.mistakes_url).data
+        self.assertEqual(
+            (report["students"], report["attempted"], report["solved"], report["stuck"], report["wrong_attempts"]),
+            (2, 2, 1, 1, 4),
+        )
+        top = report["items"][0]
+        # Ikkala talaba ham «bunday ustun yo'q» (42703) xatosiga duch kelgan: 3 urinish, 2 talaba, 100%
+        self.assertEqual((top["kind"], top["attempts"], top["students"], top["share"]), ("error", 3, 2, 100.0))
+        self.assertIn("ustun topilmadi", top["tip"])
+        second = report["items"][1]
+        self.assertEqual((second["kind"], second["students"], second["share"]), ("difference", 1, 50.0))
+        # Ismlar yo'q
+        text = json.dumps(report)
+        for student in (self.student_a1, self.student_a2):
+            self.assertNotIn(student.username, text)
+
+    def test_numbers_are_generalized(self):
+        from .mistakes import mistakes_of
+
+        first = mistakes_of({"error": None, "differences": ["sizda 3 qator, kutilgan 2 qator"]})
+        second = mistakes_of({"error": None, "differences": ["sizda 5 qator, kutilgan 2 qator"]})
+        self.assertEqual(first[0][0], second[0][0])
+        concurrent = mistakes_of({"error": {"message": "B sessiyasida: could not serialize", "sqlstate": "40001"}})
+        self.assertEqual(concurrent[0][2], "could not serialize")
+
+    def test_group_filter_and_permissions(self):
+        self.attempt(self.student_a1, "SELECT nom FROM kitob")
+        self.client.force_authenticate(self.teacher_a)
+        self.assertEqual(self.client.get(self.mistakes_url, {"group": self.group_b.pk}).data["attempted"], 0)
+        self.assertEqual(self.client.get(self.mistakes_url, {"group": self.group_a.pk}).data["attempted"], 1)
+        self.assertEqual(self.client.get(self.mistakes_url, {"group": "x"}).status_code, 400)
+        self.client.force_authenticate(self.student_a1)
+        self.assertEqual(self.client.get(self.mistakes_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.client.force_authenticate(self.teacher_b)
+        self.assertEqual(self.client.get(self.mistakes_url).status_code, status.HTTP_404_NOT_FOUND)

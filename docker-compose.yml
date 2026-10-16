@@ -15,7 +15,8 @@ services:
   # og'ir so'rov faqat laboratoriyani sekinlashtiradi, asosiy bazaga ta'sir qilmaydi.
   # Ma'lumotlar RAM'da saqlanadi (qum quti vaqtinchalik), tashqariga port ochilmaydi.
   lab_db:
-    image: docker.io/library/postgres:17
+    # pgvector bilan Postgres 17: vektorli qidiruv laboratoriyalari uchun (kengaytma alohida "ext" sxemasida)
+    image: docker.io/pgvector/pgvector:0.8.1-pg17
     environment:
       POSTGRES_USER: ${LAB_DB_USER:-lab_admin}
       POSTGRES_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}

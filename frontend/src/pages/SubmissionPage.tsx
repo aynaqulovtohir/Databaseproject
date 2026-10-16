@@ -5,6 +5,8 @@ import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AnalysisPanel, useAnalysis } from '@/components/AnalysisPanel'
+import { VivaPanel } from '@/components/VivaPanel'
+import { ErEditor } from '@/components/ErEditor'
 import { FormField } from '@/components/FormField'
 import { PageHeader } from '@/components/PageHeader'
 import { SqlCode } from '@/components/SqlCode'
@@ -281,10 +283,10 @@ function Review({ submission }: { submission: Submission }) {
         <div className="grid gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>SQL kod</CardTitle>
+              <CardTitle>{submission.diagram ? 'ER-diagramma' : 'SQL kod'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <SqlCode code={submission.sql_code} />
+              {submission.diagram ? <ErEditor value={submission.diagram} /> : <SqlCode code={submission.sql_code} />}
             </CardContent>
           </Card>
           <Card>
@@ -293,6 +295,15 @@ function Review({ submission }: { submission: Submission }) {
             </CardHeader>
             <CardContent>
               <AnalysisPanel submissionId={submission.id} staff />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Loyiha himoyasi</CardTitle>
+              <CardDescription>AI talabaga uning o'z yechimi bo'yicha savollar beradi va javoblarini baholaydi.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VivaPanel submissionId={submission.id} staff />
             </CardContent>
           </Card>
         </div>

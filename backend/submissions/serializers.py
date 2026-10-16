@@ -34,6 +34,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "student",
             "stage",
             "sql_code",
+            "diagram",
             "attempt_number",
             "is_late",
             "status",
@@ -57,7 +58,12 @@ class SubmissionSerializer(serializers.ModelSerializer):
 class SubmissionCreateSerializer(serializers.Serializer):
     # Bosqichli loyihada bosqich id'si (view tekshiradi: shu topshiriqqa tegishlimi)
     stage = serializers.IntegerField(required=False, allow_null=True, default=None)
+    # ER-diagramma bosqichida
+    diagram = serializers.JSONField(required=False, allow_null=True, default=None)
     sql_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
         max_length=MAX_SQL_CODE_LENGTH,
         trim_whitespace=False,
         error_messages={
@@ -67,7 +73,21 @@ class SubmissionCreateSerializer(serializers.Serializer):
         },
     )
 
-    def validate_sql_code(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("SQL kod bo'sh bo'lmasligi kerak.")
-        return value
+    def check_for(self, stage):
+        """Bosqich turiga qarab yechimni tekshiradi. Qaytaradi: (sql_code, diagram)."""
+        from labs.er import DiagramError, validate_diagram
+
+        data = self.validated_data
+        if stage is not None and stage.kind == stage.Kind.ER:
+            if data["diagram"] is None:
+                raise serializers.ValidationError({"diagram": "ER-diagrammani chizing."})
+            try:
+                diagram = validate_diagram(data["diagram"])
+            except DiagramError as exc:
+                raise serializers.ValidationError({"diagram": str(exc)})
+            if not diagram["entities"]:
+                raise serializers.ValidationError({"diagram": "Diagrammada kamida bitta obyekt bo'lsin."})
+            return "", diagram
+        if not data["sql_code"].strip():
+            raise serializers.ValidationError({"sql_code": "SQL kod bo'sh bo'lmasligi kerak."})
+        return data["sql_code"], None

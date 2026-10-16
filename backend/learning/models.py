@@ -97,8 +97,14 @@ class AssignmentStage(models.Model):
     assignment = models.ForeignKey(
         Assignment, verbose_name="topshiriq", on_delete=models.CASCADE, related_name="stages"
     )
+    class Kind(models.TextChoices):
+        SQL = "sql", "SQL kod"
+        ER = "er", "ER-diagramma"
+
     # 0 dan boshlab, ketma-ket
     order = models.PositiveSmallIntegerField("tartib raqami")
+    # Talaba nima topshiradi: SQL kod yoki ER-diagramma (laboratoriyadagi muharrirda chiziladi)
+    kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.SQL)
     title = models.CharField("sarlavha", max_length=200)
     description = models.TextField("bosqich sharti", blank=True)
     deadline = models.DateTimeField("muddat")

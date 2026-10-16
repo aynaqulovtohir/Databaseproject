@@ -43,6 +43,18 @@ def rubric_text(assignment, stage):
     )
 
 
+def solution_text(submission):
+    """Yechim matni: SQL kod yoki ER-diagrammaning matnli ko'rinishi."""
+    if submission.diagram:
+        from labs.er import diagram_to_text
+
+        return (
+            "Bu yechim SQL emas, konseptual ER-diagramma (obyektlar, atributlar, bog'lanishlar va kardinallik). "
+            "Uni ER-modellash qoidalari bo'yicha bahola.\n\n" + diagram_to_text(submission.diagram)
+        )
+    return submission.sql_code
+
+
 def build_analysis_messages(submission):
     """AI'ga yuboriladigan matn. Talaba haqida hech qanday ma'lumot qo'shilmaydi."""
     assignment = submission.assignment
@@ -62,7 +74,7 @@ def build_analysis_messages(submission):
                 title=assignment.title,
                 description=description,
                 grading_criteria=criteria or prompts.NO_CRITERIA_TEXT,
-                sql_code=submission.sql_code,
+                sql_code=solution_text(submission),
             ),
         }
     ]
@@ -90,19 +102,23 @@ def analyze_submission(submission):
     return result, response.usage.input_tokens, response.usage.output_tokens
 
 
-def chat_reply(assignment, history, question):
+def chat_reply(assignment, history, question, passages=()):
     """Talaba savoliga AI javobi.
 
     history: [{"role": "user" | "assistant", "content": "..."}] - oldingi xabarlar.
+    passages: kurs materiallaridan savolga mos parchalar (learning.retrieval.find_passages).
     Baholash mezonlari bu yerga ataylab qo'shilmaydi: ular talabaga ko'rinmasligi kerak.
     """
+    from learning.retrieval import MATERIALS_RULE, passages_block
+
     response = create_message(
         purpose="chat",
         max_tokens=CHAT_MAX_TOKENS,
         system=prompts.CHAT_SYSTEM_TEMPLATE.format(
             title=assignment.title, description=assignment.description
-        ),
-        messages=[*history, {"role": "user", "content": question}],
+        )
+        + MATERIALS_RULE,
+        messages=[*history, {"role": "user", "content": question + passages_block(passages)}],
         output_config={"effort": "low"},
     )
     return extract_text(response)

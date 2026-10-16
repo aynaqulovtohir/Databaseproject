@@ -36,6 +36,7 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
   const [groupIds, setGroupIds] = useState<number[]>(assignment?.groups ?? [])
   const [deadline, setDeadline] = useState(initialDeadline)
   const initialStages: StageDraft[] = (assignment?.stages ?? []).map((stage) => ({
+    kind: stage.kind,
     title: stage.title,
     description: stage.description,
     deadline: toLocalInputValue(stage.deadline),
@@ -62,6 +63,7 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
         stage: stages.length ? item.stage : null,
       }))
       body.stages = stages.map((stage, index) => ({
+        kind: stage.kind,
         title: stage.title.trim(),
         description: stage.description,
         // O'zgartirilmagan muddat asl qiymatida yuboriladi (o'tib ketgan bo'lsa ham qabul qilinadi)

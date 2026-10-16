@@ -86,6 +86,18 @@ export function ProjectPlanEditor({
                 </Button>
               ) : null}
             </div>
+            <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              Talaba topshiradi
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+                disabled={locked}
+                value={stage.kind}
+                onChange={(event) => updateStage(index, { kind: event.target.value as StageDraft['kind'] })}
+              >
+                <option value="sql">SQL kod</option>
+                <option value="er">ER-diagramma</option>
+              </select>
+            </label>
             <Textarea
               aria-label={`${index + 1}-bosqich sharti`}
               className="max-h-40 min-h-14"
@@ -110,7 +122,7 @@ export function ProjectPlanEditor({
             type="button"
             variant="outline"
             className="justify-self-start"
-            onClick={() => onStagesChange([...stages, { title: '', description: '', deadline: '' }])}
+            onClick={() => onStagesChange([...stages, { kind: 'sql', title: '', description: '', deadline: '' }])}
           >
             <Plus aria-hidden="true" />
             Bosqich qo'shish

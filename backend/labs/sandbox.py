@@ -56,9 +56,15 @@ HIDDEN_CATALOG_VIEWS = (
 )
 # Bir vaqtda bir nechta jarayon bazani sozlamasligi uchun advisory lock kaliti
 HARDENING_LOCK_KEY = 7_401_202
+# Laboratoriyalar uchun kengaytmalar (masalan, pgvector — vektorli qidiruv) shu sxemaga o'rnatiladi. Talaba roli
+# unda faqat USAGE huquqiga ega: turlar va operatorlardan foydalana oladi, lekin hech narsa yarata olmaydi.
+# Server obrazida kengaytma bo'lmasa (oddiy postgres), laboratoriyalar kengaytmasiz ishlayveradi
+EXTENSION_SCHEMA = "ext"
+EXTENSIONS = ("vector",)
 
 _database_ready = False
 _database_lock = threading.Lock()
+_extensions_checked = False
 
 
 class SandboxUnavailable(Exception):
@@ -165,6 +171,40 @@ def _ensure_database():
                 except psycopg.errors.DuplicateDatabase:
                     pass  # boshqa jarayon ayni paytda yaratib bo'lgan
         _database_ready = True
+
+
+def _ensure_extensions(admin):
+    """Kengaytmalarni ext sxemasiga bir marta o'rnatadi (har bir jarayonda bir marta tekshiriladi)."""
+    global _extensions_checked
+    if _extensions_checked:
+        return
+    schema = sql.Identifier(EXTENSION_SCHEMA)
+    with admin.transaction():
+        admin.execute("SELECT pg_advisory_xact_lock(%s)", [HARDENING_LOCK_KEY])
+        admin.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(schema))
+        admin.execute(sql.SQL("REVOKE ALL ON SCHEMA {} FROM PUBLIC").format(schema))
+        admin.execute(sql.SQL("GRANT USAGE ON SCHEMA {} TO PUBLIC").format(schema))
+    for extension in EXTENSIONS:
+        available = admin.execute("SELECT 1 FROM pg_available_extensions WHERE name = %s", [extension]).fetchone()
+        if not available:
+            logger.warning("Laboratoriya serverida %s kengaytmasi yo'q: unga oid laboratoriyalar ishlamaydi.", extension)
+            continue
+        try:
+            with admin.transaction():
+                admin.execute(
+                    sql.SQL("CREATE EXTENSION IF NOT EXISTS {} SCHEMA {}").format(sql.Identifier(extension), schema)
+                )
+        except psycopg.errors.UniqueViolation:
+            pass  # boshqa jarayon ayni paytda o'rnatgan
+    _extensions_checked = True
+
+
+def available_extensions():
+    """Qum qutida o'rnatilgan kengaytmalar (laboratoriya yaratishda tekshirish uchun)."""
+    _ensure_database()
+    with _connect(settings.LAB_SANDBOX_DB) as admin:
+        _ensure_extensions(admin)
+        return {row[0] for row in admin.execute("SELECT extname FROM pg_extension").fetchall()}
 
 
 def _harden_if_needed(admin):
@@ -462,6 +502,7 @@ def _create_role(admin, connection_limit=1):
     identifier = sql.Identifier(role)
     admin.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
     _harden_if_needed(admin)
+    _ensure_extensions(admin)
     _drop_stale_roles(admin)
     # Parol bir daqiqadan keyin o'z kuchini yo'qotadi
     valid_until = admin.execute("SELECT (now() + interval '1 minute')::text").fetchone()[0]
@@ -485,7 +526,8 @@ def _connect_runner(role, password, extra_options=""):
         settings.LAB_SANDBOX_DB,
         user=role,
         password=password,
-        options=f"-c search_path={role} -c statement_timeout={STATEMENT_TIMEOUT_MS} {extra_options}".strip(),
+        # ext — kengaytmalar turlari va operatorlari (masalan, vector va <->); talaba sxemasi birinchi turadi
+        options=f"-c search_path={role},{EXTENSION_SCHEMA} -c statement_timeout={STATEMENT_TIMEOUT_MS} {extra_options}".strip(),
     )
 
 

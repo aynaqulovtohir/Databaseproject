@@ -4,11 +4,11 @@ import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 
 import { FormField } from '@/components/FormField'
+import { PasswordInput } from '@/components/PasswordInput'
 import { PageHeader } from '@/components/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
@@ -95,9 +95,8 @@ function PasswordCard() {
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
           <FormField id="old_password" label="Joriy parol" error={errors.old_password}>
-            <Input
+            <PasswordInput
               id="old_password"
-              type="password"
               autoComplete="current-password"
               className="h-10"
               aria-invalid={Boolean(errors.old_password)}
@@ -106,9 +105,8 @@ function PasswordCard() {
             />
           </FormField>
           <FormField id="new_password" label="Yangi parol" error={errors.new_password}>
-            <Input
+            <PasswordInput
               id="new_password"
-              type="password"
               autoComplete="new-password"
               className="h-10"
               aria-invalid={Boolean(errors.new_password)}
@@ -117,9 +115,8 @@ function PasswordCard() {
             />
           </FormField>
           <FormField id="repeat_password" label="Yangi parolni takrorlang" error={errors.repeat_password}>
-            <Input
+            <PasswordInput
               id="repeat_password"
-              type="password"
               autoComplete="new-password"
               className="h-10"
               aria-invalid={Boolean(errors.repeat_password)}

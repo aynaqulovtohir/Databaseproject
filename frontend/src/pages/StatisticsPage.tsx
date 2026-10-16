@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart3 } from 'lucide-react'
 import { useState } from 'react'
 
+import { GroupMasteryCard } from '@/components/LearningPath'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
@@ -98,9 +99,9 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
                 <TableRow key={lab.id}>
                   <TableCell className="max-w-72 truncate font-medium" title={lab.title}>
                     {lab.title}
-                    {lab.kind === 'er' ? (
+                    {lab.kind !== 'sql' ? (
                       <Badge variant="outline" className="ml-2">
-                        ER
+                        {lab.kind === 'er' ? 'ER' : 'NF'}
                       </Badge>
                     ) : null}
                   </TableCell>
@@ -486,6 +487,7 @@ export function StatisticsPage() {
           <AiEffectCard effect={data.ai_effect} />
         </div>
         <LabsCard labs={data.labs} />
+        {groupId ? <GroupMasteryCard groupId={groupId} /> : null}
       </div>
     )
   }

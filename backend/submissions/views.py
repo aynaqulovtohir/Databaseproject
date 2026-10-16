@@ -54,6 +54,7 @@ class AssignmentSubmissionsView(APIView):
         serializer = SubmissionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         stage = self.get_stage(assignment, serializer.validated_data["stage"])
+        sql_code, diagram = serializer.check_for(stage)
 
         try:
             with transaction.atomic():
@@ -76,7 +77,8 @@ class AssignmentSubmissionsView(APIView):
                     assignment=assignment,
                     student=request.user,
                     stage=stage,
-                    sql_code=serializer.validated_data["sql_code"],
+                    sql_code=sql_code,
+                    diagram=diagram,
                     attempt_number=(last_submission.attempt_number + 1) if last_submission else 1,
                     is_late=timezone.now() > (stage.deadline if stage else assignment.deadline),
                 )

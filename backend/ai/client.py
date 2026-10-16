@@ -46,9 +46,32 @@ def is_configured():
     return bool(settings.GEMINI_API_KEY if uses_gemini() else settings.ANTHROPIC_API_KEY)
 
 
-def current_model():
-    """Hozir ishlatilayotgan model nomi (statistika uchun saqlanadi)."""
-    return settings.GEMINI_MODEL if uses_gemini() else settings.AI_MODEL
+def current_model(fast=False):
+    """Ishlatiladigan model nomi. fast=True — qisqa, ko'p so'raladigan javoblar (maslahatlar) uchun arzon model;
+    u sozlanmagan bo'lsa, asosiy model ishlatiladi."""
+    if uses_gemini():
+        return (fast and settings.GEMINI_FAST_MODEL) or settings.GEMINI_MODEL
+    return (fast and settings.AI_FAST_MODEL) or settings.AI_MODEL
+
+
+# Keshdan o'qilgan va keshga yozilgan kirish tokenlari narxi oddiy kirish narxiga nisbatan (Anthropic tarifi)
+CACHE_READ_PRICE_FACTOR = 0.1
+CACHE_WRITE_PRICE_FACTOR = 1.25
+
+
+def request_cost(fast, input_tokens, output_tokens, cache_read_tokens=0, cache_write_tokens=0):
+    """So'rov narxi (AQSh dollari). Narx .env da berilmagan bo'lsa 0."""
+    if fast and current_model(fast=True) != current_model():
+        input_price, output_price = settings.AI_FAST_PRICE_INPUT_PER_MTOK, settings.AI_FAST_PRICE_OUTPUT_PER_MTOK
+    else:
+        input_price, output_price = settings.AI_PRICE_INPUT_PER_MTOK, settings.AI_PRICE_OUTPUT_PER_MTOK
+    total = (
+        input_tokens * input_price
+        + cache_read_tokens * input_price * CACHE_READ_PRICE_FACTOR
+        + cache_write_tokens * input_price * CACHE_WRITE_PRICE_FACTOR
+        + output_tokens * output_price
+    )
+    return total / 1_000_000
 
 
 def get_client():
@@ -61,17 +84,23 @@ def get_client():
     )
 
 
-def _record_usage(purpose, response=None, error=None):
+def _record_usage(purpose, fast, response=None, error=None):
     """So'rov hisobini yozadi. Hisobni yozib bo'lmasa ham AI javobi talabaga yetkaziladi."""
     from .models import AIUsage
 
     try:
         usage = getattr(response, "usage", None)
+        tokens = {
+            "input_tokens": getattr(usage, "input_tokens", 0) or 0,
+            "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+            "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0,
+            "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        }
         AIUsage.objects.create(
             purpose=purpose if purpose in AIUsage.Purpose.values else AIUsage.Purpose.OTHER,
-            model_name=str(getattr(response, "model", "") or current_model())[:100],
-            input_tokens=getattr(usage, "input_tokens", 0) or 0,
-            output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            model_name=str(getattr(response, "model", "") or current_model(fast))[:100],
+            cost=request_cost(fast, **tokens),
+            **tokens,
             ok=error is None,
             error=f"{type(error).__name__}: {error}"[:200] if error else "",
         )
@@ -79,34 +108,48 @@ def _record_usage(purpose, response=None, error=None):
         logger.exception("AI so'rovi hisobini yozib bo'lmadi")
 
 
-def create_message(purpose="other", **params):
+def create_message(purpose="other", fast=False, **params):
     """Modelga so'rov yuboradi, xatolarni o'zimizning turlarga o'tkazadi va so'rov hisobini yozadi.
 
     purpose — so'rov maqsadi (AIUsage.Purpose): xarajat hisobotida shu bo'yicha ajratiladi.
+    fast — arzon va tez model (AI_FAST_MODEL): bosqichli maslahatlar kabi qisqa javoblar uchun.
     Parametrlar Anthropic API ko'rinishida beriladi (system, messages, max_tokens,
     output_config); Gemini tanlangan bo'lsa, ular shu yerda Gemini ko'rinishiga o'tkaziladi.
     """
     if not is_configured():
         raise AINotConfigured("AI uchun API kalit .env faylida ko'rsatilmagan.")
+    model = current_model(fast)
     try:
-        response = _create_gemini_message(**params) if uses_gemini() else _create_anthropic_message(**params)
+        if uses_gemini():
+            response = _create_gemini_message(model, **params)
+        else:
+            response = _create_anthropic_message(model, **params)
     except AIError as exc:
-        _record_usage(purpose, error=exc)
+        _record_usage(purpose, fast, error=exc)
         raise
-    _record_usage(purpose, response)
+    _record_usage(purpose, fast, response)
     return response
 
 
-def _create_anthropic_message(**params):
+def _cached_system(system):
+    """Tizim ko'rsatmasi har bir so'rovda bir xil, o'zgaruvchan qism (talaba kodi) esa messages ichida:
+    belgi tizim ko'rsatmasi oxiriga qo'yiladi va keyingi so'rovlar uni keshdan arzonroq o'qiydi.
+    Ko'rsatma modelning eng kichik keshlanadigan hajmidan qisqa bo'lsa, shunchaki keshlanmaydi."""
+    return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+
+
+def _create_anthropic_message(model, **params):
     client = get_client()
+    if isinstance(params.get("system"), str):
+        params["system"] = _cached_system(params["system"])
     try:
-        response = client.messages.create(model=settings.AI_MODEL, **params)
+        response = client.messages.create(model=model, **params)
     except anthropic.AuthenticationError as exc:
         raise AIPermanentError("API kalit noto'g'ri yoki bekor qilingan.") from exc
     except anthropic.PermissionDeniedError as exc:
         raise AIPermanentError("API kalitda bu amal uchun ruxsat yo'q.") from exc
     except anthropic.NotFoundError as exc:
-        raise AIPermanentError(f"AI modeli topilmadi: {settings.AI_MODEL}") from exc
+        raise AIPermanentError(f"AI modeli topilmadi: {model}") from exc
     except anthropic.BadRequestError as exc:
         raise AIPermanentError(f"AI so'rovni qabul qilmadi: {exc.message}") from exc
     except anthropic.RateLimitError as exc:
@@ -153,19 +196,19 @@ def _gemini_error_message(response):
         return response.text[:300]
 
 
-def _gemini_models():
-    """Navbat bilan sinaladigan modellar: asosiy model, keyin takrorlanmaydigan zaxiralar."""
-    models = [settings.GEMINI_MODEL]
-    models += [model for model in settings.GEMINI_FALLBACK_MODELS if model not in models]
+def _gemini_models(primary):
+    """Navbat bilan sinaladigan modellar: tanlangan model, keyin takrorlanmaydigan zaxiralar."""
+    models = [primary]
+    models += [model for model in [settings.GEMINI_MODEL, *settings.GEMINI_FALLBACK_MODELS] if model not in models]
     return models
 
 
-def _post_gemini(body):
-    """So'rovni asosiy modelga yuboradi; model band yoki mavjud bo'lmasa, keyingi zaxira modelga.
+def _post_gemini(primary, body):
+    """So'rovni tanlangan modelga yuboradi; model band yoki mavjud bo'lmasa, keyingi zaxira modelga.
 
     Qaytaradi: (javob, model nomi). Oxirgi modelning javobi qanday bo'lsa, shunday qaytariladi.
     """
-    models = _gemini_models()
+    models = _gemini_models(primary)
     for index, model in enumerate(models):
         is_last = index == len(models) - 1
         try:
@@ -186,7 +229,7 @@ def _post_gemini(body):
         logger.warning("Gemini %s band (%s), zaxira modelga o'tiladi.", model, response.status_code)
 
 
-def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
+def _create_gemini_message(primary, *, max_tokens, system, messages, output_config=None):
     if not is_configured():
         raise AINotConfigured("GEMINI_API_KEY .env faylida ko'rsatilmagan.")
 
@@ -207,7 +250,7 @@ def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
         "generationConfig": generation_config,
     }
 
-    response, model = _post_gemini(body)
+    response, model = _post_gemini(primary, body)
     if response.status_code == 429:
         raise AITransientError("AI so'rovlar limiti oshdi.")
     if response.status_code >= 500:
@@ -242,12 +285,15 @@ def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
         raise AIPermanentError("AI bu so'rovga javob berishdan bosh tortdi.")
 
     usage = data.get("usageMetadata") or {}
+    # Gemini takrorlangan boshlanishni o'zi keshlaydi; keshdan o'qilgani promptTokenCount ichida ham bor
+    cached = usage.get("cachedContentTokenCount", 0)
     return SimpleNamespace(
         model=model,
         content=[SimpleNamespace(type="text", text=text)],
         stop_reason="end_turn",
         usage=SimpleNamespace(
-            input_tokens=usage.get("promptTokenCount", 0),
+            cache_read_input_tokens=cached,
+            input_tokens=usage.get("promptTokenCount", 0) - cached,
             output_tokens=usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0),
         ),
     )

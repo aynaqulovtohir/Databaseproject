@@ -70,7 +70,7 @@ class StudentMaterialSerializer(serializers.ModelSerializer):
 class StageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentStage
-        fields = ["id", "order", "title", "description", "deadline"]
+        fields = ["id", "order", "kind", "title", "description", "deadline"]
         read_only_fields = ["id", "order"]
         extra_kwargs = {"description": {"required": False, "allow_blank": True, "max_length": 5000}}
 
@@ -131,6 +131,13 @@ class AssignmentSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             if locked and len(stages) != len(old_stages):
                 raise serializers.ValidationError(
                     {"stages": "Yechimlar kelgan: bosqichlar sonini o'zgartirib bo'lmaydi."}
+                )
+            # kind yuborilmasa, mavjud bosqich turi saqlanadi
+            if locked and any(
+                stage.get("kind", old.kind) != old.kind for stage, old in zip(stages, old_stages)
+            ):
+                raise serializers.ValidationError(
+                    {"stages": "Yechimlar kelgan: bosqich turini (SQL yoki ER-diagramma) o'zgartirib bo'lmaydi."}
                 )
             previous_deadline = None
             for order, stage in enumerate(stages):

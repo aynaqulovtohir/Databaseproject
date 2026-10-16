@@ -7,7 +7,7 @@ Platforma bitta serverda Docker konteynerlarida ishlaydi:
 | `web` | Caddy: frontend, HTTPS (Let's Encrypt sertifikati avtomatik olinadi va yangilanadi), xavfsizlik sarlavhalari |
 | `backend` | Django + gunicorn (API va admin) |
 | `db` | Asosiy PostgreSQL bazasi |
-| `lab_db` | Talabalar SQL kodi bajariladigan alohida, resurslari cheklangan PostgreSQL |
+| `lab_db` | Talabalar SQL kodi bajariladigan alohida, resurslari cheklangan PostgreSQL (pgvector kengaytmasi bilan: vektorli qidiruv laboratoriyalari uchun) |
 | `ai_worker`, `telegram_bot` | Fon jarayonlari: AI tahlili va Telegram bildirishnomalari; bot har daqiqada backend va bazalarni tekshiradi va nosozlik bo'lsa Telegram'ni bog'lagan adminlarga yozadi |
 | `backup` | Har kuni baza va yuklangan fayllarning zaxira nusxasi (`./backups`) |
 

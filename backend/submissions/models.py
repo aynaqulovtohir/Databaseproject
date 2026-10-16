@@ -34,7 +34,9 @@ class Submission(models.Model):
         on_delete=models.PROTECT,
         related_name="submissions",
     )
-    sql_code = models.TextField("SQL kod", max_length=MAX_SQL_CODE_LENGTH)
+    # ER-diagramma bosqichida sql_code bo'sh, diagram to'ldiriladi (labs/er.py formati)
+    sql_code = models.TextField("SQL kod", max_length=MAX_SQL_CODE_LENGTH, blank=True)
+    diagram = models.JSONField("ER-diagramma", null=True, blank=True)
     attempt_number = models.PositiveIntegerField("urinish raqami")
     is_late = models.BooleanField("kechikkan", default=False)
     status = models.CharField(

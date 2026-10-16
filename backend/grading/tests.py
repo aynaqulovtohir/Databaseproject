@@ -424,3 +424,66 @@ class ProjectStagesTests(BaseTestCase):
         self.assertIn("Normallashtirish (30 ball)", text)
         self.assertNotIn("ER-model (30 ball)", text)
         self.assertNotIn(self.student.username, text)
+
+
+ER_DIAGRAM = {
+    "entities": [
+        {"id": "m", "name": "Mijoz", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}, {"name": "ism", "key": ""}]},
+        {"id": "b", "name": "Buyurtma", "x": 300, "y": 0, "attributes": [{"name": "id", "key": "pk"}]},
+    ],
+    "relationships": [{"id": "r", "name": "beradi", "source": "m", "target": "b", "source_card": "1", "target_card": "N"}],
+}
+
+
+class ErStageTests(ProjectStagesTests):
+    """Bosqich turi «ER-diagramma»: talaba diagramma chizib topshiradi."""
+
+    def make_project(self):
+        response = self.create_project(stages=[{**STAGES[0], "kind": "er"}, STAGES[1]])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        project = Assignment.objects.get(pk=response.data["id"])
+        return project, list(project.stages.all())
+
+    def submit(self, project, stage, code=SQL, diagram=None):
+        self.auth_as(self.student)
+        if diagram is None and stage is not None and stage.kind == "er":
+            diagram = ER_DIAGRAM
+        return self.client.post(
+            f"/api/assignments/{project.pk}/submissions/",
+            {"sql_code": code, "stage": stage and stage.pk, "diagram": diagram},
+            format="json",
+        )
+
+    def test_er_stage_requires_valid_diagram(self):
+        project, (first, second) = self.make_project()
+        self.assertEqual(first.kind, "er")
+        self.auth_as(self.student)
+        url = f"/api/assignments/{project.pk}/submissions/"
+        self.assertIn("diagram", self.client.post(url, {"stage": first.pk, "sql_code": SQL}, format="json").data)
+        empty = {"entities": [], "relationships": []}
+        self.assertIn("diagram", self.client.post(url, {"stage": first.pk, "diagram": empty}, format="json").data)
+        broken = {"entities": [{"id": "a", "name": "", "x": 0, "y": 0, "attributes": []}], "relationships": []}
+        self.assertIn("diagram", self.client.post(url, {"stage": first.pk, "diagram": broken}, format="json").data)
+        response = self.client.post(url, {"stage": first.pk, "diagram": ER_DIAGRAM, "sql_code": "DROP TABLE x"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["sql_code"], "")
+        self.assertEqual(response.data["diagram"]["entities"][0]["name"], "Mijoz")
+        # SQL bosqichida SQL kerak
+        self.assertIn("sql_code", self.client.post(url, {"stage": second.pk, "diagram": ER_DIAGRAM}, format="json").data)
+
+    def test_ai_gets_diagram_as_text(self):
+        from ai.services import build_analysis_messages
+
+        project, (first, _) = self.make_project()
+        submission = Submission.objects.get(pk=self.submit(project, first).data["id"])
+        text = build_analysis_messages(submission)[0]["content"]
+        self.assertIn("ER-diagramma", text)
+        self.assertIn("Mijoz (1) — beradi — Buyurtma (N)", text)
+
+    def test_kind_locked_after_submissions(self):
+        project, (first, _) = self.make_project()
+        self.submit(project, first)
+        self.auth_as(self.teacher)
+        stages = [{**STAGES[0], "kind": "sql", "deadline": future(3)}, {**STAGES[1], "deadline": future(12)}]
+        response = self.client.patch(f"/api/assignments/{project.pk}/", {"stages": stages}, format="json")
+        self.assertIn("turini", str(response.data["stages"]))

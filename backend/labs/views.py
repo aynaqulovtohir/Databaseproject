@@ -1,11 +1,9 @@
 """Virtual laboratoriya API'lari."""
 import logging
 from collections import defaultdict
-from datetime import datetime, time
 
-from django.conf import settings
 from django.db import transaction
-from django.db.models import Prefetch, Sum
+from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -24,13 +22,24 @@ from users.models import User
 from .access import visible_labs
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code, try_code
+from .mistakes import build_report
+from .quota import (
+    ai_advice_left,
+    ai_error_response,
+    ai_grades_left,
+    ai_usable,
+    record_ai_action,
+    refuse_ai,
+    sandbox_down_response,
+)
 from .er import build_fixed, compare
-from .models import BlindReview, Lab, LabAttempt, LabGrade
+from .models import AIAction, BlindReview, Lab, LabAttempt, LabChatMessage, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
     DiagramRunSerializer,
     LabSerializer,
+    NormAnswerSerializer,
     RunSerializer,
     StudentLabSerializer,
     fix_payload,
@@ -38,28 +47,6 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def ai_advice_left(student):
-    """Talaba bugun yana nechta AI maslahati olishi mumkin (har bir daraja alohida sanaladi)."""
-    today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).aggregate(
-        total=Sum("ai_hint_level")
-    )["total"]
-    return max(0, settings.LAB_AI_DAILY_LIMIT - (used or 0))
-
-
-def ai_grades_left(student):
-    """Talaba bugun yana nechta topshirig'ini AI baholashi mumkin (undan keyin avtomatik baho)."""
-    today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, is_submission=True, created_at__gte=today_start).count()
-    # Hozirgina saqlangan urinishning o'zi ham hisobga kirgan
-    return settings.LAB_AI_GRADES_DAILY_LIMIT - used + 1
-
-
-def ai_usable(student):
-    """AI shu talabaga ishlatiladimi: sozlangan va guruhida o'chirilmagan."""
-    return is_configured() and student.ai_allowed
 
 
 def grade_attempt(attempt):
@@ -110,7 +97,14 @@ class LabViewSet(viewsets.ModelViewSet):
         queryset = visible_labs(user).select_related("author")
         if user.is_student:
             own_attempts = LabAttempt.objects.filter(student=user).only(
-                "lab_id", "is_correct", "sql_code", "diagram", "is_submission", "fixed_diagram", "fix_explanation"
+                "lab_id",
+                "is_correct",
+                "sql_code",
+                "diagram",
+                "answer",
+                "is_submission",
+                "fixed_diagram",
+                "fix_explanation",
             )
             return queryset.prefetch_related(
                 Prefetch("attempts", queryset=own_attempts, to_attr="my_attempts"),
@@ -151,6 +145,23 @@ class LabViewSet(viewsets.ModelViewSet):
             }
             return result, {"diagram": diagram, "ratio": comparison["ratio"]}
 
+        if lab.kind == Lab.Kind.NORM:
+            from .norm import answer_text, check
+
+            serializer = NormAnswerSerializer(data=request.data, task=lab.norm_task)
+            serializer.is_valid(raise_exception=True)
+            answer = serializer.validated_data["answer"]
+            outcome = check(lab.norm_task, answer)
+            result = {
+                "is_correct": not outcome["differences"],
+                "error": None,
+                "result": None,
+                "status_message": "",
+                "differences": outcome["differences"],
+                "checked_against_solution": True,
+            }
+            return result, {"answer": answer, "sql_code": answer_text(answer), "ratio": outcome["ratio"]}
+
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         sql_code = serializer.validated_data["sql_code"]
@@ -182,6 +193,7 @@ class LabViewSet(viewsets.ModelViewSet):
             student=student,
             sql_code=payload.get("sql_code", ""),
             diagram=payload.get("diagram"),
+            answer=payload.get("answer"),
             is_correct=result["is_correct"],
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
@@ -203,13 +215,13 @@ class LabViewSet(viewsets.ModelViewSet):
             return result
 
         result["attempt_id"] = None
-        result["ai_available"] = False
+        result["ai_available"] = result["ai_explain"] = False
         if request.user.is_student:
             attempt = self.save_attempt(lab, request.user, payload, result)
             result["attempt_id"] = attempt.pk
-            result["ai_available"] = (
-                not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
-            )
+            ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+            result["ai_available"] = not result["is_correct"] and ai_left
+            result["ai_explain"] = result["is_correct"] and ai_left
         return Response(result)
 
     @action(
@@ -229,6 +241,47 @@ class LabViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         result, payload = self.execute(request, lab, try_code, serializer.validated_data["sql_code"])
         return result if payload is None else Response(result)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="explain-plan",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="lab_ai",
+    )
+    def explain_plan(self, request, pk=None):
+        """Indeks laboratoriyasi: {sql_code, mode}. mode="explain" — rejaning AI tushuntirishi (indeks aytilmaydi);
+        mode="suggest" — yechgan talabaga AI muqobil indeksi, qum qutida o'lchab solishtiriladi."""
+        from .plan_ai import explain_plan, suggest_index
+
+        lab = self.get_object()
+        if lab.kind != Lab.Kind.SQL or not lab.plan_query.strip():
+            raise ValidationError({"detail": "Reja tushuntirishi faqat indeks (EXPLAIN) laboratoriyasida bor."})
+        mode = request.data.get("mode", "explain")
+        if mode not in ("explain", "suggest"):
+            raise ValidationError({"mode": "Rejim explain yoki suggest bo'lishi kerak."})
+        serializer = RunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if (
+            mode == "suggest"
+            and request.user.is_student
+            and not LabAttempt.objects.filter(lab=lab, student=request.user, is_correct=True).exists()
+        ):
+            raise PermissionDenied("Muqobil indeks taklifi laboratoriyani to'g'ri yechgandan keyin ochiladi.")
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+        runner = suggest_index if mode == "suggest" else explain_plan
+        try:
+            data = runner(lab, serializer.validated_data["sql_code"])
+        except SandboxUnavailable:
+            logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
+            return sandbox_down_response()
+        except AIError as exc:
+            return ai_error_response(exc, "reja")
+        record_ai_action(request.user, AIAction.Kind.PLAN_SUGGEST if mode == "suggest" else AIAction.Kind.PLAN_EXPLAIN)
+        return Response(data)
 
     @action(
         detail=True,
@@ -254,6 +307,13 @@ class LabViewSet(viewsets.ModelViewSet):
             score, comment, source = grade_diagram_attempt(attempt, payload["ratio"])
             # Noto'g'ri diagramma: tuzatilgan variant faqat topshirilgandan keyin ko'rsatiladi
             result["fix"] = fix_payload(attempt)
+        elif lab.kind == Lab.Kind.NORM:
+            score, comment = auto_grade_diagram(attempt, payload["ratio"])
+            source = LabGrade.Source.AUTO
+            if not attempt.is_correct:
+                comment = "Javobda xatolar bor. Ro'yxatdagi farqlarni ko'rib chiqing, tuzating va qayta topshiring."
+            else:
+                comment = "Kalitlar, normal forma va dekompozitsiya to'g'ri."
         else:
             score, comment, source = grade_attempt(attempt)
         with transaction.atomic():
@@ -267,9 +327,9 @@ class LabViewSet(viewsets.ModelViewSet):
                 best.save()
 
         result["attempt_id"] = attempt.pk
-        result["ai_available"] = (
-            not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
-        )
+        ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+        result["ai_available"] = not result["is_correct"] and ai_left
+        result["ai_explain"] = result["is_correct"] and ai_left
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
         return Response(result)
@@ -362,6 +422,26 @@ class LabViewSet(viewsets.ModelViewSet):
         labs = self.staff_labs(request)
         return Response(agreement(labs, None if request.user.is_admin else request.user))
 
+    @action(detail=False, methods=["get"])
+    def recommendations(self, request):
+        """Talaba: mavzular bo'yicha o'zlashtirish (BKT) va keyingi tavsiya etilgan laboratoriya.
+        O'qituvchi/admin: ?group=<id> guruhidagi har bir talabaning o'zlashtirishi."""
+        from .mastery import group_report, student_report
+
+        if request.user.is_student:
+            return Response(student_report(request.user, list(visible_labs(request.user))))
+        group_id = request.query_params.get("group", "")
+        if not group_id.isdigit():
+            raise ValidationError({"group": "Guruhni tanlang."})
+        from .statistics import allowed_groups
+
+        group = get_object_or_404(allowed_groups(request.user), pk=group_id)
+        labs = visible_labs(request.user).filter(groups=group)
+        students = User.objects.filter(role=User.Role.STUDENT, is_active=True, group=group).select_related("group").order_by(
+            "last_name", "first_name", "id"
+        )
+        return Response(group_report(list(students), list(labs)))
+
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):
         """Laboratoriyaning nusxasi: shart, SQL va namunaviy diagramma ko'chiriladi, urinishlar emas.
@@ -382,15 +462,147 @@ class LabViewSet(viewsets.ModelViewSet):
             setup_sql=lab.setup_sql,
             solution_sql=lab.solution_sql,
             hidden_setup_sql=lab.hidden_setup_sql,
+            starter_sql=lab.starter_sql,
             reference_diagram=lab.reference_diagram,
             given_diagram=lab.given_diagram,
+            norm_task=lab.norm_task,
             plan_query=lab.plan_query,
             plan_forbidden=lab.plan_forbidden,
             concurrent=lab.concurrent,
+            topic=lab.topic,
             author=request.user,
         )
         copy.groups.set(groups)
         return Response(LabSerializer(copy, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
+    def generation_lab(self, request):
+        """O'qituvchi/admin uchun AI yaratish mumkin bo'lgan laboratoriya (aks holda xato)."""
+        from .generate import supports_generation
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        if not supports_generation(lab):
+            raise ValidationError(
+                {"detail": "AI yaratish faqat namunaviy yechimi bor oddiy SQL laboratoriyasi uchun (indeks, tranzaksiya "
+                 "va ER → SQL laboratoriyalaridan tashqari)."}
+            )
+        if not is_configured():
+            raise ValidationError({"detail": "AI hali sozlanmagan."})
+        return lab
+
+    def run_generation(self, request, lab, generator, *args):
+        """Qaytaradi: (natija, None) yoki (None, xato javobi)."""
+        from .generate import GenerationError
+
+        try:
+            return generator(lab, *args), None
+        except GenerationError as exc:
+            return None, Response(
+                {"detail": f"AI ikki urinishda ham tekshiruvdan o'tadigan natija bera olmadi: {exc}"},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        except SandboxUnavailable:
+            logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
+            return None, sandbox_down_response()
+        except LabSetupError as exc:
+            return None, Response(
+                {"detail": f"Laboratoriya sozlamasida xato ({exc.field}): {exc}"}, status=status.HTTP_409_CONFLICT
+            )
+        except AIError as exc:
+            return None, ai_error_response(exc, "so'rov")
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="generate-variant",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def generate_variant(self, request, pk=None):
+        """AI yangi sohada variant yozadi; qum qutida tekshirilgach, guruhlarsiz qoralama sifatida saqlanadi.
+
+        {"domain": "kasalxona"} — ixtiyoriy soha. O'qituvchi variantni ko'rib chiqib, guruhlarga o'zi beradi.
+        """
+        from .generate import generate_variant
+
+        lab = self.generation_lab(request)
+        domain = request.data.get("domain", "")
+        if not isinstance(domain, str) or len(domain) > 100:
+            raise ValidationError({"domain": "Soha nomi 100 belgidan oshmasin."})
+        data, failure = self.run_generation(request, lab, generate_variant, domain)
+        if failure:
+            return failure
+        title_length = Lab._meta.get_field("title").max_length
+        variant = Lab.objects.create(
+            kind=Lab.Kind.SQL,
+            title=f"{data['title']} (AI varianti)"[:title_length],
+            description=data["description"],
+            theory=lab.theory,
+            setup_sql=data["setup_sql"],
+            solution_sql=data["solution_sql"],
+            hidden_setup_sql=data["hidden_setup_sql"],
+            author=request.user,
+        )
+        return Response(LabSerializer(variant, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="generate-buggy",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def generate_buggy(self, request, pk=None):
+        """"Xatoni top" mashqi: xatosiz bajariladigan, lekin noto'g'ri natija beradigan kod (saqlanmaydi).
+
+        O'qituvchi uni ko'rib chiqib, laboratoriyaning boshlang'ich kodi (starter_sql) sifatida o'zi saqlaydi.
+        """
+        from .generate import generate_buggy
+
+        lab = self.generation_lab(request)
+        data, failure = self.run_generation(request, lab, generate_buggy)
+        return failure or Response(data)
+
+    def mistakes_report(self, request):
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        groups = lab.groups.all()
+        group_id = request.query_params.get("group")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            groups = groups.filter(pk=group_id)
+        student_ids = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups).values_list(
+            "pk", flat=True
+        )
+        attempts = LabAttempt.objects.filter(lab=lab).only("student_id", "is_correct", "feedback").order_by("id")
+        return lab, build_report(attempts, student_ids)
+
+    @action(detail=True, methods=["get"])
+    def mistakes(self, request, pk=None):
+        """O'qituvchi uchun: eng ko'p uchraydigan xatolar (?group=<id> — bitta guruh bo'yicha)."""
+        return Response(self.mistakes_report(request)[1])
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="mistakes/summary",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def mistakes_summary(self, request, pk=None):
+        """Xatolar hisobotining AI xulosasi: keyingi dars uchun tavsiyalar (?group=<id>)."""
+        from .mistakes import summarize_report
+
+        lab, report = self.mistakes_report(request)
+        if not report["wrong_attempts"]:
+            raise ValidationError({"detail": "Hali noto'g'ri urinishlar yo'q: xulosa qilinadigan narsa yo'q."})
+        try:
+            return Response({"summary": summarize_report(lab, report)})
+        except AIError as exc:
+            return ai_error_response(exc, "hisobot")
 
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
@@ -416,6 +628,7 @@ class LabViewSet(viewsets.ModelViewSet):
             correct = [attempt for attempt in attempts if attempt.is_correct]
             # Bajargan bo'lsa to'g'ri kodi, aks holda oxirgi urinishi ko'rsatiladi
             shown = (correct or attempts or [None])[-1]
+            explained = [attempt for attempt in correct if attempt.explanation_verdict]
             rows.append(
                 {
                     "id": student.pk,
@@ -428,6 +641,16 @@ class LabViewSet(viewsets.ModelViewSet):
                     "code": shown.sql_code if shown else "",
                     "diagram": shown.diagram if shown else None,
                     "grade": grade_payload(grade) if grade else None,
+                    # Talaba yechimini o'z so'zlari bilan tushuntirgan bo'lsa — oxirgisi va AI bahosi
+                    "explanation": (
+                        {
+                            "text": explained[-1].self_explanation,
+                            "verdict": explained[-1].explanation_verdict,
+                            "feedback": explained[-1].explanation_feedback,
+                        }
+                        if explained
+                        else None
+                    ),
                 }
             )
         return Response(rows)
@@ -538,6 +761,127 @@ class LabAttemptAdviceView(APIView):
     @staticmethod
     def payload(hints):
         return {"advice": hints[-1], "hints": hints, "level": len(hints), "max_level": MAX_HINT_LEVEL}
+
+
+class LabAttemptExplainView(APIView):
+    """To'g'ri urinishdan keyin: talaba yechimini o'z so'zlari bilan tushuntiradi {text}, AI mosligini baholaydi."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lab_ai"
+    MIN_LENGTH = 40
+    MAX_LENGTH = 3000
+
+    def post(self, request, pk):
+        from .self_explain import evaluate_explanation
+
+        attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
+        if not attempt.is_correct:
+            raise ValidationError({"detail": "Tushuntirish to'g'ri yechimdan keyin yoziladi."})
+        text = request.data.get("text")
+        if not isinstance(text, str) or len(text.strip()) < self.MIN_LENGTH:
+            raise ValidationError({"text": f"Kamida {self.MIN_LENGTH} belgi yozing: yechim nima qiladi va nega shunday?"})
+        if len(text) > self.MAX_LENGTH:
+            raise ValidationError({"text": f"Tushuntirish {self.MAX_LENGTH} belgidan oshmasin."})
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+        try:
+            verdict, feedback = evaluate_explanation(attempt, text.strip())
+        except AIError as exc:
+            return ai_error_response(exc, "tushuntirish")
+        attempt.self_explanation = text.strip()
+        attempt.explanation_verdict = verdict
+        attempt.explanation_feedback = feedback
+        attempt.save(update_fields=["self_explanation", "explanation_verdict", "explanation_feedback"])
+        record_ai_action(request.user, AIAction.Kind.SELF_EXPLAIN)
+        return Response({"verdict": verdict, "feedback": feedback})
+
+
+class LabChatView(APIView):
+    """Laboratoriya murabbiyi (Sokrat usulidagi AI). GET — yozishma, POST {content, sql_code?, diagram?} — savol.
+
+    Faqat talaba va faqat o'ziga ko'rinadigan laboratoriyada. Har bir savol umumiy kunlik AI limitidan yechiladi.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "lab_ai"
+
+    def get_throttles(self):
+        # Yozishmani o'qish cheklanmaydi, faqat AI'ga savol yuborish
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_student:
+            raise PermissionDenied("Murabbiy faqat talaba uchun.")
+        if not request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
+        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+
+    def own_messages(self):
+        return LabChatMessage.objects.filter(lab=self.lab, student=self.request.user)
+
+    def payload(self):
+        return {
+            "messages": [
+                {"id": message.pk, "role": message.role, "content": message.content, "created_at": message.created_at}
+                for message in self.own_messages()
+            ],
+            "ai_left": ai_advice_left(self.request.user),
+        }
+
+    def get(self, request, pk):
+        return Response(self.payload())
+
+    def post(self, request, pk):
+        from learning.retrieval import find_passages
+
+        from .coach import HISTORY_LIMIT, coach_reply, work_block
+
+        content = request.data.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValidationError({"content": "Savol matni bo'sh bo'lmasligi kerak."})
+        if len(content) > 2000:
+            raise ValidationError({"content": "Savol 2000 belgidan oshmasligi kerak."})
+        sql_code, diagram = "", None
+        if self.lab.kind == Lab.Kind.ER and request.data.get("diagram") is not None:
+            serializer = DiagramRunSerializer(data={"diagram": request.data["diagram"]})
+            serializer.is_valid(raise_exception=True)
+            diagram = serializer.validated_data["diagram"]
+        elif self.lab.kind != Lab.Kind.ER and request.data.get("sql_code"):
+            serializer = RunSerializer(data={"sql_code": request.data["sql_code"]})
+            serializer.is_valid(raise_exception=True)
+            sql_code = serializer.validated_data["sql_code"]
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+
+        recent = list(self.own_messages().order_by("-created_at", "-id")[:HISTORY_LIMIT])[::-1]
+        history = [
+            {"role": message.role, "content": work_block(message.content) if message.role == "user" else message.content}
+            for message in recent
+        ]
+        try:
+            answer = coach_reply(
+                self.lab,
+                history,
+                content.strip(),
+                sql_code=sql_code,
+                diagram=diagram,
+                passages=find_passages(request.user, content, self.lab.title),
+            )
+        except AIError as exc:
+            return ai_error_response(exc, "savol")
+        with transaction.atomic():
+            LabChatMessage.objects.create(
+                lab=self.lab, student=request.user, role=LabChatMessage.Role.USER, content=content.strip()
+            )
+            LabChatMessage.objects.create(
+                lab=self.lab, student=request.user, role=LabChatMessage.Role.ASSISTANT, content=answer
+            )
+            record_ai_action(request.user, AIAction.Kind.LAB_CHAT)
+        return Response(self.payload(), status=status.HTTP_201_CREATED)
 
 
 class StatisticsView(APIView):

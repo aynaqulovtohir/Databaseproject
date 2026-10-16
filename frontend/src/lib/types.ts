@@ -94,6 +94,8 @@ export interface AssignmentStage {
   id: number
   /** 0 dan boshlab */
   order: number
+  /** Talaba nima topshiradi: SQL kod yoki ER-diagramma */
+  kind: 'sql' | 'er'
   title: string
   description: string
   deadline: string
@@ -172,7 +174,10 @@ export interface Submission {
   student: PersonShort
   /** Bosqichli loyihada bosqich id'si */
   stage: number | null
+  /** ER-diagramma bosqichida bo'sh */
   sql_code: string
+  /** ER-diagramma bosqichida chizilgan diagramma */
+  diagram: ErDiagram | null
   attempt_number: number
   is_late: boolean
   status: SubmissionStatus
@@ -237,7 +242,23 @@ export interface ErFix {
   explanation: string
 }
 
-export type LabKind = 'sql' | 'er'
+export type LabKind = 'sql' | 'er' | 'norm'
+
+/** Normallashtirish topshirig'i: munosabat atributlari, funksional bog'liqliklar va maqsad normal forma */
+export interface NormTask {
+  attributes: string[]
+  fds: { lhs: string[]; rhs: string[] }[]
+  target: '3NF' | 'BCNF'
+}
+
+export type NormalForm = '1NF' | '2NF' | '3NF' | 'BCNF'
+
+/** Talabaning normallashtirish javobi (matn ko'rinishida yuboriladi, backend tekshiradi) */
+export interface NormAnswer {
+  keys: string[] | string[][]
+  normal_form: NormalForm
+  decomposition: string[] | string[][]
+}
 
 /** Talabaning laboratoriyadagi holati */
 export interface LabProgress {
@@ -250,6 +271,8 @@ export interface LabProgress {
   /** ER laboratoriyasida: oxirgi chizilgan diagramma va oxirgi topshirishning tuzatilgan varianti */
   last_diagram?: ErDiagram | null
   last_fix?: ErFix | null
+  /** Normallashtirish laboratoriyasida: oxirgi javob */
+  last_answer?: NormAnswer | null
 }
 
 export interface Lab {
@@ -261,12 +284,18 @@ export interface Lab {
   theory: string
   /** Har bir ishga tushirishdan oldin bajariladigan tayyor jadvallar */
   setup_sql: string
+  /** Talaba muharririda dastlab turadigan kod (masalan, «AI yozgan xatoli kod — xatoni toping») */
+  starter_sql?: string
   /** Talabaga yuborilmaydi */
   solution_sql?: string
   /** Yashirin test ma'lumotlari. Talabaga yuborilmaydi */
   hidden_setup_sql?: string
   /** ER laboratoriyasining namunaviy diagrammasi. Talabaga yuborilmaydi */
   reference_diagram?: ErDiagram | null
+  /** Normallashtirish laboratoriyasi topshirig'i (talabaga ko'rinadi) */
+  norm_task?: NormTask | null
+  /** O'qituvchiga: algoritm hisoblagan javob. Talabaga yuborilmaydi */
+  norm_reference?: { keys: string[][]; normal_form: NormalForm; decomposition: string[][] } | null
   /** SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL) */
   given_diagram?: ErDiagram | null
   /** Indeks laboratoriyasi: rejasi (EXPLAIN) tekshiriladigan so'rov */
@@ -275,6 +304,9 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** O'qituvchi tanlagan mavzu (bo'sh — avtomatik) va amaldagi mavzu */
+  topic?: string
+  effective_topic?: string
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
@@ -354,11 +386,84 @@ export interface LabRunResult {
   /** Faqat talabada: saqlangan urinish id'si */
   attempt_id: number | null
   ai_available: boolean
+  /** To'g'ri natijada: talaba yechimini tushuntirib, AI bahosini olishi mumkin */
+  ai_explain?: boolean
   /** Faqat baholashga topshirilganda: shu topshirishning bahosi va eng yuqori baho */
   grade?: LabGrade
   best_grade?: LabGrade
   /** ER laboratoriyasi, baholashga topshirilganda: noto'g'ri bo'lsa tuzatilgan diagramma, aks holda null */
   fix?: ErFix | null
+}
+
+export type ExplanationVerdict = 'ok' | 'partial' | 'wrong'
+
+export const EXPLANATION_VERDICTS: Record<ExplanationVerdict, { label: string; className: string }> = {
+  ok: { label: 'Tushuntirish mos', className: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' },
+  partial: { label: 'Qisman mos', className: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
+  wrong: { label: 'Mos emas', className: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200' },
+}
+
+/** O'qituvchi uchun: AI yozgan, qum qutida tekshirilgan xatoli kod */
+export interface BuggyCode {
+  buggy_sql: string
+  bugs: string[]
+  differences: string[]
+}
+
+/** Moslashuvchan o'quv yo'li (talaba) */
+export interface LearningPath {
+  topics: { topic: string; label: string; mastery: number; mastered: boolean; labs: number; solved: number }[]
+  next: { id: number; title: string; topic: string; reason: string } | null
+}
+
+/** O'qituvchi: guruh talabalari mavzular bo'yicha (foizda) */
+export interface GroupMastery {
+  topics: { topic: string; label: string }[]
+  students: (PersonShort & { group: string; mastery: Record<string, number> })[]
+}
+
+/** Loyiha himoyasi (viva) */
+export interface Viva {
+  status: 'asked' | 'evaluated'
+  questions: string[]
+  answers: string[]
+  feedback: { score: 0 | 1 | 2; comment: string }[]
+  created_at: string
+  answered_at: string | null
+  /** Faqat o'qituvchi va adminga */
+  understanding?: number | null
+  teacher_summary?: string
+}
+
+/** Laboratoriya murabbiyi bilan yozishma */
+export interface LabChatState {
+  messages: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }[]
+  /** Bugun qolgan umumiy AI yordamlari soni */
+  ai_left: number
+}
+
+/** Indeks laboratoriyasi: qum qutida o'lchangan reja */
+export interface PlanMeasure {
+  ok: boolean
+  error: string
+  plan: string[]
+  /** Rejalashtiruvchi baholagan narx (shartli birlik) */
+  cost: number | null
+  /** Rejada qolgan taqiqlangan tugunlar haqida xabarlar */
+  remaining: string[]
+}
+
+export interface PlanExplanation {
+  explanation: string
+  before: PlanMeasure
+  after: PlanMeasure
+}
+
+export interface PlanSuggestion {
+  explanation: string
+  index_sql: string
+  suggestion: PlanMeasure
+  mine: PlanMeasure
 }
 
 /** O'qituvchi ko'radigan talaba holati */
@@ -370,6 +475,8 @@ export interface LabStudentProgress extends PersonShort {
   code: string
   diagram: ErDiagram | null
   grade: LabGrade | null
+  /** Talabaning o'z yechimini tushuntirishi va AI bahosi */
+  explanation: { text: string; verdict: ExplanationVerdict; feedback: string } | null
 }
 
 export interface SimilarWork extends PersonShort {
@@ -601,13 +708,21 @@ export interface AIUsageTotals {
   failed: number
   input_tokens: number
   output_tokens: number
+  /** Prompt caching: keshdan arzon narxda o'qilgan kirish tokenlari (input_tokens ga kirmaydi) */
+  cache_read_tokens: number
   /** AQSh dollari (narx sozlanmagan bo'lsa 0) */
   cost: number
 }
 
 export interface AIUsageReport {
   days: number
-  price: { input_per_mtok: number; output_per_mtok: number; configured: boolean }
+  price: {
+    input_per_mtok: number
+    output_per_mtok: number
+    fast_input_per_mtok: number
+    fast_output_per_mtok: number
+    configured: boolean
+  }
   today: AIUsageTotals
   month: AIUsageTotals
   previous_month: AIUsageTotals
@@ -678,4 +793,24 @@ export interface Statistics {
   learning_curve: LearningCurvePoint[]
   ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
   groups: StatisticsGroup[]
+}
+
+/** Laboratoriya bo'yicha eng ko'p uchraydigan xatolar (o'qituvchi uchun) */
+export interface LabMistake {
+  kind: 'error' | 'difference'
+  text: string
+  tip: string
+  attempts: number
+  students: number
+  /** Urinib ko'rgan talabalarning necha foizi shu xatoga duch kelgan */
+  share: number
+}
+
+export interface LabMistakesReport {
+  students: number
+  attempted: number
+  solved: number
+  stuck: number
+  wrong_attempts: number
+  items: LabMistake[]
 }

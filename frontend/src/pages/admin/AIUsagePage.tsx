@@ -111,6 +111,7 @@ function BreakdownTable({ rows, label, priced }: { rows: (AIUsageTotals & { name
           <TableHead className="text-right">So'rovlar</TableHead>
           <TableHead className="text-right">Xato</TableHead>
           <TableHead className="text-right">Kirish tokeni</TableHead>
+          <TableHead className="text-right">Keshdan</TableHead>
           <TableHead className="text-right">Chiqish tokeni</TableHead>
           {priced ? <TableHead className="text-right">Xarajat</TableHead> : null}
         </TableRow>
@@ -122,6 +123,7 @@ function BreakdownTable({ rows, label, priced }: { rows: (AIUsageTotals & { name
             <TableCell className="text-right tabular-nums">{numberFormat.format(row.requests)}</TableCell>
             <TableCell className="text-right tabular-nums">{row.failed ? numberFormat.format(row.failed) : '—'}</TableCell>
             <TableCell className="text-right tabular-nums">{formatTokens(row.input_tokens)}</TableCell>
+            <TableCell className="text-right tabular-nums">{row.cache_read_tokens ? formatTokens(row.cache_read_tokens) : '—'}</TableCell>
             <TableCell className="text-right tabular-nums">{formatTokens(row.output_tokens)}</TableCell>
             {priced ? <TableCell className="text-right tabular-nums">{formatCost(row.cost)}</TableCell> : null}
           </TableRow>
@@ -179,7 +181,11 @@ export function AIUsagePage() {
         <Card>
           <CardHeader>
             <CardTitle>Model bo'yicha</CardTitle>
-            <CardDescription>Asosiy model band bo'lsa, so'rov zaxira modelga o'tadi.</CardDescription>
+            <CardDescription>
+              Maslahatlar arzon tez modelda (AI_FAST_MODEL), baholash va tahlil asosiy modelda bajariladi. Asosiy model
+              band bo'lsa, so'rov zaxira modelga o'tadi. «Keshdan» — takrorlanuvchi ko'rsatmalarning keshdan o'qilgan
+              qismi: u oddiy kirish narxining 10 foiziga hisoblanadi.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <BreakdownTable rows={data.by_model.map((row) => ({ ...row, name: row.model }))} label="Model" priced={priced} />

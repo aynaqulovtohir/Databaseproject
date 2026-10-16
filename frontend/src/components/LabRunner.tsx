@@ -3,6 +3,8 @@ import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Se
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
+import { PlanAssistant } from '@/components/PlanAssistant'
+import { SelfExplain } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -228,6 +230,11 @@ function Verdict({ result }: { result: LabRunResult }) {
             ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
             : 'Kod xatosiz ishladi.'}
         </p>
+        {result.ai_explain && result.attempt_id ? (
+          <div className="mt-3">
+            <SelfExplain attemptId={result.attempt_id} kind="sql" />
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -361,10 +368,24 @@ interface LabRunnerProps {
   gradable?: boolean
   /** Har bir ishga tushirish yoki topshirishdan keyin chaqiriladi */
   onResult?: (result: LabRunResult, code: string) => void
+  /** Indeks laboratoriyasida: AI reja yordamchisi ko'rsatiladi (AI yoqilgan bo'lsa) */
+  planAssistant?: boolean
+  /** Laboratoriya yechilganmi: AI muqobil indeksi faqat shundan keyin ochiladi */
+  solved?: boolean
+  /** Muharrirdagi kod o'zgarganda (murabbiyga hozirgi ishni yuborish uchun) */
+  onCodeChange?: (code: string) => void
 }
 
 /** SQL muharriri, «Sinab ko'rish» va «Tekshirish» tugmalari va natija paneli. */
-export function LabRunner({ labId, initialCode = '', gradable = false, onResult }: LabRunnerProps) {
+export function LabRunner({
+  labId,
+  initialCode = '',
+  gradable = false,
+  onResult,
+  planAssistant = false,
+  solved = false,
+  onCodeChange,
+}: LabRunnerProps) {
   const [code, setCode] = useState(initialCode)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -444,7 +465,10 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
             maxLength={MAX_SQL_LENGTH}
             aria-invalid={Boolean(fieldError)}
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => {
+              setCode(event.target.value)
+              onCodeChange?.(event.target.value)
+            }}
             onKeyDown={handleKeyDown}
           />
           {fieldError ? (
@@ -477,6 +501,8 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
             : ''}
         </p>
       </form>
+
+      {planAssistant ? <PlanAssistant labId={labId} code={code} solved={solved} /> : null}
 
       {shown === 'try' && tryMutation.data && !busy ? (
         <div aria-live="polite">

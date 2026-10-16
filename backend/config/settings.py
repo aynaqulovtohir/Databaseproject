@@ -124,6 +124,11 @@ REST_FRAMEWORK = {
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
         "blind_review": "60/min",
+        # AI yordamlari (EXPLAIN tushuntirishi, murabbiy, yechimni tushuntirish, himoya): kunlik limitdan tashqari
+        # qisqa vaqtda ko'p so'rov yuborib serverni band qilmaslik uchun
+        "lab_ai": "10/min",
+        # O'qituvchi uchun AI yaratish (variant, xatoli kod, xulosa): har biri qum qutida bir necha marta ishlaydi
+        "ai_generate": "6/min",
         # Testda javoblarni oraliq saqlash
         "quiz_save": "120/min",
     },
@@ -177,8 +182,11 @@ LOGGING = {
 AI_PROVIDER = env("AI_PROVIDER", default="anthropic").strip().lower()
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 AI_MODEL = env("AI_MODEL", default="claude-sonnet-5-5")
+# Bosqichli maslahatlar va boshqa qisqa javoblar uchun arzon, tez model. Bo'sh bo'lsa — AI_MODEL ishlatiladi
+AI_FAST_MODEL = env("AI_FAST_MODEL", default="claude-haiku-5-5")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-3.5-flash")
+GEMINI_FAST_MODEL = env("GEMINI_FAST_MODEL", default="")
 # Asosiy model band bo'lsa (bepul tarifda tez-tez uchraydi), navbat bilan sinaladigan modellar
 GEMINI_FALLBACK_MODELS = env.list("GEMINI_FALLBACK_MODELS", default=["gemini-3.5-flash-lite", "gemini-3.7-flash"])
 # Testlar haqiqiy AI xizmatiga so'rov yubormasligi (pul va limit sarflamasligi) uchun kalitlar bo'shatiladi.
@@ -189,6 +197,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "test":
 # 0 bo'lsa (masalan, bepul tarifda), hisobotda faqat tokenlar ko'rsatiladi.
 AI_PRICE_INPUT_PER_MTOK = env.float("AI_PRICE_INPUT_PER_MTOK", default=0.0)
 AI_PRICE_OUTPUT_PER_MTOK = env.float("AI_PRICE_OUTPUT_PER_MTOK", default=0.0)
+# Tez model (AI_FAST_MODEL) narxi; keshdan o'qilgan tokenlar avtomatik ravishda 0.1 narxda hisoblanadi
+AI_FAST_PRICE_INPUT_PER_MTOK = env.float("AI_FAST_PRICE_INPUT_PER_MTOK", default=0.0)
+AI_FAST_PRICE_OUTPUT_PER_MTOK = env.float("AI_FAST_PRICE_OUTPUT_PER_MTOK", default=0.0)
 # Bitta talaba kuniga yubora oladigan chat xabarlari soni
 AI_CHAT_DAILY_LIMIT = env.int("AI_CHAT_DAILY_LIMIT", default=30)
 

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { ErEditor, ErFixLegend } from '@/components/ErEditor'
 import { AiAdvice, GradeCard } from '@/components/LabRunner'
+import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
 import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
@@ -19,6 +20,11 @@ function ErVerdict({ result }: { result: LabRunResult }) {
           To'g'ri!
         </div>
         <p className="mt-1 text-sm">Diagramma namunaviy loyiha bilan to'liq mos keldi.</p>
+        {result.ai_explain && result.attempt_id ? (
+          <div className="mt-3">
+            <SelfExplain attemptId={result.attempt_id} kind="er" />
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -86,10 +92,19 @@ interface ErLabRunnerProps {
   /** true bo'lsa, "Baholashga topshirish" tugmasi ham ko'rinadi (talaba uchun) */
   gradable?: boolean
   onResult?: (result: LabRunResult, diagram: ErDiagram) => void
+  /** Diagramma o'zgarganda (murabbiyga hozirgi ishni yuborish uchun) */
+  onDiagramChange?: (diagram: ErDiagram) => void
 }
 
 /** ER-diagramma muharriri, tekshirish va baholashga topshirish. */
-export function ErLabRunner({ labId, initialDiagram, initialFix = null, gradable = false, onResult }: ErLabRunnerProps) {
+export function ErLabRunner({
+  labId,
+  initialDiagram,
+  initialFix = null,
+  gradable = false,
+  onResult,
+  onDiagramChange,
+}: ErLabRunnerProps) {
   const [diagram, setDiagram] = useState<ErDiagram>(initialDiagram ?? EMPTY_DIAGRAM)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -123,6 +138,7 @@ export function ErLabRunner({ labId, initialDiagram, initialFix = null, gradable
         onChange={(next) => {
           setDiagram(next)
           setFieldError(null)
+          onDiagramChange?.(next)
         }}
       />
       {fieldError ? (

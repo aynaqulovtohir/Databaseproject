@@ -87,12 +87,26 @@ class AIUsage(models.Model):
         LAB_GRADE = "lab_grade", "SQL baholash"
         ER_ADVICE = "er_advice", "ER maslahati"
         ER_GRADE = "er_grade", "ER baholash"
+        PLAN_EXPLAIN = "plan_explain", "EXPLAIN tushuntirishi"
+        PLAN_SUGGEST = "plan_suggest", "Indeks taklifi (tekshiriladi)"
+        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
+        SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
+        VIVA = "viva", "Loyiha himoyasi"
+        VARIANT = "variant", "Topshiriq varianti"
+        BUGGY_CODE = "buggy_code", "Xatoli kod yaratish"
+        MISTAKES_SUMMARY = "mistakes_summary", "Xatolar xulosasi"
         OTHER = "other", "Boshqa"
 
     purpose = models.CharField("maqsad", max_length=20, choices=Purpose.choices, default=Purpose.OTHER)
     model_name = models.CharField("AI modeli", max_length=100, blank=True)
     input_tokens = models.PositiveIntegerField("kirish tokenlari", default=0)
     output_tokens = models.PositiveIntegerField("chiqish tokenlari", default=0)
+    # Prompt caching: keshdan o'qilgan (arzon) va keshga yozilgan tokenlar; input_tokens — qolgan qismi
+    cache_read_tokens = models.PositiveIntegerField("keshdan o'qilgan tokenlar", default=0)
+    cache_write_tokens = models.PositiveIntegerField("keshga yozilgan tokenlar", default=0)
+    # So'rov paytidagi narx bo'yicha hisoblangan xarajat (AQSh dollari). Eski yozuvlarda bo'sh — hisobotda
+    # tokenlar joriy narx bo'yicha hisoblanadi
+    cost = models.FloatField("narxi ($)", null=True, blank=True)
     ok = models.BooleanField("muvaffaqiyatli", default=True)
     error = models.CharField("xato", max_length=200, blank=True)
     created_at = models.DateTimeField("vaqti", default=timezone.now, db_index=True)
@@ -104,3 +118,36 @@ class AIUsage(models.Model):
 
     def __str__(self):
         return f"{self.get_purpose_display()} / {self.model_name}: {self.input_tokens}+{self.output_tokens}"
+
+
+class VivaSession(models.Model):
+    """Loyiha himoyasi: AI talabaning O'Z yechimi bo'yicha savollar beradi, talaba javob yozadi, AI baholaydi.
+
+    Maqsad — talaba yechimni tushunganini (va o'zi yozganini) tekshirish. Bahoga avtomatik ta'sir qilmaydi:
+    tushunish darajasini o'qituvchi ko'radi va o'zi qaror qiladi.
+    """
+
+    class Status(models.TextChoices):
+        ASKED = "asked", "Savollar berildi"
+        EVALUATED = "evaluated", "Baholandi"
+
+    submission = models.OneToOneField(
+        "submissions.Submission", verbose_name="yechim", on_delete=models.CASCADE, related_name="viva"
+    )
+    status = models.CharField("holati", max_length=10, choices=Status.choices, default=Status.ASKED)
+    questions = models.JSONField("savollar", default=list)
+    answers = models.JSONField("javoblar", default=list, blank=True)
+    # Talabaga ko'rinadi: har bir javob bo'yicha izoh
+    feedback = models.JSONField("izohlar", default=list, blank=True)
+    # Faqat o'qituvchi va adminga: tushunish darajasi (0-100) va xulosa
+    understanding = models.PositiveSmallIntegerField("tushunish darajasi", null=True, blank=True)
+    teacher_summary = models.TextField("o'qituvchi uchun xulosa", blank=True)
+    created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
+    answered_at = models.DateTimeField("javob berilgan vaqti", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "loyiha himoyasi"
+        verbose_name_plural = "loyiha himoyalari"
+
+    def __str__(self):
+        return f"{self.submission} ({self.get_status_display()})"

@@ -1,4 +1,4 @@
-"""Tayyor laboratoriyalarni (ER-model, loyihalash, ER → SQL va SELECT so'rovlari) bazaga qo'shadi (design_labs.py, query_labs.py).
+"""Tayyor laboratoriyalarni (ER-model, loyihalash, normallashtirish, ER → SQL va SELECT so'rovlari) bazaga qo'shadi (design_labs.py, query_labs.py).
 
 Ishga tushirish:
     python manage.py seed_design_labs --author <o'qituvchi logini> --group <guruh nomi> [--group ...] [--update]
@@ -16,6 +16,7 @@ from ...checker import LabSetupError, validate_concurrent, validate_lab_sql, val
 from ...design_labs import ALL_LABS
 from ...er import DiagramError, validate_diagram
 from ...models import Lab
+from ...norm import NormError, parse_task
 
 
 class Command(BaseCommand):
@@ -43,6 +44,10 @@ class Command(BaseCommand):
             try:
                 if lab_data.get("kind") == Lab.Kind.ER:
                     validate_diagram(lab_data["reference_diagram"])
+                elif lab_data.get("kind") == Lab.Kind.NORM:
+                    task = lab_data["norm_task"]
+                    fds = "\n".join(f"{', '.join(fd['lhs'])} -> {', '.join(fd['rhs'])}" for fd in task["fds"])
+                    parse_task(", ".join(task["attributes"]), fds, task["target"])
                 else:
                     validate_lab_sql(
                         lab_data["setup_sql"], lab_data["solution_sql"], lab_data.get("hidden_setup_sql", "")
@@ -60,6 +65,8 @@ class Command(BaseCommand):
                         )
             except LabSetupError as exc:
                 raise CommandError(f"«{lab_data['title']}» ({exc.field}) xato: {exc}")
+            except NormError as exc:
+                raise CommandError(f"«{lab_data['title']}» topshirig'ida xato: {exc}")
             except DiagramError as exc:
                 raise CommandError(f"«{lab_data['title']}» diagrammasida xato: {exc}")
 

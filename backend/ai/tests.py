@@ -19,7 +19,7 @@ from users.models import StudentGroup, User
 
 from . import worker
 from .client import AINotConfigured, AIPermanentError, AITransientError
-from .models import AIAnalysis, ChatMessage
+from .models import AIAnalysis, ChatMessage, VivaSession
 from .services import analyze_submission, chat_reply
 
 PASSWORD = "Kuchli-Parol-2026"
@@ -597,8 +597,145 @@ class AIUsageTests(DataMixin, APITestCase):
             self.assertEqual(self.client.get("/api/ai/usage/", {"days": bad}).status_code, 400)
         data = self.client.get("/api/ai/usage/", {"days": 7}).data
         self.assertEqual(len(data["daily"]), 7)
-        self.assertEqual(data["period"], {"requests": 2, "failed": 1, "input_tokens": 500_000, "output_tokens": 250_000, "cost": 1.5})
+        self.assertEqual(
+            data["period"],
+            {"requests": 2, "failed": 1, "input_tokens": 500_000, "output_tokens": 250_000, "cache_read_tokens": 0, "cost": 1.5},
+        )
         self.assertEqual(data["today"]["requests"], 2)
         self.assertEqual(data["by_purpose"][0]["label"], "SQL maslahati")
         self.assertTrue(data["price"]["configured"])
         self.assertEqual(data["daily"][-1]["requests"], 2)
+
+
+@override_settings(
+    AI_PROVIDER="anthropic",
+    ANTHROPIC_API_KEY="test-key",
+    AI_MODEL="asosiy-model",
+    AI_FAST_MODEL="tez-model",
+    AI_PRICE_INPUT_PER_MTOK=2.0,
+    AI_PRICE_OUTPUT_PER_MTOK=10.0,
+    AI_FAST_PRICE_INPUT_PER_MTOK=0.1,
+    AI_FAST_PRICE_OUTPUT_PER_MTOK=0.5,
+)
+class CachingAndFastModelTests(DataMixin, TestCase):
+    """Tizim ko'rsatmasi keshlanadi; maslahatlar arzon modelda; xarajat kesh va model narxi bo'yicha hisoblanadi."""
+
+    def test_system_prompt_is_cached_and_main_model_used(self):
+        client = fake_client("javob")
+        with patch("ai.client.get_client", return_value=client):
+            chat_reply(self.assignment, [], "NOYOB-SAVOL-42")
+        kwargs = client.messages.create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "asosiy-model")
+        self.assertEqual(kwargs["system"][-1]["cache_control"], {"type": "ephemeral"})
+        # O'zgaruvchan savol keshlanadigan qismdan keyin keladi
+        self.assertNotIn("NOYOB-SAVOL-42", json.dumps(kwargs["system"], ensure_ascii=False))
+
+    def test_fast_model_and_cost_with_cache(self):
+        from .client import create_message
+        from .models import AIUsage
+
+        client = fake_client("javob")
+        client.messages.create.return_value.usage = SimpleNamespace(
+            input_tokens=1_000_000, output_tokens=1_000_000, cache_read_input_tokens=1_000_000, cache_creation_input_tokens=0
+        )
+        with patch("ai.client.get_client", return_value=client):
+            create_message(purpose="lab_advice", fast=True, max_tokens=10, system="s", messages=[])
+        self.assertEqual(client.messages.create.call_args.kwargs["model"], "tez-model")
+        usage = AIUsage.objects.get()
+        self.assertEqual((usage.model_name, usage.cache_read_tokens), ("tez-model", 1_000_000))
+        # 0.1 (kirish) + 0.01 (kesh: 0.1 narxning 10%) + 0.5 (chiqish)
+        self.assertAlmostEqual(usage.cost, 0.61)
+
+    @override_settings(AI_FAST_MODEL="")
+    def test_empty_fast_model_falls_back_to_main(self):
+        from .client import create_message
+
+        client = fake_client("javob")
+        with patch("ai.client.get_client", return_value=client):
+            create_message(purpose="lab_advice", fast=True, max_tokens=10, system="s", messages=[])
+        self.assertEqual(client.messages.create.call_args.kwargs["model"], "asosiy-model")
+
+
+QUESTIONS = [f"`kitob` jadvali haqida {index}-savol?" for index in range(1, 6)]
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key", LAB_AI_DAILY_LIMIT=5)
+class VivaTests(DataMixin, APITestCase):
+    """Loyiha himoyasi: savollar talabaning o'z yechimidan, tushunish darajasini faqat o'qituvchi ko'radi."""
+
+    def auth_as(self, user):
+        cache.clear()
+        response = self.client.post("/api/auth/login/", {"username": user.username, "password": PASSWORD})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+    def setUp(self):
+        super().setUp()
+        self.url = f"/api/submissions/{self.submission.pk}/viva/"
+
+    def start(self):
+        client = fake_client(json.dumps({"questions": QUESTIONS}))
+        with patch("ai.client.get_client", return_value=client):
+            response = self.client.post(self.url, format="json")
+        return response, client
+
+    def test_full_flow_and_privacy(self):
+        self.auth_as(self.student)
+        response, client = self.start()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["viva"]["questions"], QUESTIONS)
+        payload = json.dumps(client.messages.create.call_args.kwargs, ensure_ascii=False)
+        self.assertIn(SQL, payload)
+        for secret in ("maxfiy_login", "Maxfiyism", "YASHIRIN-MEZON", "MAXFIY-GURUH-A"):
+            self.assertNotIn(secret, payload)
+
+        evaluation = {
+            "items": [{"score": 2, "comment": "Yaxshi"}] * 2 + [{"score": 9, "comment": "x"}] + [{"score": 0, "comment": "y"}] * 2,
+            "understanding": 100,
+            "teacher_summary": "Tushunadi.",
+        }
+        answers = ["Javob 1", "Javob 2", "Javob 3", "", ""]
+        with patch("ai.client.get_client", return_value=fake_client(json.dumps(evaluation))):
+            response = self.client.post(f"{self.url}answers/", {"answers": answers}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        viva = response.data["viva"]
+        self.assertEqual([item["score"] for item in viva["feedback"]], [2, 2, 2, 0, 0])
+        self.assertNotIn("understanding", viva)
+        self.assertNotIn("understanding", self.client.get(self.url).data["viva"])
+
+        self.auth_as(self.teacher_a)
+        staff_view = self.client.get(self.url).data["viva"]
+        # AI 100 dedi, lekin ballar 60% — farq 20 dan oshmaydi
+        self.assertEqual(staff_view["understanding"], 80)
+        self.assertEqual(staff_view["teacher_summary"], "Tushunadi.")
+
+        # Qayta javob berib bo'lmaydi
+        self.auth_as(self.student)
+        response = self.client.post(f"{self.url}answers/", {"answers": answers}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_permissions(self):
+        self.auth_as(self.classmate)
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.client.post(self.url, format="json").status_code, status.HTTP_403_FORBIDDEN)
+        self.group_a.ai_enabled = False
+        self.group_a.save()
+        self.auth_as(self.student)
+        self.assertEqual(self.start()[0].status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_single_session_and_answer_validation(self):
+        self.auth_as(self.student)
+        self.start()
+        self.assertEqual(self.start()[0].status_code, status.HTTP_400_BAD_REQUEST)
+        for bad in (None, ["a"] * 4, ["a"] * 4 + [5], ["x" * 2001] + ["a"] * 4, [""] * 5):
+            response = self.client.post(f"{self.url}answers/", {"answers": bad}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, bad)
+
+    def test_too_few_questions_is_error(self):
+        self.auth_as(self.student)
+        with patch("ai.client.get_client", return_value=fake_client(json.dumps({"questions": ["bitta"]}))):
+            response = self.client.post(self.url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertFalse(VivaSession.objects.exists())
