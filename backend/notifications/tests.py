@@ -12,11 +12,12 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from config import health
 from learning.models import Assignment
 from submissions.models import Submission
 from users.models import StudentGroup, User
 
-from . import bot, linking, services, telegram
+from . import bot, linking, monitor, services, telegram
 from .models import Notification, TelegramAccount, TelegramLinkCode
 
 PASSWORD = "Kuchli-Parol-2026"
@@ -376,3 +377,113 @@ class SendTests(DataMixin, TestCase):
     def test_not_configured(self):
         with self.assertRaises(telegram.TelegramNotConfigured):
             telegram.send_message(111, "x")
+
+
+def health_response(code=200, **data):
+    response = MagicMock(status_code=code)
+    response.json.return_value = {"ok": all(data.values()), **data}
+    return response
+
+
+HEALTHY = {"database": True, "lab_database": True}
+
+
+@override_settings(**CONFIGURED, MONITOR_HEALTH_URL="http://backend:8000/api/health/", ALLOWED_HOSTS=["mb.example.uz"])
+class MonitorTests(DataMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        TelegramAccount.objects.create(user=self.admin, chat_id=444)
+        self.monitor = monitor.Monitor()
+
+    def run_check(self, health):
+        get = {"side_effect": health} if isinstance(health, Exception) else {"return_value": health}
+        with patch("notifications.monitor.requests.get", **get) as get_mock, patch(
+            "notifications.telegram.requests.post", return_value=telegram_ok()
+        ) as post:
+            text = self.monitor.check()
+        self.get_call = get_mock.call_args
+        return text, [call.kwargs["json"]["chat_id"] for call in post.call_args_list]
+
+    def test_alerts_only_admins_after_repeated_failure_then_recovery(self):
+        down = health_response(503, database=False, lab_database=True)
+        self.assertEqual(self.run_check(down), (None, []))  # bir martalik uzilish — xabar yo'q
+        text, chats = self.run_check(down)
+        self.assertEqual(chats, [444])  # talaba va o'qituvchiga yuborilmaydi
+        self.assertIn("Asosiy baza", text)
+        self.assertNotIn("Laboratoriya", text)
+        self.assertEqual(self.run_check(down), (None, []))  # takroriy xabar yo'q
+        text, chats = self.run_check(health_response(**HEALTHY))
+        self.assertEqual(chats, [444])
+        self.assertIn("Qayta ishlayapti", text)
+        self.assertEqual(self.run_check(health_response(**HEALTHY)), (None, []))
+
+    def test_request_uses_internal_url_host_header_and_no_redirects(self):
+        self.run_check(health_response(**HEALTHY))
+        self.assertEqual(self.get_call.args[0], "http://backend:8000/api/health/")
+        self.assertEqual(self.get_call.kwargs["headers"], {"Host": "mb.example.uz"})
+        self.assertFalse(self.get_call.kwargs["allow_redirects"])
+
+    def test_unreachable_backend_and_bad_responses(self):
+        for health in (requests.ConnectionError("x"), health_response(500), health_response(301)):
+            self.monitor = monitor.Monitor()
+            self.run_check(health)
+            text, chats = self.run_check(health)
+            self.assertIn("Backend", text)
+            self.assertEqual(chats, [444])
+
+    def test_admin_chats_remembered_when_database_is_down(self):
+        self.monitor.refresh_admin_chats()
+        with patch.object(TelegramAccount.objects, "filter", side_effect=Exception("baza ishlamayapti")):
+            self.assertEqual(self.monitor.refresh_admin_chats(), [444])
+
+    def test_inactive_admin_not_alerted(self):
+        User.objects.filter(pk=self.admin.pk).update(is_active=False)
+        down = requests.ConnectionError("x")
+        self.run_check(down)
+        self.assertEqual(self.run_check(down)[1], [])
+
+    def test_retries_when_telegram_unavailable(self):
+        down = requests.ConnectionError("x")
+        self.run_check(down)
+        with patch("notifications.monitor.requests.get", side_effect=down), patch(
+            "notifications.telegram.requests.post", return_value=telegram_error(502, "Bad Gateway")
+        ):
+            self.assertIsNone(self.monitor.check())
+        self.assertEqual(self.run_check(down)[1], [444])
+
+    @override_settings(MONITOR_HEALTH_URL="")
+    def test_disabled_without_url(self):
+        self.assertFalse(monitor.is_enabled())
+
+
+class HealthViewTests(APITestCase):
+    def setUp(self):
+        health.reset_cache()
+
+    def tearDown(self):
+        health.reset_cache()
+
+    def test_reports_only_booleans_without_login(self):
+        with patch("labs.sandbox.ping"):
+            response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), {"ok": True, "database": True, "lab_database": True})
+
+    def test_lab_database_down_returns_503_without_details(self):
+        with patch("labs.sandbox.ping", side_effect=Exception("host=lab_db parol=MAXFIY")):
+            response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.json(), {"ok": False, "database": True, "lab_database": False})
+        self.assertNotIn("MAXFIY", response.content.decode())
+
+    def test_result_is_cached(self):
+        with patch("labs.sandbox.ping") as ping:
+            for _ in range(5):
+                self.client.get("/api/health/")
+        self.assertEqual(ping.call_count, 1)
+
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_not_redirected_to_https(self):
+        with patch("labs.sandbox.ping"):
+            self.assertEqual(self.client.get("/api/health/").status_code, status.HTTP_200_OK)
+            self.assertEqual(self.client.get("/api/auth/me/").status_code, 301)

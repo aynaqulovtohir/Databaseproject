@@ -151,6 +151,8 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 # HTTPS majburiyligi: sayt faqat HTTPS orqali ishlashi aniq bo'lgandan keyin .env da yoqiladi
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+# Monitoring ichki tarmoqdan oddiy http orqali keladi (tashqaridan Caddy bu manzilni yopadi)
+SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
 
 # Kesh: urinishlar cheklovlari (login, kod ishga tushirish) shu yerda hisoblanadi. Ishchi serverda gunicorn
@@ -205,6 +207,10 @@ LAB_DB = {
 LAB_AI_DAILY_LIMIT = env.int("LAB_AI_DAILY_LIMIT", default=40)
 # Bitta talabaning kuniga AI baholaydigan topshirishlari soni (undan keyin avtomatik baho qo'yiladi)
 LAB_AI_GRADES_DAILY_LIMIT = env.int("LAB_AI_GRADES_DAILY_LIMIT", default=20)
+
+# Monitoring: Telegram bot shu manzil orqali backend, asosiy va laboratoriya bazalarini tekshiradi
+# va nosozlik bo'lsa Telegram'ni bog'lagan adminlarga xabar yuboradi. Bo'sh bo'lsa, HTTP tekshiruv o'chiq.
+MONITOR_HEALTH_URL = env("MONITOR_HEALTH_URL", default="http://backend:8000/api/health/")
 
 # Telegram bildirishnomalari. Ikkalasi ham bo'sh bo'lmasa, bot ishlaydi.
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
