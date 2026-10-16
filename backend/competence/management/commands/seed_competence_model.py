@@ -1,4 +1,4 @@
-"""Namunaviy kompetentlik modelini yaratadi: 4 komponent va ularning ko'rsatkichlari.
+"""Namunaviy kompetentlik modelini yaratadi: 5 komponent va ularning ko'rsatkichlari.
 
 Ishga tushirish:
     python manage.py seed_competence_model [--replace]
@@ -55,13 +55,21 @@ MODEL = [
         "indicators": [
             {"name": "Yechimni o'z so'zlari bilan tushuntirish sifati", "source": S.EXPLANATION, "topics": DESIGN_TOPICS},
             {"name": "O'z bilimini baholash aniqligi (ishonch va natija)", "source": S.CALIBRATION},
+            {"name": "Hamkasb ishini baholash aniqligi", "source": S.PEER_ACCURACY},
+        ],
+    },
+    {
+        "name": "Kommunikativ-hamkorlik",
+        "description": "Hamkasbining loyihasini tahlil qilib, asoslangan va foydali fikr bildira olish.",
+        "indicators": [
+            {"name": "Izohlar foydaliligi (hamkasblar bahosi)", "source": S.PEER_HELPFUL},
         ],
     },
 ]
 
 
 class Command(BaseCommand):
-    help = "Namunaviy kompetentlik modelini (4 komponent) yaratadi va testlarni turiga qarab bog'laydi"
+    help = "Namunaviy kompetentlik modelini (5 komponent) yaratadi va testlarni turiga qarab bog'laydi"
 
     def add_arguments(self, parser):
         parser.add_argument("--replace", action="store_true", help="Bor modelni o'chirib, qayta yaratish")

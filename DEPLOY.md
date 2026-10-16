@@ -86,7 +86,7 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 docker compose -f docker-compose.prod.yml exec backend \
     python manage.py seed_design_labs --author <o'qituvchi_logini> --group "<guruh nomi>"
 
-# Namunaviy kompetentlik modeli (4 komponent). Kirish/chiqish testlari va so'rovnomadan keyin
+# Namunaviy kompetentlik modeli (5 komponent). Kirish/chiqish testlari va so'rovnomadan keyin
 # ishga tushiring: testlar turiga qarab avtomatik bog'lanadi. Keyin admin panelda metodikaga moslang.
 docker compose -f docker-compose.prod.yml exec backend python manage.py seed_competence_model
 ```

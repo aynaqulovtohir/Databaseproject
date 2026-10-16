@@ -21,7 +21,7 @@ from django.utils import timezone
 from users.models import User
 
 from .checker import ERROR_TIPS
-from .models import BlindReview, LabAttempt, LabGrade
+from .models import AIOutputReview, BlindReview, LabAttempt, LabGrade, PeerReview
 
 QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "delayed": "kechiktirilgan", "practice": "oddiy", "survey": "sorovnoma"}
 QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
@@ -276,6 +276,23 @@ oqituvchi_ball              o'qituvchi bahosi (0-100)
 farq                        tizim_ball − oqituvchi_ball (musbat — tizim yumshoqroq)
 tizim_baho, oqituvchi_baho  5 ballik shkalada: 86+ → 5, 71-85 → 4, 55-70 → 3, 0-54 → 2
 
+ozaro_baholash.csv — talabalarning bir-birining ER-diagrammasini baholashi
+---------------------------------------------------------------------------
+baholovchi, muallif         ikkala talabaning taxallusi
+obyektlar, atributlar, boglanishlar, tushunarlilik  rubrika ballari (1 — ko'p xato ... 4 — to'liq to'g'ri)
+baholovchi_ball             tuzilma mezonlari (obyektlar, atributlar, bog'lanishlar) bo'yicha 0-100
+tizim_ball                  baholash paytida ishning namunaga mosligi (0-100)
+aniqlik                     100 − |baholovchi_ball − tizim_ball|
+foydali                     muallif izohni foydali deb belgiladimi (1 / 0; bo'sh — belgilamagan)
+izoh_uzunligi               izoh belgilari soni (izoh matni eksportga kirmaydi)
+
+ai_sifati.csv — o'qituvchilarning AI matnlariga bergan baholari
+----------------------------------------------------------------
+baholovchi                  o'qituvchi taxallusi (O-...)
+turi                        hint (AI maslahati) yoki explanation (tushuntirish bo'yicha AI izohi)
+daraja                      maslahat darajasi (1 dan); izohda 0
+baho                        helpful (foydali), unclear (tushunarsiz), wrong (noto'g'ri), revealed (javobni aytib qo'ydi)
+
 kompetentlik.csv — har bir talaba, kesim va kompetentlik komponenti
 ---------------------------------------------------------------------
 talaba, guruh, ai_yoqilgan
@@ -500,6 +517,77 @@ def _quiz_rows(quizzes):
     return quiz_rows, answer_rows
 
 
+PEER_REVIEW_COLUMNS = [
+    "baholovchi",
+    "muallif",
+    "guruh",
+    "ai_yoqilgan",
+    "laboratoriya_id",
+    "laboratoriya",
+    "obyektlar",
+    "atributlar",
+    "boglanishlar",
+    "tushunarlilik",
+    "baholovchi_ball",
+    "tizim_ball",
+    "aniqlik",
+    "foydali",
+    "izoh_uzunligi",
+    "vaqt",
+]
+
+
+def _peer_review_rows(labs):
+    """O'zaro baholashlar: ikkala tomon taxallus bilan; izoh matni kirmaydi (unda ism bo'lishi mumkin), faqat uzunligi."""
+    from .peer_review import accuracy, structural_score
+
+    rows = []
+    reviews = PeerReview.objects.filter(attempt__lab__in=labs).select_related("attempt__lab", "reviewer__group").order_by("id")
+    for review in reviews:
+        group = review.reviewer.group
+        rows.append(
+            [
+                pseudonym(review.reviewer_id),
+                pseudonym(review.attempt.student_id),
+                group.name if group else "",
+                _flag(group.ai_enabled) if group else "",
+                review.attempt.lab_id,
+                review.attempt.lab.title,
+                review.scores.get("entities"),
+                review.scores.get("attributes"),
+                review.scores.get("relationships"),
+                review.scores.get("clarity"),
+                round(structural_score(review.scores), 1),
+                round(100 * review.reference_ratio, 1),
+                round(accuracy(review), 1),
+                "" if review.helpful is None else _flag(review.helpful),
+                len(review.comment),
+                _local(review.created_at),
+            ]
+        )
+    return rows
+
+
+AI_QUALITY_COLUMNS = ["baholovchi", "laboratoriya_id", "laboratoriya", "turi", "daraja", "baho", "vaqt"]
+
+
+def _ai_quality_rows(labs):
+    """O'qituvchilarning AI matnlariga bergan baholari (baholovchi taxallus bilan)."""
+    reviews = AIOutputReview.objects.filter(attempt__lab__in=labs).select_related("attempt__lab").order_by("id")
+    return [
+        [
+            reviewer_pseudonym(review.reviewer_id),
+            review.attempt.lab_id,
+            review.attempt.lab.title,
+            review.kind,
+            review.level,
+            review.rating,
+            _local(review.created_at),
+        ]
+        for review in reviews
+    ]
+
+
 COMPETENCE_COLUMNS = ["talaba", "guruh", "ai_yoqilgan", "kesim", "komponent", "ball", "daraja"]
 COMPETENCE_STAGES = {"initial": "boshida", "final": "oxirida", "delayed": "keyin"}
 COMPETENCE_LEVELS = {"low": "past", "medium": "orta", "high": "yuqori"}
@@ -612,6 +700,8 @@ def build_export(labs, quizzes=None, groups=None):
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
         zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs)))
+        zip_file.writestr("ozaro_baholash.csv", _csv(PEER_REVIEW_COLUMNS, _peer_review_rows(labs)))
+        zip_file.writestr("ai_sifati.csv", _csv(AI_QUALITY_COLUMNS, _ai_quality_rows(labs)))
         if quizzes is not None:
             quiz_rows, answer_rows = _quiz_rows(quizzes)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))

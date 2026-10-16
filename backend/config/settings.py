@@ -125,6 +125,8 @@ REST_FRAMEWORK = {
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
         "blind_review": "60/min",
+        # O'zaro baholash: talaba guruhdoshi ishini baholashi va izohni "foydali" deb belgilashi
+        "peer_review": "20/min",
         # AI yordamlari (EXPLAIN tushuntirishi, murabbiy, yechimni tushuntirish, himoya): kunlik limitdan tashqari
         # qisqa vaqtda ko'p so'rov yuborib serverni band qilmaslik uchun
         "lab_ai": "10/min",

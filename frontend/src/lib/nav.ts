@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BookOpen,
+  BotMessageSquare,
   ClipboardCheck,
   ClipboardList,
   Coins,
@@ -8,6 +9,7 @@ import {
   FlaskConical,
   Gauge,
   Home,
+  ShieldAlert,
   UserRound,
   Users,
   UsersRound,
@@ -34,6 +36,8 @@ const LEARNING_ITEMS: NavItem[] = [
 const STAFF_ITEMS: NavItem[] = [
   { to: '/statistics', label: 'Statistika', icon: BarChart3 },
   { to: '/competence', label: 'Kompetentlik', icon: Gauge },
+  { to: '/risk', label: 'Erta ogohlantirish', icon: ShieldAlert },
+  { to: '/ai-quality', label: 'AI sifati', icon: BotMessageSquare },
   { to: '/blind-review', label: "Ko'r baholash", icon: EyeOff },
 ]
 const COMMON_ITEMS: NavItem[] = [{ to: '/profile', label: 'Profil', icon: UserRound }]

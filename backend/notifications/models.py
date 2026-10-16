@@ -47,6 +47,8 @@ class Notification(models.Model):
         RETURNED = "returned", "Ish qaytarildi"
         DEADLINE_REMINDER = "deadline_reminder", "Muddat eslatmasi"
         NEW_SUBMISSION = "new_submission", "Yangi yechim"
+        # O'qituvchiga haftalik: e'tibor kerak bo'lgan talabalar (labs/risk.py)
+        RISK_DIGEST = "risk_digest", "Erta ogohlantirish"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Navbatda"

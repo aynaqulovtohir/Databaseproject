@@ -985,3 +985,75 @@ export interface CompetenceEfficiency {
   students: Record<CompetenceCohort, number>
   rows: CompetenceEfficiencyRow[]
 }
+
+// O'zaro baholash (ER)
+export type PeerCriterionKey = 'entities' | 'attributes' | 'relationships' | 'clarity'
+
+export interface PeerReviewReceived {
+  id: number
+  scores: Record<PeerCriterionKey, number>
+  comment: string
+  helpful: boolean | null
+  created_at: string
+}
+
+export interface PeerReviewState {
+  criteria: { key: PeerCriterionKey; name: string; hint: string }[]
+  scale: { value: number; label: string }[]
+  per_lab: number
+  written: number
+  /** Baholanadigan navbatdagi ish (muallif ismisiz) */
+  current: { attempt_id: number; diagram: ErDiagram } | null
+  /** Navbatda ish bo'lmasa — sababi */
+  reason: string
+  /** Talabaning o'z ishlariga berilgan baholar (baholovchi ismisiz) */
+  received: PeerReviewReceived[]
+}
+
+// Erta ogohlantirish
+export type RiskLevel = 'high' | 'medium' | 'low' | 'none'
+
+export interface RiskReport {
+  group: { id: number; name: string }
+  labs: number
+  median_solved: number
+  students: {
+    id: number
+    name: string
+    level: RiskLevel
+    level_label: string
+    score: number
+    reasons: { code: string; text: string }[]
+    last_activity: string | null
+    solved: number
+  }[]
+}
+
+// AI sifatini nazorat qilish
+export type AIRating = 'helpful' | 'unclear' | 'wrong' | 'revealed'
+
+export interface AIQualityItem {
+  attempt: number
+  kind: 'hint' | 'explanation'
+  kind_label: string
+  level: number
+  lab: { title: string; description: string }
+  work: string
+  is_correct: boolean
+  differences: string[]
+  explanation: string
+  verdict: string
+  text: string
+}
+
+export interface AIQualityState {
+  next: AIQualityItem | null
+  rated_by_me: number
+  ratings: { value: AIRating; label: string }[]
+  summary: {
+    kind: string
+    label: string
+    total: number
+    ratings: { rating: AIRating; label: string; count: number; percent: number | null; ci95: [number, number] | null }[]
+  }[]
+}

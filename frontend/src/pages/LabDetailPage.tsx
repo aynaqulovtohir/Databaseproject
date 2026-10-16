@@ -21,6 +21,7 @@ import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
 import { InterviewPanel, RequirementList } from '@/components/InterviewPanel'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
+import { PeerReviewPanel } from '@/components/PeerReviewPanel'
 import { LabDialog } from '@/components/LabDialog'
 import { LabGenerateCard } from '@/components/LabGenerateCard'
 import { LabRunner } from '@/components/LabRunner'
@@ -775,6 +776,8 @@ function StudentView({ lab }: { lab: Lab }) {
       },
     })
     void queryClient.invalidateQueries({ queryKey: ['labs'] })
+    // Yechilgandan keyin o'zaro baholash ochiladi
+    if (result.is_correct && lab.kind === 'er') void queryClient.invalidateQueries({ queryKey: ['peer-review', lab.id] })
     // Yechilgandan keyin buyurtmachi suhbatida aniqlanmagan talablar ham ko'rsatiladi
     if (result.is_correct && lab.interview?.ai) void queryClient.invalidateQueries({ queryKey: ['lab-interview', lab.id] })
     // Normallashtirish javobi (last_answer) serverda tuzilma sifatida saqlanadi: qayta o'qib olinadi
@@ -810,6 +813,18 @@ function StudentView({ lab }: { lab: Lab }) {
                 onResult={(result, diagram) => handleResult(result, { diagram })}
                 onDiagramChange={(diagram) => (work.current = { diagram })}
               />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>O'zaro baholash</CardTitle>
+              <CardDescription>
+                Laboratoriyani to'g'ri yechgach, guruhdoshlaringizning diagrammalarini rubrika bo'yicha baholang. Ikkala
+                tomon ham bir-birining ismini ko'rmaydi.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PeerReviewPanel labId={lab.id} />
             </CardContent>
           </Card>
           <CoachCard labId={lab.id} getWork={getWork} />

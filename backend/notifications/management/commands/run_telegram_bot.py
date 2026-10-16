@@ -58,6 +58,8 @@ class Command(BaseCommand):
 
                 if time.monotonic() - last_reminder_check >= REMINDER_INTERVAL_SECONDS:
                     services.create_deadline_reminders()
+                    # Haftalik erta ogohlantirish: har bir o'qituvchiga haftasiga ko'pi bilan bir marta
+                    services.create_risk_digests()
                     last_reminder_check = time.monotonic()
 
                 bot.send_pending()
