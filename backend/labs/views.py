@@ -1,5 +1,6 @@
 """Virtual laboratoriya API'lari."""
 import logging
+from collections import defaultdict
 from datetime import datetime, time
 
 from django.conf import settings
@@ -401,6 +402,52 @@ class LabViewSet(viewsets.ModelViewSet):
                 }
             )
         return Response(rows)
+
+
+    @action(detail=True, methods=["get"])
+    def similarity(self, request, pk=None):
+        """O'qituvchi uchun: yechimlari shubhali darajada o'xshash talabalar juftliklari (ko'chirish belgisi)."""
+        from .similarity import THRESHOLD, find_similar
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        students = {
+            student.pk: student
+            for student in User.objects.filter(
+                role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all()
+            ).select_related("group")
+        }
+        attempts_by_student = defaultdict(list)
+        for attempt in LabAttempt.objects.filter(lab=lab, student_id__in=students).order_by("created_at", "id"):
+            attempts_by_student[attempt.student_id].append(attempt)
+        pairs, compared = find_similar(lab, attempts_by_student)
+
+        def work(student_id):
+            attempts = attempts_by_student[student_id]
+            final = ([attempt for attempt in attempts if attempt.is_correct] or attempts)[-1]
+            student = students[student_id]
+            return {
+                "id": student.pk,
+                "first_name": student.first_name,
+                "last_name": student.last_name,
+                "group": student.group.name,
+                "solved": any(attempt.is_correct for attempt in attempts),
+                "code": final.sql_code,
+                "diagram": final.diagram,
+            }
+
+        return Response(
+            {
+                "compared": compared,
+                "threshold": THRESHOLD,
+                "pairs": [
+                    {**{key: value for key, value in pair.items() if key != "students"},
+                     "students": [work(student_id) for student_id in pair["students"]]}
+                    for pair in pairs
+                ],
+            }
+        )
 
 
 class LabAttemptAdviceView(APIView):

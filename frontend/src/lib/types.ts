@@ -273,6 +273,31 @@ export interface LabStudentProgress extends PersonShort {
   grade: LabGrade | null
 }
 
+export interface SimilarWork extends PersonShort {
+  group: string
+  solved: boolean
+  code: string
+  diagram: ErDiagram | null
+}
+
+/** Yechimlari shubhali darajada o'xshash ikki talaba */
+export interface SimilarPair {
+  students: [SimilarWork, SimilarWork]
+  /** Talabalarning o'z tanlovlari (namunada yo'q bo'laklar) bo'yicha o'xshashlik, 0-1 */
+  score: number
+  shared: number
+  /** Ikkalasida bir xil bo'lgan noodatiy xato urinishlar soni */
+  shared_wrong: number
+  /** Birinchi to'g'ri yechimlari orasidagi vaqt (daqiqa) */
+  gap_minutes: number | null
+}
+
+export interface SimilarityReport {
+  compared: number
+  threshold: number
+  pairs: SimilarPair[]
+}
+
 export type AnalysisStatus = 'pending' | 'processing' | 'done' | 'failed'
 
 export interface AnalysisIssue {

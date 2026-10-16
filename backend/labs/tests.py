@@ -1211,3 +1211,91 @@ class AgreementMathTests(TestCase):
         self.assertEqual(stats["band_agreement"], 0.667)
         self.assertEqual(stats["within_10"], 0.667)
         self.assertEqual(agreement_stats([]), {"count": 0})
+
+
+COPIED_SQL = """-- kitoblarni narx bo'yicha saralaymiz
+SELECT nomi AS kitob_nomi, narx AS bahosi
+FROM kitob k
+WHERE k.narx >= 20
+ORDER BY bahosi DESC;"""
+OWN_SQL = """select nomi, narx from kitob where narx between 20 and 1000000 order by 2 desc"""
+
+
+class SimilarityTests(BaseTestCase):
+    """Ko'chirishni aniqlash: talabaning o'z tanlovlari solishtiriladi, namunaga mos qismlar emas."""
+
+    def setUp(self):
+        super().setUp()
+        self.student_a3 = User.objects.create_user(
+            "student_a3", password=PASSWORD, role=User.Role.STUDENT, group=self.group_a
+        )
+        self.url = f"/api/labs/{self.lab.pk}/similarity/"
+
+    def attempt(self, student, code, correct=True, diagram=None, lab=None):
+        return LabAttempt.objects.create(
+            lab=lab or self.lab, student=student, sql_code=code, diagram=diagram, is_correct=correct
+        )
+
+    def get(self, user=None):
+        self.auth_as(user or self.teacher_a)
+        return self.client.get(self.url)
+
+    def test_copied_solution_is_flagged_but_independent_ones_are_not(self):
+        self.attempt(self.student_a1, COPIED_SQL)
+        self.attempt(self.student_a2, COPIED_SQL.replace("DESC;", "DESC ;"))  # bo'sh joy farqi
+        self.attempt(self.student_a3, OWN_SQL)
+        data = self.get().data
+        self.assertEqual(len(data["pairs"]), 1)
+        pair = data["pairs"][0]
+        self.assertEqual({student["id"] for student in pair["students"]}, {self.student_a1.pk, self.student_a2.pk})
+        self.assertEqual(pair["score"], 1.0)
+        self.assertIsNotNone(pair["gap_minutes"])
+
+    def test_solutions_equal_to_reference_are_not_flagged(self):
+        for student in (self.student_a1, self.student_a2):
+            self.attempt(student, SOLUTION)
+        self.assertEqual(self.get().data["pairs"], [])
+
+    def test_shared_unusual_wrong_attempt_is_flagged(self):
+        wrong = "SELECT nomi, narx, muallif FROM kitob WHERE narx > 20 AND nomi LIKE '%a%' ORDER BY nomi;"
+        self.attempt(self.student_a1, wrong, correct=False)
+        self.attempt(self.student_a2, wrong, correct=False)
+        self.attempt(self.student_a1, SOLUTION)
+        self.attempt(self.student_a2, OWN_SQL)
+        pairs = self.get().data["pairs"]
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0]["shared_wrong"], 1)
+
+    def test_er_names_are_compared(self):
+        reference = {
+            "entities": [{"id": "e1", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
+            "relationships": [],
+        }
+        lab = Lab.objects.create(kind="er", title="ER", reference_diagram=reference, author=self.teacher_a)
+        lab.groups.add(self.group_a)
+
+        def diagram(*names):
+            return {
+                "entities": [
+                    {"id": "e1", "name": "Talaba", "x": 0, "y": 0,
+                     "attributes": [{"name": "id", "key": "pk"}] + [{"name": name, "key": ""} for name in names]},
+                    {"id": "e2", "name": "Yotoqxona xonasi", "x": 0, "y": 0, "attributes": [{"name": "qavat", "key": ""}]},
+                ],
+                "relationships": [],
+            }
+
+        unusual = ("tugilgan_joyi", "sevimli_fan", "oyoq_kiyim_olchami", "telefon_2")
+        self.attempt(self.student_a1, "", False, diagram(*unusual), lab)
+        self.attempt(self.student_a2, "", False, diagram(*[name.upper() for name in unusual]), lab)
+        self.attempt(self.student_a3, "", False, diagram("ism", "familiya", "manzil", "telefon"), lab)
+        self.url = f"/api/labs/{lab.pk}/similarity/"
+        pairs = self.get().data["pairs"]
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual({student["id"] for student in pairs[0]["students"]}, {self.student_a1.pk, self.student_a2.pk})
+
+    def test_access(self):
+        self.attempt(self.student_a1, COPIED_SQL)
+        self.attempt(self.student_a2, COPIED_SQL)
+        self.assertEqual(self.get(self.student_a1).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.get(self.teacher_b).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.get(self.admin).status_code, status.HTTP_200_OK)
