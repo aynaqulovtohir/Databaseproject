@@ -1644,3 +1644,97 @@ class QueryLabsTests(TestCase):
                 self.assertTrue(outcome.result.rows, lab_data["title"])
                 # Namuna universitet jadvallariga emas, do'kon jadvallariga murojaat qiladi
                 self.assertIsNone(re.search(r"\b(talaba|baho|guruh|fan)\b", code), lab_data["title"])
+
+
+class ErSqlLabsTests(BaseTestCase):
+    """ER → SQL: berilgan ER-model bo'yicha jadvallar (er_sql_labs.py)."""
+
+    @staticmethod
+    def check(lab_data, code):
+        from .checker import check_code
+
+        return check_code(Lab(**{k: v for k, v in lab_data.items() if k != "theory"}), code)
+
+    def test_solutions_pass_and_diagrams_are_valid(self):
+        from .er import validate_diagram
+        from .er_sql_labs import ER_SQL_LABS
+
+        for lab_data in ER_SQL_LABS:
+            validate_diagram(lab_data["given_diagram"])
+            self.assertTrue(self.check(lab_data, lab_data["solution_sql"])["is_correct"], lab_data["title"])
+
+    def test_diagram_matches_solution_tables(self):
+        """Har bir obyekt — jadval, atributlari — ustunlar; M:N uchun oraliq jadval nomlash qoidasi bo'yicha."""
+        from .er_sql_labs import ER_SQL_LABS
+
+        for lab_data in ER_SQL_LABS:
+            tables = run_sql(lab_data["solution_sql"]).tables
+            diagram = lab_data["given_diagram"]
+            names = {entity["id"]: entity["name"].lower().replace("'", "") for entity in diagram["entities"]}
+            for entity in diagram["entities"]:
+                table = names[entity["id"]]
+                self.assertIn(table, tables, lab_data["title"])
+                for attribute in entity["attributes"]:
+                    self.assertIn(attribute["name"], tables[table].columns, (lab_data["title"], table))
+            for relationship in diagram["relationships"]:
+                if relationship["source_card"] == relationship["target_card"] == "N":
+                    junction = f"{names[relationship['source']]}_{names[relationship['target']]}"
+                    self.assertIn(junction, tables, lab_data["title"])
+
+    def test_typical_mistakes_fail(self):
+        from .er_sql_labs import ER_SQL_LABS
+
+        first, second, third = ER_SQL_LABS
+        mistakes = [
+            # Tashqi kalit «1» tomonda
+            (first, """CREATE TABLE oqituvchi (id SERIAL PRIMARY KEY, ism VARCHAR(100) NOT NULL,
+                       telefon VARCHAR(20) NOT NULL UNIQUE, kurs_id INTEGER);
+                       CREATE TABLE kurs (id SERIAL PRIMARY KEY, nomi VARCHAR(100) NOT NULL, narx NUMERIC(10,2) NOT NULL);"""),
+            # M:N oraliq jadvalsiz: kursga tinglovchi_id qo'shilgan
+            (second, second["solution_sql"].split("CREATE TABLE tinglovchi_kurs")[0]),
+            # 1:1 uchun UNIQUE unutilgan — bu 1:N bo'lib qoladi
+            (third, third["solution_sql"].replace("oqituvchi_id INTEGER UNIQUE REFERENCES", "oqituvchi_id INTEGER REFERENCES")),
+        ]
+        for lab_data, code in mistakes:
+            self.assertFalse(self.check(lab_data, code)["is_correct"], lab_data["title"])
+
+    def test_theory_examples_run_and_hide_solutions(self):
+        import re
+
+        from .er_sql_labs import ER_SQL_LABS
+
+        for lab_data in ER_SQL_LABS:
+            solution_tables = set(re.findall(r"CREATE TABLE (\w+)", lab_data["solution_sql"]))
+            for code in re.findall(r"```sql\n(.*?)```", lab_data["theory"], re.DOTALL):
+                self.assertIsNone(run_sql(code).error, lab_data["title"])
+                self.assertFalse(solution_tables & set(re.findall(r"CREATE TABLE (\w+)", code)), lab_data["title"])
+
+    def test_student_sees_given_diagram(self):
+        from .er_sql_labs import ER_SQL_LABS
+
+        diagram = ER_SQL_LABS[0]["given_diagram"]
+        Lab.objects.filter(pk=self.lab.pk).update(given_diagram=diagram)
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.url).data["given_diagram"]["entities"][0]["name"], "O'qituvchi")
+
+    def test_teacher_saves_validated_diagram(self):
+        from .er_sql_labs import ER_SQL_LABS
+
+        self.auth_as(self.teacher_a)
+        bad = {"entities": [{"id": "a", "name": "", "x": 0, "y": 0, "attributes": []}], "relationships": []}
+        response = self.client.patch(self.url, {"given_diagram": bad}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("given_diagram", response.data)
+        diagram = ER_SQL_LABS[1]["given_diagram"]
+        response = self.client.patch(self.url, {"given_diagram": diagram}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.lab.refresh_from_db()
+        self.assertEqual(len(self.lab.given_diagram["entities"]), 3)
+        # Bo'sh diagramma — olib tashlash
+        self.client.patch(self.url, {"given_diagram": {"entities": [], "relationships": []}}, format="json")
+        self.lab.refresh_from_db()
+        self.assertIsNone(self.lab.given_diagram)
+        # Nusxalashda o'tadi
+        Lab.objects.filter(pk=self.lab.pk).update(given_diagram=diagram)
+        copy = Lab.objects.get(pk=self.client.post(f"{self.url}duplicate/").data["id"])
+        self.assertEqual(copy.given_diagram, diagram)

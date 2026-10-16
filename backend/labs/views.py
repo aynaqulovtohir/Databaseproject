@@ -383,6 +383,7 @@ class LabViewSet(viewsets.ModelViewSet):
             solution_sql=lab.solution_sql,
             hidden_setup_sql=lab.hidden_setup_sql,
             reference_diagram=lab.reference_diagram,
+            given_diagram=lab.given_diagram,
             author=request.user,
         )
         copy.groups.set(groups)

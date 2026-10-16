@@ -222,6 +222,8 @@ export interface Lab {
   hidden_setup_sql?: string
   /** ER laboratoriyasining namunaviy diagrammasi. Talabaga yuborilmaydi */
   reference_diagram?: ErDiagram | null
+  /** SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL) */
+  given_diagram?: ErDiagram | null
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]

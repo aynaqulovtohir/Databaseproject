@@ -1,4 +1,4 @@
-"""Tayyor laboratoriyalarni (ER-model, loyihalash va SELECT so'rovlari) bazaga qo'shadi (design_labs.py, query_labs.py).
+"""Tayyor laboratoriyalarni (ER-model, loyihalash, ER → SQL va SELECT so'rovlari) bazaga qo'shadi (design_labs.py, query_labs.py).
 
 Ishga tushirish:
     python manage.py seed_design_labs --author <o'qituvchi logini> --group <guruh nomi> [--group ...] [--update]
@@ -19,7 +19,7 @@ from ...models import Lab
 
 
 class Command(BaseCommand):
-    help = "Tayyor laboratoriyalarni (ER-model, loyihalash, SELECT so'rovlari) qo'shadi"
+    help = "Tayyor laboratoriyalarni (ER-model, loyihalash, ER → SQL, SELECT so'rovlari) qo'shadi"
 
     def add_arguments(self, parser):
         parser.add_argument("--author", required=True, help="Laboratoriyalar muallifi (o'qituvchi yoki admin logini)")
@@ -47,6 +47,8 @@ class Command(BaseCommand):
                     validate_lab_sql(
                         lab_data["setup_sql"], lab_data["solution_sql"], lab_data.get("hidden_setup_sql", "")
                     )
+                    if lab_data.get("given_diagram"):
+                        validate_diagram(lab_data["given_diagram"])
             except LabSetupError as exc:
                 raise CommandError(f"«{lab_data['title']}» ({exc.field}) xato: {exc}")
             except DiagramError as exc:

@@ -50,6 +50,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "solution_sql",
             "hidden_setup_sql",
             "reference_diagram",
+            "given_diagram",
             "author",
             "groups",
             "created_at",
@@ -64,6 +65,14 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         if kind == Lab.Kind.ER:
             return self.validate_er(attrs)
         attrs["reference_diagram"] = None
+        given = attrs.get("given_diagram")
+        if given is not None:
+            try:
+                given = validate_diagram(given)
+            except DiagramError as exc:
+                raise serializers.ValidationError({"given_diagram": str(exc)})
+            # Bo'sh diagramma — berilmagan bilan teng
+            attrs["given_diagram"] = given if given["entities"] else None
         return self.validate_sql(attrs)
 
     def validate_er(self, attrs):
@@ -80,6 +89,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["reference_diagram"] = diagram
         # ER laboratoriyasida SQL ishlatilmaydi
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = ""
+        attrs["given_diagram"] = None
         return attrs
 
     def validate_sql(self, attrs):
@@ -122,7 +132,18 @@ class StudentLabSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ["id", "kind", "title", "description", "theory", "setup_sql", "author", "created_at", "my_progress"]
+        fields = [
+            "id",
+            "kind",
+            "title",
+            "description",
+            "theory",
+            "setup_sql",
+            "given_diagram",
+            "author",
+            "created_at",
+            "my_progress",
+        ]
         read_only_fields = fields
 
     def get_my_progress(self, lab):

@@ -72,6 +72,15 @@ function ConditionCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
+        {lab.kind === 'sql' && lab.given_diagram?.entities.length ? (
+          <div>
+            <h3 className="mb-1 text-sm font-medium">Berilgan ER-model</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Shu model bo'yicha jadvallarni yarating. Diagrammani surib va kattalashtirib ko'rish mumkin.
+            </p>
+            <ErEditor value={lab.given_diagram} />
+          </div>
+        ) : null}
         {lab.theory.trim() ? (
           <details open className="group rounded-lg border bg-muted/30 p-3">
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium select-none">

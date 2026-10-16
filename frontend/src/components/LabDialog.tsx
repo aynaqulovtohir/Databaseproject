@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -37,6 +37,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
 
   const [kind, setKind] = useState<LabKind>(lab?.kind ?? 'sql')
   const [referenceDiagram, setReferenceDiagram] = useState<ErDiagram>(lab?.reference_diagram ?? EMPTY_DIAGRAM)
+  const [givenDiagram, setGivenDiagram] = useState<ErDiagram>(lab?.given_diagram ?? EMPTY_DIAGRAM)
   const [title, setTitle] = useState(lab?.title ?? '')
   const [description, setDescription] = useState(lab?.description ?? '')
   const [theory, setTheory] = useState(lab?.theory ?? '')
@@ -52,7 +53,14 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
-          : { ...common, kind, setup_sql: setupSql, solution_sql: solutionSql, hidden_setup_sql: hiddenSql }
+          : {
+              ...common,
+              kind,
+              setup_sql: setupSql,
+              solution_sql: solutionSql,
+              hidden_setup_sql: hiddenSql,
+              given_diagram: givenDiagram.entities.length ? cleanDiagram(givenDiagram) : null,
+            }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
         : api<Lab>('/labs/', { method: 'POST', body })
@@ -168,6 +176,19 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             </div>
           ) : (
             <>
+              <div className="grid gap-1.5">
+                <span className="text-sm font-medium">Talabaga beriladigan ER-model (ixtiyoriy)</span>
+                <p className="text-xs text-muted-foreground">
+                  ER → SQL laboratoriyasi uchun: talaba shu model bo'yicha jadvallarni yaratadi. Talabaga ko'rinadi;
+                  tekshiruv namunaviy yechim bo'yicha. Bo'sh qoldirilsa, ko'rsatilmaydi.
+                </p>
+                <ErEditor value={givenDiagram} onChange={setGivenDiagram} />
+                {errors.given_diagram ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {errors.given_diagram}
+                  </p>
+                ) : null}
+              </div>
               <FormField
                 id="lab_setup"
                 label="Tayyor jadvallar (SQL)"
