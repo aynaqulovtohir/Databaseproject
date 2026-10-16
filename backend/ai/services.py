@@ -102,19 +102,23 @@ def analyze_submission(submission):
     return result, response.usage.input_tokens, response.usage.output_tokens
 
 
-def chat_reply(assignment, history, question):
+def chat_reply(assignment, history, question, passages=()):
     """Talaba savoliga AI javobi.
 
     history: [{"role": "user" | "assistant", "content": "..."}] - oldingi xabarlar.
+    passages: kurs materiallaridan savolga mos parchalar (learning.retrieval.find_passages).
     Baholash mezonlari bu yerga ataylab qo'shilmaydi: ular talabaga ko'rinmasligi kerak.
     """
+    from learning.retrieval import MATERIALS_RULE, passages_block
+
     response = create_message(
         purpose="chat",
         max_tokens=CHAT_MAX_TOKENS,
         system=prompts.CHAT_SYSTEM_TEMPLATE.format(
             title=assignment.title, description=assignment.description
-        ),
-        messages=[*history, {"role": "user", "content": question}],
+        )
+        + MATERIALS_RULE,
+        messages=[*history, {"role": "user", "content": question + passages_block(passages)}],
         output_config={"effort": "low"},
     )
     return extract_text(response)

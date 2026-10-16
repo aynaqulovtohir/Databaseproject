@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 const MAX_MESSAGE_LENGTH = 4000
 
-function Bubble({ role, children }: { role: 'user' | 'assistant'; children: string }) {
+export function Bubble({ role, children }: { role: 'user' | 'assistant'; children: string }) {
   return (
     <div className={cn('flex', role === 'user' ? 'justify-end' : 'justify-start')}>
       <div

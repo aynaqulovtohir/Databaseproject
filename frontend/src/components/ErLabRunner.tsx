@@ -86,10 +86,19 @@ interface ErLabRunnerProps {
   /** true bo'lsa, "Baholashga topshirish" tugmasi ham ko'rinadi (talaba uchun) */
   gradable?: boolean
   onResult?: (result: LabRunResult, diagram: ErDiagram) => void
+  /** Diagramma o'zgarganda (murabbiyga hozirgi ishni yuborish uchun) */
+  onDiagramChange?: (diagram: ErDiagram) => void
 }
 
 /** ER-diagramma muharriri, tekshirish va baholashga topshirish. */
-export function ErLabRunner({ labId, initialDiagram, initialFix = null, gradable = false, onResult }: ErLabRunnerProps) {
+export function ErLabRunner({
+  labId,
+  initialDiagram,
+  initialFix = null,
+  gradable = false,
+  onResult,
+  onDiagramChange,
+}: ErLabRunnerProps) {
   const [diagram, setDiagram] = useState<ErDiagram>(initialDiagram ?? EMPTY_DIAGRAM)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -123,6 +132,7 @@ export function ErLabRunner({ labId, initialDiagram, initialFix = null, gradable
         onChange={(next) => {
           setDiagram(next)
           setFieldError(null)
+          onDiagramChange?.(next)
         }}
       />
       {fieldError ? (

@@ -366,6 +366,13 @@ export interface LabRunResult {
   fix?: ErFix | null
 }
 
+/** Laboratoriya murabbiyi bilan yozishma */
+export interface LabChatState {
+  messages: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }[]
+  /** Bugun qolgan umumiy AI yordamlari soni */
+  ai_left: number
+}
+
 /** Indeks laboratoriyasi: qum qutida o'lchangan reja */
 export interface PlanMeasure {
   ok: boolean

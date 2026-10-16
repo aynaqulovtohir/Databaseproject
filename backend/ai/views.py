@@ -117,8 +117,12 @@ class AssignmentChatView(APIView):
         recent = list(self.own_messages().order_by("-created_at", "-id")[:CHAT_HISTORY_LIMIT])[::-1]
         history = [{"role": message.role, "content": message.content} for message in recent]
 
+        from learning.retrieval import find_passages
+
         try:
-            answer = chat_reply(self.assignment, history, question)
+            answer = chat_reply(
+                self.assignment, history, question, find_passages(request.user, question, self.assignment.title)
+            )
         except AINotConfigured:
             return Response(
                 {"detail": "AI yordamchi hali sozlanmagan. Administratorga murojaat qiling."},

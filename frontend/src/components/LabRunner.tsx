@@ -366,6 +366,8 @@ interface LabRunnerProps {
   planAssistant?: boolean
   /** Laboratoriya yechilganmi: AI muqobil indeksi faqat shundan keyin ochiladi */
   solved?: boolean
+  /** Muharrirdagi kod o'zgarganda (murabbiyga hozirgi ishni yuborish uchun) */
+  onCodeChange?: (code: string) => void
 }
 
 /** SQL muharriri, «Sinab ko'rish» va «Tekshirish» tugmalari va natija paneli. */
@@ -376,6 +378,7 @@ export function LabRunner({
   onResult,
   planAssistant = false,
   solved = false,
+  onCodeChange,
 }: LabRunnerProps) {
   const [code, setCode] = useState(initialCode)
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -456,7 +459,10 @@ export function LabRunner({
             maxLength={MAX_SQL_LENGTH}
             aria-invalid={Boolean(fieldError)}
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => {
+              setCode(event.target.value)
+              onCodeChange?.(event.target.value)
+            }}
             onKeyDown={handleKeyDown}
           />
           {fieldError ? (

@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, Copy, Lightbulb, Pencil, ShieldCheck, Trash2, TriangleAlert, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
+import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { LabDialog } from '@/components/LabDialog'
 import { LabRunner } from '@/components/LabRunner'
 import { PageHeader } from '@/components/PageHeader'
@@ -590,10 +591,32 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
 
 // ---------- Talaba ----------
 
+/** Laboratoriya murabbiyi kartasi (AI o'chirilgan guruhda ko'rsatilmaydi) */
+function CoachCard({ labId, getWork }: { labId: number; getWork: () => LabWork }) {
+  const user = useUser()
+  if (!user.ai_enabled) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Murabbiy</CardTitle>
+        <CardDescription>
+          Savollar bilan yo'l ko'rsatadigan AI murabbiy. U namunaviy yechimni ko'rmaydi va tayyor javob bermaydi.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <LabCoach labId={labId} getWork={getWork} />
+      </CardContent>
+    </Card>
+  )
+}
+
 function StudentView({ lab }: { lab: Lab }) {
   const user = useUser()
   const queryClient = useQueryClient()
   const progress = lab.my_progress ?? { attempts: 0, solved: false }
+  // Murabbiyga savol bilan yuboriladigan hozirgi ish: holat emas, ref — har bir harfda qayta chizilmasin
+  const work = useRef<LabWork>({ code: progress.last_code ?? '', diagram: progress.last_diagram ?? null })
+  const getWork = () => work.current
 
   function handleResult(result: LabRunResult, work: { code?: string; diagram?: ErDiagram }) {
     // Holat va oxirgi ish keshda yangilanadi: sahifaga qaytilganda ham to'g'ri ko'rinadi
@@ -638,9 +661,11 @@ function StudentView({ lab }: { lab: Lab }) {
                 initialFix={progress.last_fix}
                 gradable
                 onResult={(result, diagram) => handleResult(result, { diagram })}
+                onDiagramChange={(diagram) => (work.current = { diagram })}
               />
             </CardContent>
           </Card>
+          <CoachCard labId={lab.id} getWork={getWork} />
         </div>
       </>
     )
@@ -672,9 +697,13 @@ function StudentView({ lab }: { lab: Lab }) {
               onResult={(result, code) => handleResult(result, { code })}
               planAssistant={Boolean(lab.plan_query?.trim()) && user.ai_enabled}
               solved={progress.solved}
+              onCodeChange={(code) => (work.current = { code })}
             />
           </CardContent>
         </Card>
+      </div>
+      <div className="mt-4">
+        <CoachCard labId={lab.id} getWork={getWork} />
       </div>
     </>
   )

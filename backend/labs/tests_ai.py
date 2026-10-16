@@ -124,3 +124,97 @@ class ExplainPlanTests(BaseTestCase):
             response = self.post(self.solution, mode="suggest")
         self.assertFalse(response.data["suggestion"]["ok"])
         self.assertTrue(response.data["suggestion"]["error"])
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key", LAB_AI_DAILY_LIMIT=5)
+class LabCoachTests(BaseTestCase):
+    """Murabbiy namunaviy yechimni ko'rmaydi, faqat o'z guruhining materialiga tayanadi."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        from learning.models import Material
+
+        own = Material.objects.create(
+            title="JOIN va saralash",
+            text="Kirish.\n\nORDER BY narx DESC natijani kamayish tartibida saralaydi. WHERE shart qatorlarni filtrlaydi.",
+            author=cls.teacher_a,
+        )
+        own.groups.add(cls.group_a)
+        other = Material.objects.create(
+            title="BOSHQA-GURUH-MATERIALI", text="ORDER BY narx DESC haqida maxfiy parcha.", author=cls.teacher_b
+        )
+        other.groups.add(cls.group_b)
+        cls.chat_url = f"/api/labs/{cls.lab.pk}/chat/"
+
+    def ask(self, content, **extra):
+        return self.client.post(self.chat_url, {"content": content, **extra}, format="json")
+
+    @patch("labs.coach.create_message", return_value=ai_text("Qaysi ustun bo'yicha saralash kerak?"))
+    def test_socratic_reply_without_solution_and_with_own_materials(self, create_message):
+        self.auth_as(self.student_a1)
+        response = self.ask("Natijani qanday saralayman? ORDER BY narx kerakmi?", sql_code="SELECT * FROM kitob")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual([m["role"] for m in response.data["messages"]], ["user", "assistant"])
+        self.assertEqual(response.data["ai_left"], 4)
+
+        payload = json.dumps(create_message.call_args.kwargs, ensure_ascii=False)
+        self.assertNotIn("ORDER BY narx DESC;", payload)  # namunaviy yechim (SOLUTION) yuborilmaydi
+        self.assertNotIn("Zuhriddin", payload)
+        self.assertIn("SELECT * FROM kitob", payload)  # talabaning hozirgi kodi
+        self.assertIn("JOIN va saralash", payload)  # o'z guruhi materiali
+        self.assertNotIn("BOSHQA-GURUH-MATERIALI", payload)
+        self.assertNotIn("maxfiy parcha", payload)
+
+    @patch("labs.coach.create_message", return_value=ai_text("javob"))
+    def test_history_is_private_and_wrapped(self, create_message):
+        self.auth_as(self.student_a1)
+        self.ask("birinchi savol")
+        self.ask("ikkinchi savol")
+        history = create_message.call_args.kwargs["messages"]
+        self.assertEqual(len(history), 3)
+        self.assertIn("<talaba_ishi>", history[0]["content"])
+        self.auth_as(self.student_a2)
+        self.assertEqual(self.client.get(self.chat_url).data["messages"], [])
+
+    def test_staff_other_group_and_disabled_ai_rejected(self):
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.ask("savol").status_code, status.HTTP_403_FORBIDDEN)
+        self.auth_as(self.student_b)
+        self.assertEqual(self.ask("savol").status_code, status.HTTP_404_NOT_FOUND)
+        self.group_a.ai_enabled = False
+        self.group_a.save()
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.ask("savol").status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_validation(self):
+        self.auth_as(self.student_a1)
+        for bad in ("", "   ", "x" * 2001, 5):
+            self.assertEqual(self.ask(bad).status_code, status.HTTP_400_BAD_REQUEST, bad)
+
+    @patch("labs.coach.create_message", side_effect=AITransientError("tarmoq"))
+    def test_failure_saves_nothing(self, create_message):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.ask("savol").status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(self.client.get(self.chat_url).data, {"messages": [], "ai_left": 5})
+
+
+class RetrievalTests(BaseTestCase):
+    def test_passages_are_ranked_and_limited_to_visible_materials(self):
+        from learning.models import Material
+        from learning.retrieval import find_passages
+
+        texts = {
+            "Normallashtirish": "Ikkinchi normal forma (2NF) qisman bog'liqlikni yo'qotadi.\n\nTranzitiv bog'liqlik 3NF da yo'qoladi.",
+            "Indekslar": "B-tree indeks tartiblangan qidiruvni tezlashtiradi.",
+        }
+        for title, text in texts.items():
+            Material.objects.create(title=title, text=text, author=self.teacher_a).groups.add(self.group_a)
+        Material.objects.create(title="Tranzitiv", text="tranzitiv bog'liqlik", author=self.teacher_b).groups.add(
+            self.group_b
+        )
+        passages = find_passages(self.student_a1, "tranzitiv bog'liqlik nima?")
+        self.assertEqual(passages[0]["title"], "Normallashtirish")
+        self.assertTrue(all(item["title"] != "Tranzitiv" for item in passages))
+        self.assertEqual(find_passages(self.student_b, "indeks"), [])
+        self.assertEqual(find_passages(self.student_a1, "?? !"), [])

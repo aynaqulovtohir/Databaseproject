@@ -33,7 +33,7 @@ from .quota import (
     sandbox_down_response,
 )
 from .er import build_fixed, compare
-from .models import AIAction, BlindReview, Lab, LabAttempt, LabGrade
+from .models import AIAction, BlindReview, Lab, LabAttempt, LabChatMessage, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -583,6 +583,92 @@ class LabAttemptAdviceView(APIView):
     @staticmethod
     def payload(hints):
         return {"advice": hints[-1], "hints": hints, "level": len(hints), "max_level": MAX_HINT_LEVEL}
+
+
+class LabChatView(APIView):
+    """Laboratoriya murabbiyi (Sokrat usulidagi AI). GET — yozishma, POST {content, sql_code?, diagram?} — savol.
+
+    Faqat talaba va faqat o'ziga ko'rinadigan laboratoriyada. Har bir savol umumiy kunlik AI limitidan yechiladi.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "lab_ai"
+
+    def get_throttles(self):
+        # Yozishmani o'qish cheklanmaydi, faqat AI'ga savol yuborish
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_student:
+            raise PermissionDenied("Murabbiy faqat talaba uchun.")
+        if not request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
+        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+
+    def own_messages(self):
+        return LabChatMessage.objects.filter(lab=self.lab, student=self.request.user)
+
+    def payload(self):
+        return {
+            "messages": [
+                {"id": message.pk, "role": message.role, "content": message.content, "created_at": message.created_at}
+                for message in self.own_messages()
+            ],
+            "ai_left": ai_advice_left(self.request.user),
+        }
+
+    def get(self, request, pk):
+        return Response(self.payload())
+
+    def post(self, request, pk):
+        from learning.retrieval import find_passages
+
+        from .coach import HISTORY_LIMIT, coach_reply, work_block
+
+        content = request.data.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValidationError({"content": "Savol matni bo'sh bo'lmasligi kerak."})
+        if len(content) > 2000:
+            raise ValidationError({"content": "Savol 2000 belgidan oshmasligi kerak."})
+        sql_code, diagram = "", None
+        if self.lab.kind == Lab.Kind.ER and request.data.get("diagram") is not None:
+            serializer = DiagramRunSerializer(data={"diagram": request.data["diagram"]})
+            serializer.is_valid(raise_exception=True)
+            diagram = serializer.validated_data["diagram"]
+        elif self.lab.kind != Lab.Kind.ER and request.data.get("sql_code"):
+            serializer = RunSerializer(data={"sql_code": request.data["sql_code"]})
+            serializer.is_valid(raise_exception=True)
+            sql_code = serializer.validated_data["sql_code"]
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+
+        recent = list(self.own_messages().order_by("-created_at", "-id")[:HISTORY_LIMIT])[::-1]
+        history = [
+            {"role": message.role, "content": work_block(message.content) if message.role == "user" else message.content}
+            for message in recent
+        ]
+        try:
+            answer = coach_reply(
+                self.lab,
+                history,
+                content.strip(),
+                sql_code=sql_code,
+                diagram=diagram,
+                passages=find_passages(request.user, content, self.lab.title),
+            )
+        except AIError as exc:
+            return ai_error_response(exc, "savol")
+        with transaction.atomic():
+            LabChatMessage.objects.create(
+                lab=self.lab, student=request.user, role=LabChatMessage.Role.USER, content=content.strip()
+            )
+            LabChatMessage.objects.create(
+                lab=self.lab, student=request.user, role=LabChatMessage.Role.ASSISTANT, content=answer
+            )
+            record_ai_action(request.user, AIAction.Kind.LAB_CHAT)
+        return Response(self.payload(), status=status.HTTP_201_CREATED)
 
 
 class StatisticsView(APIView):

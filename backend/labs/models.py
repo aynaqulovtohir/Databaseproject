@@ -177,3 +177,25 @@ class AIAction(models.Model):
         verbose_name = "AI so'rovi (talaba)"
         verbose_name_plural = "AI so'rovlari (talabalar)"
         ordering = ["-id"]
+
+
+class LabChatMessage(models.Model):
+    """Talabaning laboratoriya murabbiyi (AI) bilan yozishmasi. Faqat talabaning o'zi ko'radi."""
+
+    class Role(models.TextChoices):
+        USER = "user", "Talaba"
+        ASSISTANT = "assistant", "AI"
+
+    lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="chat_messages")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="lab_chat_messages"
+    )
+    role = models.CharField("kim yozgan", max_length=10, choices=Role.choices)
+    content = models.TextField("matn")
+    created_at = models.DateTimeField("vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "murabbiy xabari"
+        verbose_name_plural = "murabbiy xabarlari"
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["lab", "student"])]
