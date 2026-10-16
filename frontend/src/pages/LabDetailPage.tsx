@@ -69,7 +69,7 @@ function BackLink() {
 function TheoryText({ text }: { text: string }) {
   const parts = text.split(/```[a-z]*\n?/)
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       {parts.map((part, index) =>
         !part.trim() ? null : index % 2 === 1 ? (
           <SqlCode key={index} code={part.trimEnd()} />
@@ -108,7 +108,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
       <CardHeader>
         <CardTitle>Laboratoriya sharti</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
         {lab.kind === 'norm' && lab.norm_task ? <NormTaskView task={lab.norm_task} /> : null}
         {lab.kind === 'sql' && lab.plan_query?.trim() ? (
