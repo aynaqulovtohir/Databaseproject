@@ -14,6 +14,7 @@ from .norm_labs import NORM_LABS
 from .query_labs import QUERY_LABS
 from .theory import THEORY
 from .transaction_labs import TRANSACTION_LABS
+from .vector_labs import VECTOR_LABS
 
 FK_NOTE = "Tashqi kalitlarga ON DELETE / ON UPDATE amallarini qo'shmang."
 NO_SELECT_NOTE = "Kod oxirida SELECT yozish shart emas: tekshiruv yaratilgan jadvallarni solishtiradi."
@@ -479,5 +480,6 @@ O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning 
 for _lab in ER_LABS + DESIGN_LABS:
     _lab["theory"] = THEORY.get(_lab["title"], "")
 
-# Kurs tartibida: ER-model → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar → tranzaksiyalar
-ALL_LABS = ER_LABS + DESIGN_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS
+# Kurs tartibida: ER-model → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar →
+# tranzaksiyalar → vektorli qidiruv
+ALL_LABS = ER_LABS + DESIGN_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS + VECTOR_LABS

@@ -15,6 +15,7 @@ class Lab(models.Model):
         SELECT = "select", "SELECT so'rovlari"
         INDEX = "index", "Indekslar"
         TRANSACTION = "transaction", "Tranzaksiyalar"
+        VECTOR = "vector", "Vektorli qidiruv (AI)"
 
     class Kind(models.TextChoices):
         SQL = "sql", "SQL kod"
