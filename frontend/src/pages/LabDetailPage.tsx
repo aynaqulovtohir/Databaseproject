@@ -11,6 +11,7 @@ import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { LabDialog } from '@/components/LabDialog'
 import { LabRunner } from '@/components/LabRunner'
 import { PageHeader } from '@/components/PageHeader'
+import { VerdictBadge } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
@@ -265,6 +266,7 @@ function ProgressCard({ lab }: { lab: Lab }) {
                   {student.solved ? (
                     <span className="text-xs text-muted-foreground">{student.attempts} ta urinish</span>
                   ) : null}
+                  {student.explanation ? <VerdictBadge verdict={student.explanation.verdict} /> : null}
                 </span>
               </TableCell>
               <TableCell className="text-right tabular-nums">
@@ -324,6 +326,15 @@ function ProgressCard({ lab }: { lab: Lab }) {
             </div>
           ) : null}
           {viewing?.diagram ? <ErEditor value={viewing.diagram} /> : viewing ? <SqlCode code={viewing.code} /> : null}
+          {viewing?.explanation ? (
+            <div className="grid gap-1.5 rounded-lg border p-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2 font-medium">
+                Talabaning tushuntirishi <VerdictBadge verdict={viewing.explanation.verdict} />
+              </div>
+              <p className="whitespace-pre-wrap">{viewing.explanation.text}</p>
+              <p className="text-xs whitespace-pre-wrap text-muted-foreground">AI: {viewing.explanation.feedback}</p>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </Card>

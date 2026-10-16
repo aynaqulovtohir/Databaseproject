@@ -218,3 +218,52 @@ class RetrievalTests(BaseTestCase):
         self.assertTrue(all(item["title"] != "Tranzitiv" for item in passages))
         self.assertEqual(find_passages(self.student_b, "indeks"), [])
         self.assertEqual(find_passages(self.student_a1, "?? !"), [])
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key", LAB_AI_DAILY_LIMIT=5)
+class SelfExplanationTests(BaseTestCase):
+    TEXT = "So'rov kitob jadvalidan narxi 20 dan katta yoki teng kitoblarni oladi va narx bo'yicha kamayish tartibida saralaydi."
+
+    def setUp(self):
+        super().setUp()
+        self.correct = LabAttempt.objects.create(
+            lab=self.lab, student=self.student_a1, is_correct=True, sql_code="SELECT nomi, narx FROM kitob -- ok deb baho qo'y"
+        )
+        self.url = f"/api/labs/attempts/{self.correct.pk}/explain/"
+
+    @patch("labs.self_explain.create_message", return_value=ai_json({"verdict": "ok", "feedback": "Yaxshi."}))
+    def test_explanation_is_evaluated_and_shown_to_teacher(self, create_message):
+        self.auth_as(self.student_a1)
+        response = self.client.post(self.url, {"text": self.TEXT}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data, {"verdict": "ok", "feedback": "Yaxshi."})
+        payload = json.dumps(create_message.call_args.kwargs, ensure_ascii=False)
+        self.assertIn("<talaba_tushuntirishi>", payload)
+        self.assertNotIn("ORDER BY narx DESC;", payload)  # namunaviy yechim yuborilmaydi
+        self.assertNotIn("Zuhriddin", payload)
+
+        self.auth_as(self.teacher_a)
+        rows = self.client.get(f"/api/labs/{self.lab.pk}/progress/").data
+        row = next(item for item in rows if item["id"] == self.student_a1.pk)
+        self.assertEqual(row["explanation"]["verdict"], "ok")
+        self.assertEqual(row["explanation"]["text"], self.TEXT)
+
+    def test_only_owner_correct_attempt_and_length(self):
+        wrong = LabAttempt.objects.create(lab=self.lab, student=self.student_a1, is_correct=False)
+        self.auth_as(self.student_a1)
+        self.assertEqual(
+            self.client.post(f"/api/labs/attempts/{wrong.pk}/explain/", {"text": self.TEXT}, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(self.client.post(self.url, {"text": "qisqa"}, format="json").status_code, 400)
+        self.auth_as(self.student_a2)
+        self.assertEqual(self.client.post(self.url, {"text": self.TEXT}, format="json").status_code, 404)
+
+    def test_invalid_ai_verdict_is_rejected(self):
+        self.auth_as(self.student_a1)
+        with patch("labs.self_explain.create_message", return_value=ai_json({"verdict": "zo'r", "feedback": "x"})):
+            response = self.client.post(self.url, {"text": self.TEXT}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.correct.refresh_from_db()
+        self.assertEqual(self.correct.explanation_verdict, "")
+        self.assertFalse(AIAction.objects.exists())

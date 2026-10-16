@@ -189,13 +189,13 @@ class LabViewSet(viewsets.ModelViewSet):
             return result
 
         result["attempt_id"] = None
-        result["ai_available"] = False
+        result["ai_available"] = result["ai_explain"] = False
         if request.user.is_student:
             attempt = self.save_attempt(lab, request.user, payload, result)
             result["attempt_id"] = attempt.pk
-            result["ai_available"] = (
-                not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
-            )
+            ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+            result["ai_available"] = not result["is_correct"] and ai_left
+            result["ai_explain"] = result["is_correct"] and ai_left
         return Response(result)
 
     @action(
@@ -294,9 +294,9 @@ class LabViewSet(viewsets.ModelViewSet):
                 best.save()
 
         result["attempt_id"] = attempt.pk
-        result["ai_available"] = (
-            not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
-        )
+        ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+        result["ai_available"] = not result["is_correct"] and ai_left
+        result["ai_explain"] = result["is_correct"] and ai_left
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
         return Response(result)
@@ -461,6 +461,7 @@ class LabViewSet(viewsets.ModelViewSet):
             correct = [attempt for attempt in attempts if attempt.is_correct]
             # Bajargan bo'lsa to'g'ri kodi, aks holda oxirgi urinishi ko'rsatiladi
             shown = (correct or attempts or [None])[-1]
+            explained = [attempt for attempt in correct if attempt.explanation_verdict]
             rows.append(
                 {
                     "id": student.pk,
@@ -473,6 +474,16 @@ class LabViewSet(viewsets.ModelViewSet):
                     "code": shown.sql_code if shown else "",
                     "diagram": shown.diagram if shown else None,
                     "grade": grade_payload(grade) if grade else None,
+                    # Talaba yechimini o'z so'zlari bilan tushuntirgan bo'lsa — oxirgisi va AI bahosi
+                    "explanation": (
+                        {
+                            "text": explained[-1].self_explanation,
+                            "verdict": explained[-1].explanation_verdict,
+                            "feedback": explained[-1].explanation_feedback,
+                        }
+                        if explained
+                        else None
+                    ),
                 }
             )
         return Response(rows)
@@ -583,6 +594,41 @@ class LabAttemptAdviceView(APIView):
     @staticmethod
     def payload(hints):
         return {"advice": hints[-1], "hints": hints, "level": len(hints), "max_level": MAX_HINT_LEVEL}
+
+
+class LabAttemptExplainView(APIView):
+    """To'g'ri urinishdan keyin: talaba yechimini o'z so'zlari bilan tushuntiradi {text}, AI mosligini baholaydi."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lab_ai"
+    MIN_LENGTH = 40
+    MAX_LENGTH = 3000
+
+    def post(self, request, pk):
+        from .self_explain import evaluate_explanation
+
+        attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
+        if not attempt.is_correct:
+            raise ValidationError({"detail": "Tushuntirish to'g'ri yechimdan keyin yoziladi."})
+        text = request.data.get("text")
+        if not isinstance(text, str) or len(text.strip()) < self.MIN_LENGTH:
+            raise ValidationError({"text": f"Kamida {self.MIN_LENGTH} belgi yozing: yechim nima qiladi va nega shunday?"})
+        if len(text) > self.MAX_LENGTH:
+            raise ValidationError({"text": f"Tushuntirish {self.MAX_LENGTH} belgidan oshmasin."})
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+        try:
+            verdict, feedback = evaluate_explanation(attempt, text.strip())
+        except AIError as exc:
+            return ai_error_response(exc, "tushuntirish")
+        attempt.self_explanation = text.strip()
+        attempt.explanation_verdict = verdict
+        attempt.explanation_feedback = feedback
+        attempt.save(update_fields=["self_explanation", "explanation_verdict", "explanation_feedback"])
+        record_ai_action(request.user, AIAction.Kind.SELF_EXPLAIN)
+        return Response({"verdict": verdict, "feedback": feedback})
 
 
 class LabChatView(APIView):

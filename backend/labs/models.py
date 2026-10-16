@@ -83,6 +83,16 @@ class LabAttempt(models.Model):
     is_submission = models.BooleanField("baholashga topshirilgan", default=False)
     # Urinish vaqtida talabaning guruhida AI yoqilganmi (tajriba tahlili uchun saqlanadi)
     ai_enabled = models.BooleanField("AI yoqilgan edi", default=True)
+    # To'g'ri yechimdan keyin talaba o'z so'zlari bilan tushuntiradi (self-explanation); AI mosligini baholaydi.
+    # Bahoga ta'sir qilmaydi: o'qituvchi tasodifan yoki ko'chirib topilgan javoblarni ko'rishi uchun
+    self_explanation = models.TextField("talabaning tushuntirishi", blank=True, max_length=3000)
+    explanation_verdict = models.CharField(
+        "tushuntirish bahosi",
+        max_length=10,
+        blank=True,
+        choices=[("ok", "Mos"), ("partial", "Qisman"), ("wrong", "Mos emas")],
+    )
+    explanation_feedback = models.TextField("tushuntirish bo'yicha izoh", blank=True)
     created_at = models.DateTimeField("vaqti", auto_now_add=True)
 
     class Meta:

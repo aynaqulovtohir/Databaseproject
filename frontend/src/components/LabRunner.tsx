@@ -4,6 +4,7 @@ import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
 import { PlanAssistant } from '@/components/PlanAssistant'
+import { SelfExplain } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -229,6 +230,11 @@ function Verdict({ result }: { result: LabRunResult }) {
             ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
             : 'Kod xatosiz ishladi.'}
         </p>
+        {result.ai_explain && result.attempt_id ? (
+          <div className="mt-3">
+            <SelfExplain attemptId={result.attempt_id} kind="sql" />
+          </div>
+        ) : null}
       </div>
     )
   }

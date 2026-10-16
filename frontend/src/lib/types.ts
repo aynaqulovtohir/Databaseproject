@@ -359,11 +359,21 @@ export interface LabRunResult {
   /** Faqat talabada: saqlangan urinish id'si */
   attempt_id: number | null
   ai_available: boolean
+  /** To'g'ri natijada: talaba yechimini tushuntirib, AI bahosini olishi mumkin */
+  ai_explain?: boolean
   /** Faqat baholashga topshirilganda: shu topshirishning bahosi va eng yuqori baho */
   grade?: LabGrade
   best_grade?: LabGrade
   /** ER laboratoriyasi, baholashga topshirilganda: noto'g'ri bo'lsa tuzatilgan diagramma, aks holda null */
   fix?: ErFix | null
+}
+
+export type ExplanationVerdict = 'ok' | 'partial' | 'wrong'
+
+export const EXPLANATION_VERDICTS: Record<ExplanationVerdict, { label: string; className: string }> = {
+  ok: { label: 'Tushuntirish mos', className: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' },
+  partial: { label: 'Qisman mos', className: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
+  wrong: { label: 'Mos emas', className: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200' },
 }
 
 /** Laboratoriya murabbiyi bilan yozishma */
@@ -406,6 +416,8 @@ export interface LabStudentProgress extends PersonShort {
   code: string
   diagram: ErDiagram | null
   grade: LabGrade | null
+  /** Talabaning o'z yechimini tushuntirishi va AI bahosi */
+  explanation: { text: string; verdict: ExplanationVerdict; feedback: string } | null
 }
 
 export interface SimilarWork extends PersonShort {
