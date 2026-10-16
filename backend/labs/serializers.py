@@ -3,7 +3,7 @@ from rest_framework import serializers
 from learning.serializers import AuthorSerializer, GroupsValidationMixin
 from users.models import StudentGroup
 
-from .checker import LabSetupError, format_error, validate_lab_sql, validate_plan
+from .checker import LabSetupError, format_error, validate_concurrent, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
 from .models import MAX_SQL_LENGTH, Lab
 from .sandbox import SandboxUnavailable
@@ -53,6 +53,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "given_diagram",
             "plan_query",
             "plan_forbidden",
+            "concurrent",
             "author",
             "groups",
             "created_at",
@@ -92,6 +93,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         # ER laboratoriyasida SQL ishlatilmaydi
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["given_diagram"] = None
+        attrs["concurrent"] = False
         return attrs
 
     def validate_sql(self, attrs):
@@ -102,19 +104,29 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         hidden_sql = attrs.get("hidden_setup_sql", current.hidden_setup_sql if current else "")
         plan_query = attrs.get("plan_query", current.plan_query if current else "")
         plan_forbidden = attrs.get("plan_forbidden", current.plan_forbidden if current else "Seq Scan")
-        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden)
+        concurrent = attrs.get("concurrent", current.concurrent if current else False)
+        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent)
         changed = current is None or values != (
             current.setup_sql,
             current.solution_sql,
             current.hidden_setup_sql,
             current.plan_query,
             current.plan_forbidden,
+            current.concurrent,
         )
+        if concurrent and (plan_query.strip() or hidden_sql.strip()):
+            raise serializers.ValidationError(
+                {"concurrent": "Ikki sessiyali tekshiruv reja va yashirin ma'lumotlar bilan birga ishlatilmaydi."}
+            )
+        if concurrent and not solution_sql.strip():
+            raise serializers.ValidationError({"solution_sql": "Tranzaksiya laboratoriyasida namunaviy yechim kerak."})
         if plan_query.strip() and not solution_sql.strip():
             raise serializers.ValidationError({"solution_sql": "Reja tekshiriladigan laboratoriyada namunaviy yechim (indeks) kerak."})
         if changed and (setup_sql.strip() or solution_sql.strip() or hidden_sql.strip()):
             try:
                 validate_lab_sql(setup_sql, solution_sql, hidden_sql)
+                if concurrent:
+                    validate_concurrent(setup_sql, solution_sql)
                 if plan_query.strip():
                     validate_plan(
                         setup_sql, solution_sql, plan_query, [item.strip() for item in plan_forbidden.split(",") if item.strip()]
@@ -154,6 +166,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "setup_sql",
             "given_diagram",
             "plan_query",
+            "concurrent",
             "author",
             "created_at",
             "my_progress",

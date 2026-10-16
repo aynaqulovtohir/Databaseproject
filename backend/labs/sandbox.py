@@ -12,6 +12,7 @@ Xotira sarfini (work_mem) PostgreSQL ichida cheklab bo'lmaydi, shuning uchun qum
 alohida, resurslari cheklangan serverda (docker-compose'dagi lab_db) ishlatiladi.
 """
 import logging
+import re
 import secrets
 import select
 import threading
@@ -454,40 +455,52 @@ def _explain(runner, query, outcome):
         )
 
 
+def _create_role(admin, connection_limit=1):
+    """Bir martalik rol va uning sxemasi. Qaytaradi: (rol nomi, parol). Keyin _drop_role bilan o'chiriladi."""
+    role = ROLE_PREFIX + uuid.uuid4().hex[:20]
+    password = secrets.token_hex(24)
+    identifier = sql.Identifier(role)
+    admin.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
+    _harden_if_needed(admin)
+    _drop_stale_roles(admin)
+    # Parol bir daqiqadan keyin o'z kuchini yo'qotadi
+    valid_until = admin.execute("SELECT (now() + interval '1 minute')::text").fetchone()[0]
+    admin.execute(
+        sql.SQL(
+            "CREATE ROLE {} LOGIN PASSWORD {} CONNECTION LIMIT {} "
+            "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT VALID UNTIL {}"
+        ).format(identifier, sql.Literal(password), sql.Literal(connection_limit), sql.Literal(valid_until))
+    )
+    admin.execute(sql.SQL("ALTER ROLE {} SET temp_file_limit = {}").format(identifier, sql.Literal(TEMP_FILE_LIMIT)))
+    try:
+        admin.execute(sql.SQL("CREATE SCHEMA {} AUTHORIZATION {}").format(identifier, identifier))
+    except psycopg.Error:
+        _drop_role(admin, role)
+        raise
+    return role, password
+
+
+def _connect_runner(role, password, extra_options=""):
+    return _connect(
+        settings.LAB_SANDBOX_DB,
+        user=role,
+        password=password,
+        options=f"-c search_path={role} -c statement_timeout={STATEMENT_TIMEOUT_MS} {extra_options}".strip(),
+    )
+
+
 def run_sql(script, setup_sql="", explain_sql=""):
     """`setup_sql` dan keyin `script` ni toza sxemada bajaradi va natijani qaytaradi.
 
     `explain_sql` berilsa, skriptdan keyin shu so'rovning rejasi ham olinadi (so'rovning o'zi bajarilmaydi).
     """
     _ensure_database()
-    role = ROLE_PREFIX + uuid.uuid4().hex[:20]
-    password = secrets.token_hex(24)
-    identifier = sql.Identifier(role)
     outcome = RunOutcome()
 
     with _connect(settings.LAB_SANDBOX_DB) as admin:
-        admin.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
-        _harden_if_needed(admin)
-        _drop_stale_roles(admin)
-        # Parol bir daqiqadan keyin o'z kuchini yo'qotadi
-        valid_until = admin.execute("SELECT (now() + interval '1 minute')::text").fetchone()[0]
-        admin.execute(
-            sql.SQL(
-                "CREATE ROLE {} LOGIN PASSWORD {} CONNECTION LIMIT 1 "
-                "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT VALID UNTIL {}"
-            ).format(identifier, sql.Literal(password), sql.Literal(valid_until))
-        )
-        admin.execute(
-            sql.SQL("ALTER ROLE {} SET temp_file_limit = {}").format(identifier, sql.Literal(TEMP_FILE_LIMIT))
-        )
+        role, password = _create_role(admin)
         try:
-            admin.execute(sql.SQL("CREATE SCHEMA {} AUTHORIZATION {}").format(identifier, identifier))
-            runner = _connect(
-                settings.LAB_SANDBOX_DB,
-                user=role,
-                password=password,
-                options=f"-c search_path={role} -c statement_timeout={STATEMENT_TIMEOUT_MS}",
-            )
+            runner = _connect_runner(role, password)
             try:
                 if setup_sql.strip():
                     setup_error, _, _ = _execute_script(runner, setup_sql, admin)
@@ -508,3 +521,250 @@ def run_sql(script, setup_sql="", explain_sql=""):
             except psycopg.Error:
                 logger.exception("Laboratoriya rolini o'chirib bo'lmadi: %s", role)
     return outcome
+
+
+# ---------- Ikki sessiya bir vaqtda (tranzaksiyalar laboratoriyasi) ----------
+
+MAX_CONCURRENT_STATEMENTS = 20
+# Shuncha vaqt ichida javob kelmasa, sessiya qulf kutyapti deb hisoblanadi va ikkinchisi davom etadi
+BLOCK_DETECT_SECONDS = 0.3
+CONCURRENT_TIMEOUT_SECONDS = 12
+# Cheksiz kutish bo'lmasin; o'zaro qulflanishni (deadlock) PostgreSQL o'zi ~1 soniyada aniqlaydi
+LOCK_TIMEOUT_MS = 4000
+STEP_SHOWN_ROWS = 5
+MAX_STEP_SQL_LENGTH = 300
+
+
+def split_statements(script):
+    """Skriptni alohida buyruqlarga ajratadi: matn ('...'), nomlar ("..."), $teg$...$teg$ bloklari va
+    izohlar ichidagi nuqtali vergul hisobga olinmaydi."""
+    statements, current, index, length = [], [], 0, len(script)
+    while index < length:
+        char = script[index]
+        if char in ("'", '"'):
+            end = index + 1
+            while end < length:
+                if script[end] == char:
+                    if end + 1 < length and script[end + 1] == char:
+                        end += 2
+                        continue
+                    break
+                end += 1
+            current.append(script[index : end + 1])
+            index = end + 1
+        elif script.startswith("--", index):
+            end = script.find("\n", index)
+            index = length if end == -1 else end
+        elif script.startswith("/*", index):
+            end = script.find("*/", index + 2)
+            index = length if end == -1 else end + 2
+        elif char == "$" and (match := re.match(r"\$[A-Za-z_]*\$", script[index:])):
+            tag = match.group(0)
+            end = script.find(tag, index + len(tag))
+            end = length if end == -1 else end + len(tag)
+            current.append(script[index:end])
+            index = end
+        elif char == ";":
+            statement = "".join(current).strip()
+            if statement:
+                statements.append(statement)
+            current = []
+            index += 1
+        else:
+            current.append(char)
+            index += 1
+    statement = "".join(current).strip()
+    if statement:
+        statements.append(statement)
+    return statements
+
+
+@dataclass
+class ConcurrentStep:
+    """Vaqt chizig'idagi bitta voqea: sessiya buyruqni boshladi, qulf kutdi yoki tugatdi."""
+
+    session: str
+    sql: str
+    # ok — bajarildi; waiting — qulf kutmoqda; resumed — kutishdan keyin bajarildi; error — xato
+    status: str
+    columns: list[str] = field(default_factory=list)
+    rows: list[tuple] = field(default_factory=list)
+    message: str = ""
+
+
+@dataclass
+class ConcurrentOutcome:
+    error: SqlError | None = None
+    # Xato bergan sessiya ("A" yoki "B")
+    error_session: str = ""
+    setup_failed: bool = False
+    steps: list[ConcurrentStep] = field(default_factory=list)
+    tables: dict[str, TableState] = field(default_factory=dict)
+
+
+class _Session:
+    def __init__(self, name, connection, statements):
+        self.name = name
+        self.connection = connection
+        self.pgconn = connection.pgconn
+        self.statements = statements
+        self.next = 0
+        self.running = None  # bajarilayotgan buyruq raqami
+        self.started_at = 0.0
+        self.waiting = False
+        self.failed = False
+        self.columns, self.rows, self.received = [], [], 0
+        self.error = None
+
+    @property
+    def done(self):
+        return self.failed or (self.next >= len(self.statements) and self.running is None)
+
+    def start(self, index):
+        self.running, self.started_at, self.waiting = index, time.monotonic(), False
+        self.columns, self.rows, self.received, self.error = [], [], 0, None
+        self.pgconn.send_query(self.statements[index].encode("utf-8"))
+        self.pgconn.set_single_row_mode()
+
+    def drain(self):
+        """Kelgan natijalarni o'qiydi. Qaytaradi: buyruq tugadimi."""
+        self.pgconn.consume_input()
+        while not self.pgconn.is_busy():
+            result = self.pgconn.get_result()
+            if result is None:
+                return True
+            status = result.status
+            if status in (pq.ExecStatus.SINGLE_TUPLE, pq.ExecStatus.TUPLES_OK):
+                if not self.columns:
+                    self.columns = [result.fname(i).decode("utf-8", "replace") for i in range(result.nfields)]
+                if status == pq.ExecStatus.SINGLE_TUPLE:
+                    self.received += 1
+                    if len(self.rows) < STEP_SHOWN_ROWS:
+                        self.rows.append(tuple(_decode(result.get_value(0, i)) for i in range(result.nfields)))
+                    if self.received > MAX_RECEIVED_ROWS:
+                        self.error = SqlError(message=f"So'rov {MAX_RECEIVED_ROWS} tadan ortiq qator qaytardi.")
+                        self.pgconn.get_cancel().cancel()
+            elif status == pq.ExecStatus.FATAL_ERROR:
+                self.error = self.error or _error_from_result(result, self.statements[self.running])
+            elif status in (pq.ExecStatus.COPY_IN, pq.ExecStatus.COPY_OUT, pq.ExecStatus.COPY_BOTH):
+                self.error = SqlError(message="COPY buyrug'i laboratoriyada ishlamaydi.")
+                self.connection.close()
+                return True
+        return False
+
+
+def run_concurrent(script, setup_sql=""):
+    """`setup_sql` dan keyin `script` ni ikki sessiyada (A va B) bir vaqtda bajaradi.
+
+    Tartib — eng xavflisi: A ning COMMIT gacha bo'lgan buyruqlari, keyin B ning, keyin A COMMIT, B COMMIT.
+    Sessiya qulf kutib qolsa (BLOCK_DETECT_SECONDS ichida javob yo'q), ikkinchisi davom etadi.
+    """
+    _ensure_database()
+    outcome = ConcurrentOutcome()
+    statements = split_statements(script)
+    if not statements or len(statements) > MAX_CONCURRENT_STATEMENTS:
+        outcome.error = SqlError(message=f"Kodda 1 tadan {MAX_CONCURRENT_STATEMENTS} tagacha buyruq bo'lishi kerak.")
+        return outcome
+    body = len(statements) - 1
+    order = [("A", i) for i in range(body)] + [("B", i) for i in range(body)] + [("A", body), ("B", body)]
+
+    with _connect(settings.LAB_SANDBOX_DB) as admin:
+        role, password = _create_role(admin, connection_limit=2)
+        sessions = {}
+        try:
+            options = f"-c lock_timeout={LOCK_TIMEOUT_MS}"
+            first = _connect_runner(role, password, options)
+            sessions["A"] = _Session("A", first, statements)
+            if setup_sql.strip():
+                setup_error, _, _ = _execute_script(first, setup_sql, admin)
+                if setup_error:
+                    outcome.error, outcome.setup_failed = setup_error, True
+                    return outcome
+            sessions["B"] = _Session("B", _connect_runner(role, password, options), statements)
+            _schedule(sessions, order, outcome, admin)
+        finally:
+            for session in sessions.values():
+                session.connection.close()  # COMMIT qilinmagan o'zgarishlar bekor bo'ladi
+            try:
+                if outcome.error is None:
+                    outcome.tables = _read_tables(admin, role)
+            finally:
+                try:
+                    _drop_role(admin, role)
+                except psycopg.Error:
+                    logger.exception("Laboratoriya rolini o'chirib bo'lmadi: %s", role)
+    return outcome
+
+
+def _schedule(sessions, order, outcome, admin):
+    deadline = time.monotonic() + CONCURRENT_TIMEOUT_SECONDS
+    next_storage_check = 0.0
+    pending = list(order)
+
+    def short(text):
+        text = " ".join(text.split())
+        return text if len(text) <= MAX_STEP_SQL_LENGTH else text[:MAX_STEP_SQL_LENGTH] + "…"
+
+    def finish(session):
+        index, waited = session.running, session.waiting
+        session.running = None
+        session.next = index + 1
+        if session.error:
+            session.failed = True
+            outcome.steps.append(ConcurrentStep(session.name, short(session.statements[index]), "error", message=session.error.message))
+            if outcome.error is None:
+                outcome.error, outcome.error_session = session.error, session.name
+        else:
+            outcome.steps.append(
+                ConcurrentStep(
+                    session.name,
+                    short(session.statements[index]),
+                    "resumed" if waited else "ok",
+                    session.columns,
+                    session.rows,
+                )
+            )
+
+    while True:
+        # Navbatdagi buyruqni boshlash: faqat hech kim bajarmayotgan bo'lsa yoki bajarayotgani qulf kutsa
+        pending = [item for item in pending if not sessions[item[0]].failed]
+        running = [s for s in sessions.values() if s.running is not None]
+        if all(s.waiting for s in running):
+            for item in pending:
+                session = sessions[item[0]]
+                if session.running is None and session.next == item[1]:
+                    pending.remove(item)
+                    session.start(item[1])
+                    break
+        running = [s for s in sessions.values() if s.running is not None]
+        if not running:
+            # Hamma buyruq bajarildi (yoki boshlab bo'lmaydi — bu bo'lmasligi kerak, lekin cheksiz sikl ham bo'lmasin)
+            return
+
+        if time.monotonic() > deadline:
+            for session in running:
+                session.pgconn.get_cancel().cancel()
+            outcome.error = outcome.error or SqlError(
+                message=f"Kod {CONCURRENT_TIMEOUT_SECONDS} soniyadan uzoq ishladi va to'xtatildi.", sqlstate="57014"
+            )
+            for session in sessions.values():
+                session.failed = True
+            return
+
+        if time.monotonic() >= next_storage_check:
+            next_storage_check = time.monotonic() + STORAGE_CHECK_SECONDS
+            if _storage_used(admin) > MAX_STORAGE_BYTES:
+                for session in running:
+                    session.pgconn.get_cancel().cancel()
+                outcome.error = SqlError(message=f"Kod juda ko'p ma'lumot yozdi ({MAX_STORAGE_BYTES // (1024 * 1024)} MB dan ortiq).")
+                for session in sessions.values():
+                    session.failed = True
+                return
+
+        select.select([s.pgconn.socket for s in running], [], [], 0.05)
+        for session in running:
+            if session.drain():
+                finish(session)
+            elif not session.waiting and time.monotonic() - session.started_at >= BLOCK_DETECT_SECONDS:
+                session.waiting = True
+                outcome.steps.append(ConcurrentStep(session.name, short(session.statements[session.running]), "waiting"))

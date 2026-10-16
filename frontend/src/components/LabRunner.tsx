@@ -14,10 +14,12 @@ import {
   type LabGrade,
   type LabRunError,
   type LabRunResult,
+  type LabConcurrentStep,
   type LabRunTable,
   type LabTryResult,
   type LabTryTable,
 } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 const MAX_SQL_LENGTH = 50_000
 
@@ -123,6 +125,54 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
           ) : null}
         </>
       )}
+    </div>
+  )
+}
+
+const STEP_STATUS: Record<LabConcurrentStep['status'], { label: string; className: string }> = {
+  ok: { label: 'bajarildi', className: 'text-muted-foreground' },
+  waiting: { label: 'qulf kutmoqda…', className: 'text-amber-700 dark:text-amber-400' },
+  resumed: { label: 'kutgandan keyin bajarildi', className: 'text-amber-700 dark:text-amber-400' },
+  error: { label: 'xato', className: 'text-destructive' },
+}
+
+/** Ikki sessiya (A va B) buyruqlari qanday ketma-ketlikda bajarilgani va har biri nimani o'qigani. */
+function ConcurrencyTimeline({ steps }: { steps?: LabConcurrentStep[] }) {
+  if (!steps?.length) return null
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">Vaqt chizig'i: ikki sessiya bir vaqtda</h3>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Yuqoridan pastga — vaqt tartibida. A va B — kodingizni bir vaqtda bajargan ikki sessiya.
+      </p>
+      <ol className="grid gap-1.5">
+        {steps.map((step, index) => {
+          const status = STEP_STATUS[step.status]
+          return (
+            <li
+              key={index}
+              className={cn(
+                'grid min-w-0 gap-1 rounded-lg border p-2 text-xs sm:w-[85%]',
+                step.session === 'B' ? 'sm:justify-self-end bg-muted/40' : 'sm:justify-self-start',
+              )}
+            >
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-semibold">{step.session}</span>
+                <span className="min-w-0 font-mono break-all">{step.sql}</span>
+              </div>
+              <div className={status.className}>
+                {status.label}
+                {step.message ? `: ${step.message}` : ''}
+              </div>
+              {step.rows.length ? (
+                <div className="font-mono text-muted-foreground">
+                  o'qidi: {step.columns.join(', ')} = {step.rows.map((row) => row.join(', ')).join('; ')}
+                </div>
+              ) : null}
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }
@@ -275,6 +325,7 @@ function TryResult({ result }: { result: LabTryResult }) {
         Bu sinov: natija namunaviy yechim bilan solishtirilmadi va urinish hisoblanmadi.
       </p>
       <PlanView plan={result.plan} />
+      <ConcurrencyTimeline steps={result.steps} />
       {result.result ? <ResultTable table={result.result} /> : null}
       <TablesSummary tables={result.tables} />
     </div>
@@ -438,6 +489,7 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
           {result.grade ? <GradeCard grade={result.grade} best={result.best_grade} /> : null}
           <Verdict result={result} />
           <PlanView plan={result.plan} />
+          <ConcurrencyTimeline steps={result.steps} />
           {result.result ? <ResultTable table={result.result} /> : null}
           {!result.error && !result.result && result.status_message ? (
             <p className="text-xs text-muted-foreground">

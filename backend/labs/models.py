@@ -32,6 +32,9 @@ class Lab(models.Model):
     plan_query = models.TextField("rejasi tekshiriladigan so'rov", blank=True, max_length=5000)
     # Vergul bilan: rejada bo'lmasligi kerak bo'lgan tugunlar
     plan_forbidden = models.CharField("rejada taqiqlangan tugunlar", max_length=200, blank=True, default="Seq Scan")
+    # Tranzaksiya laboratoriyasi: talaba kodi (BEGIN ... COMMIT) ikki sessiyada bir vaqtda bajariladi va natija
+    # ketma-ket bajarilgandagiga teng bo'lishi kerak (yo'qolgan yangilanish, "tekshir-keyin-bajar" poygasi)
+    concurrent = models.BooleanField("ikki sessiyada bir vaqtda tekshiriladi", default=False)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="muallif",

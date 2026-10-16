@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -46,6 +46,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [hiddenSql, setHiddenSql] = useState(lab?.hidden_setup_sql ?? '')
   const [planQuery, setPlanQuery] = useState(lab?.plan_query ?? '')
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
+  const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
   const [groupIds, setGroupIds] = useState<number[]>(lab?.groups ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -64,6 +65,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               given_diagram: givenDiagram.entities.length ? cleanDiagram(givenDiagram) : null,
               plan_query: planQuery,
               plan_forbidden: planForbidden,
+              concurrent,
             }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
@@ -257,6 +259,26 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   {...SQL_PROPS}
                 />
               </FormField>
+              <div className="grid gap-1">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={concurrent}
+                    onChange={(event) => setConcurrent(event.target.checked)}
+                  />
+                  Ikki sessiyada bir vaqtda tekshirish (tranzaksiya laboratoriyasi)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Talaba kodi (BEGIN … COMMIT) A va B sessiyalarida bir vaqtda bajariladi; natija ketma-ket ikki marta
+                  bajarilgandagiga teng bo'lishi kerak. Namunaviy yechim ham shu tekshiruvdan o'tishi kerak.
+                </p>
+                {errors.concurrent ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {errors.concurrent}
+                  </p>
+                ) : null}
+              </div>
               {planQuery.trim() ? (
                 <FormField
                   id="lab_plan_forbidden"
