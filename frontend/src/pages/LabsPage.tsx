@@ -105,9 +105,9 @@ export function LabsPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 className="min-w-0 font-medium">
                   {lab.title}
-                  {lab.kind === 'er' ? (
+                  {lab.kind !== 'sql' ? (
                     <Badge variant="outline" className="ml-2 align-middle">
-                      ER-diagramma
+                      {lab.kind === 'er' ? 'ER-diagramma' : 'Normallashtirish'}
                     </Badge>
                   ) : null}
                 </h2>

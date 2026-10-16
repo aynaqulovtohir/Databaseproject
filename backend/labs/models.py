@@ -9,6 +9,7 @@ class Lab(models.Model):
     class Kind(models.TextChoices):
         SQL = "sql", "SQL kod"
         ER = "er", "ER-diagramma"
+        NORM = "norm", "Normallashtirish"
 
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.SQL)
     title = models.CharField("sarlavha", max_length=200)
@@ -26,6 +27,8 @@ class Lab(models.Model):
     hidden_setup_sql = models.TextField("yashirin test ma'lumotlari (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # ER-diagramma laboratoriyasi uchun namunaviy diagramma (labs/er.py dagi format); talabaga ko'rinmaydi
     reference_diagram = models.JSONField("namunaviy ER-diagramma", null=True, blank=True)
+    # Normallashtirish laboratoriyasi (labs/norm.py): {"attributes", "fds": [{"lhs", "rhs"}], "target"}. Talabaga ko'rinadi
+    norm_task = models.JSONField("normallashtirish topshirig'i", null=True, blank=True)
     # SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL): talaba shu model bo'yicha jadvallarni yaratadi.
     # Talabaga ko'rinadi; tekshiruv o'zgarmaydi — jadvallar namunaviy yechim bilan solishtiriladi
     given_diagram = models.JSONField("berilgan ER-model", null=True, blank=True)
@@ -68,6 +71,9 @@ class LabAttempt(models.Model):
     sql_code = models.TextField("SQL kod", max_length=MAX_SQL_LENGTH, blank=True)
     # ER-diagramma laboratoriyasida: talaba chizgan diagramma
     diagram = models.JSONField("ER-diagramma", null=True, blank=True)
+    # Normallashtirish laboratoriyasida: talaba javobi (kalitlar, normal forma, dekompozitsiya). Uning o'qiladigan
+    # ko'rinishi sql_code ga ham yoziladi: o'qituvchi sahifasi, o'xshashlik va eksport uni matn sifatida ko'rsatadi
+    answer = models.JSONField("javob", null=True, blank=True)
     # Baholashga topshirilgan noto'g'ri diagramma uchun: tuzatilgan diagramma va AI tushuntirishi
     fixed_diagram = models.JSONField("tuzatilgan diagramma", null=True, blank=True)
     fix_explanation = models.TextField("tuzatish tushuntirishi", blank=True)

@@ -17,12 +17,21 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
   { value: 'er', label: 'ER-diagramma', hint: 'Talaba ER-diagramma chizadi, u namunaviy diagramma bilan solishtiriladi.' },
+  {
+    value: 'norm',
+    label: 'Normallashtirish',
+    hint: "Talaba nomzod kalitlarni, normal formani va dekompozitsiyani topadi; javob algoritm bilan tekshiriladi.",
+  },
 ]
+
+function fdsText(lab?: Lab) {
+  return (lab?.norm_task?.fds ?? []).map((fd) => `${fd.lhs.join(', ')} -> ${fd.rhs.join(', ')}`).join('\n')
+}
 const SQL_PROPS = { spellCheck: false, autoCapitalize: 'none', autoCorrect: 'off' } as const
 
 interface LabDialogProps {
@@ -47,6 +56,10 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planQuery, setPlanQuery] = useState(lab?.plan_query ?? '')
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
+  const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
+  const [normAttributes, setNormAttributes] = useState(lab?.norm_task?.attributes.join(', ') ?? '')
+  const [normFds, setNormFds] = useState(fdsText(lab))
+  const [normTarget, setNormTarget] = useState<'3NF' | 'BCNF'>(lab?.norm_task?.target ?? '3NF')
   const [groupIds, setGroupIds] = useState<number[]>(lab?.groups ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -56,12 +69,15 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
-          : {
+          : kind === 'norm'
+            ? { ...common, kind, norm_task: { attributes: normAttributes, fds: normFds, target: normTarget } }
+            : {
               ...common,
               kind,
               setup_sql: setupSql,
               solution_sql: solutionSql,
               hidden_setup_sql: hiddenSql,
+              starter_sql: starterSql,
               given_diagram: givenDiagram.entities.length ? cleanDiagram(givenDiagram) : null,
               plan_query: planQuery,
               plan_forbidden: planForbidden,
@@ -180,6 +196,49 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 </p>
               ) : null}
             </div>
+          ) : kind === 'norm' ? (
+            <>
+              <FormField
+                id="lab_norm_attributes"
+                label="Munosabat atributlari"
+                error={errors.norm_task}
+                hint="Vergul bilan, lotin harflarida (2–12 ta). Talabaga ko'rinadi."
+              >
+                <Input
+                  id="lab_norm_attributes"
+                  placeholder="talaba_id, ism, fan_id, fan_nomi, baho"
+                  aria-invalid={Boolean(errors.norm_task)}
+                  value={normAttributes}
+                  onChange={(event) => setNormAttributes(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              <FormField
+                id="lab_norm_fds"
+                label="Funksional bog'liqliklar"
+                hint="Har bir qatorda bittasi: chap tomon -> o'ng tomon. Talabaga ko'rinadi."
+              >
+                <Textarea
+                  id="lab_norm_fds"
+                  className="max-h-64 min-h-28 font-mono text-sm md:text-xs"
+                  placeholder={'talaba_id -> ism\nfan_id -> fan_nomi\ntalaba_id, fan_id -> baho'}
+                  value={normFds}
+                  onChange={(event) => setNormFds(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              <FormField id="lab_norm_target" label="Maqsad normal forma">
+                <select
+                  id="lab_norm_target"
+                  className="h-10 justify-self-start rounded-md border bg-background px-2 text-sm"
+                  value={normTarget}
+                  onChange={(event) => setNormTarget(event.target.value as '3NF' | 'BCNF')}
+                >
+                  <option value="3NF">3NF (bog'liqliklar saqlanishi ham tekshiriladi)</option>
+                  <option value="BCNF">BCNF</option>
+                </select>
+              </FormField>
+            </>
           ) : (
             <>
               <div className="grid gap-1.5">
@@ -239,6 +298,21 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   aria-invalid={Boolean(errors.hidden_setup_sql)}
                   value={hiddenSql}
                   onChange={(event) => setHiddenSql(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              <FormField
+                id="lab_starter"
+                label="Boshlang'ich kod (ixtiyoriy)"
+                error={errors.starter_sql}
+                hint="Talaba muharririda dastlab turadi. Masalan, «AI yozgan xatoli yechim — xatolarini toping» mashqi uchun."
+              >
+                <Textarea
+                  id="lab_starter"
+                  className="max-h-64 min-h-16 font-mono text-sm md:text-xs"
+                  aria-invalid={Boolean(errors.starter_sql)}
+                  value={starterSql}
+                  onChange={(event) => setStarterSql(event.target.value)}
                   {...SQL_PROPS}
                 />
               </FormField>
@@ -313,7 +387,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             </Button>
             <Button type="submit" size="lg" disabled={mutation.isPending || !title.trim() || !description.trim()}>
               {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              {mutation.isPending ? (kind === 'er' ? 'Saqlanmoqda…' : 'Kod tekshirilmoqda…') : 'Saqlash'}
+              {mutation.isPending ? (kind === 'sql' ? 'Kod tekshirilmoqda…' : 'Saqlanmoqda…') : 'Saqlash'}
             </Button>
           </DialogFooter>
         </form>

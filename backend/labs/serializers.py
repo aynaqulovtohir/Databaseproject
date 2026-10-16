@@ -5,16 +5,34 @@ from users.models import StudentGroup
 
 from .checker import LabSetupError, format_error, validate_concurrent, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
+from .norm import NormError, parse_answer, parse_task, reference_solution
 from .models import MAX_SQL_LENGTH, Lab
 from .sandbox import SandboxUnavailable
 
 SQL_TOO_LONG = "SQL kod {max_length} belgidan oshmasligi kerak."
 
 
+def _task_input(value):
+    """norm_task ni matn ({"attributes": "a, b", "fds": "a -> b", ...}) yoki saqlangan tuzilma ko'rinishida qabul qiladi."""
+    if not isinstance(value, dict):
+        raise NormError("Normallashtirish topshirig'i noto'g'ri formatda.")
+    attributes = value.get("attributes", "")
+    if isinstance(attributes, list):
+        attributes = ", ".join(map(str, attributes))
+    fds = value.get("fds", "")
+    if isinstance(fds, list):
+        fds = "\n".join(
+            f"{', '.join(fd.get('lhs', []))} -> {', '.join(fd.get('rhs', []))}" for fd in fds if isinstance(fd, dict)
+        )
+    return parse_task(attributes, fds, value.get("target"))
+
+
 class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
     """Admin va o'qituvchi uchun."""
 
     author = AuthorSerializer(read_only=True)
+    # Normallashtirish laboratoriyasi: o'qituvchiga ko'rinadigan hisoblangan javob (talabaga yuborilmaydi)
+    norm_reference = serializers.SerializerMethodField()
     groups = serializers.PrimaryKeyRelatedField(many=True, queryset=StudentGroup.objects.all())
     setup_sql = serializers.CharField(
         required=False,
@@ -59,6 +77,8 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "hidden_setup_sql",
             "reference_diagram",
             "given_diagram",
+            "norm_task",
+            "norm_reference",
             "plan_query",
             "plan_forbidden",
             "concurrent",
@@ -68,6 +88,9 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at"]
 
+    def get_norm_reference(self, lab):
+        return reference_solution(lab.norm_task) if lab.kind == Lab.Kind.NORM and lab.norm_task else None
+
     def validate(self, attrs):
         current = self.instance
         kind = attrs.get("kind", current.kind if current else Lab.Kind.SQL)
@@ -75,6 +98,9 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"kind": "Laboratoriya turini o'zgartirib bo'lmaydi."})
         if kind == Lab.Kind.ER:
             return self.validate_er(attrs)
+        if kind == Lab.Kind.NORM:
+            return self.validate_norm(attrs)
+        attrs["norm_task"] = None
         attrs["reference_diagram"] = None
         given = attrs.get("given_diagram")
         if given is not None:
@@ -102,6 +128,22 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["starter_sql"] = ""
         attrs["given_diagram"] = None
+        attrs["concurrent"] = False
+        return attrs
+
+    def validate_norm(self, attrs):
+        current = self.instance
+        task = attrs.get("norm_task", current.norm_task if current else None)
+        if task is None:
+            raise serializers.ValidationError({"norm_task": "Atributlar va funksional bog'liqliklarni kiriting."})
+        try:
+            attrs["norm_task"] = _task_input(task)
+        except NormError as exc:
+            raise serializers.ValidationError({"norm_task": str(exc)})
+        # Normallashtirishda SQL va diagramma ishlatilmaydi
+        attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
+        attrs["starter_sql"] = ""
+        attrs["reference_diagram"] = attrs["given_diagram"] = None
         attrs["concurrent"] = False
         return attrs
 
@@ -175,6 +217,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "setup_sql",
             "starter_sql",
             "given_diagram",
+            "norm_task",
             "plan_query",
             "concurrent",
             "author",
@@ -195,6 +238,8 @@ class StudentLabSerializer(serializers.ModelSerializer):
         if self.context.get("include_last_code"):
             # Talaba sahifani qayta ochganda oxirgi yozgan kodi tiklanadi
             progress["last_code"] = attempts[0].sql_code if attempts else ""
+            if lab.kind == Lab.Kind.NORM:
+                progress["last_answer"] = attempts[0].answer if attempts else None
             if lab.kind == Lab.Kind.ER:
                 progress["last_diagram"] = attempts[0].diagram if attempts else None
                 # Oxirgi topshirilgan noto'g'ri diagrammaning tuzatilgan varianti
@@ -216,6 +261,20 @@ class DiagramRunSerializer(serializers.Serializer):
         try:
             return validate_diagram(value)
         except DiagramError as exc:
+            raise serializers.ValidationError(str(exc))
+
+
+class NormAnswerSerializer(serializers.Serializer):
+    answer = serializers.JSONField(error_messages={"required": "Javob yuborilmadi."})
+
+    def __init__(self, *args, task=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.task = task
+
+    def validate_answer(self, value):
+        try:
+            return parse_answer(value, self.task)
+        except NormError as exc:
             raise serializers.ValidationError(str(exc))
 
 

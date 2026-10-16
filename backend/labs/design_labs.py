@@ -10,6 +10,7 @@ Laboratoriyalarni bazaga qo'shish: python manage.py seed_design_labs --author <l
 
 from .er_sql_labs import ER_SQL_LABS
 from .index_labs import INDEX_LABS
+from .norm_labs import NORM_LABS
 from .query_labs import QUERY_LABS
 from .theory import THEORY
 from .transaction_labs import TRANSACTION_LABS
@@ -478,5 +479,5 @@ O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning 
 for _lab in ER_LABS + DESIGN_LABS:
     _lab["theory"] = THEORY.get(_lab["title"], "")
 
-# Kurs tartibida: ER-model → loyihalash → ER-modeldan jadvallarga → SELECT → indekslar → tranzaksiyalar
-ALL_LABS = ER_LABS + DESIGN_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS
+# Kurs tartibida: ER-model → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar → tranzaksiyalar
+ALL_LABS = ER_LABS + DESIGN_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS

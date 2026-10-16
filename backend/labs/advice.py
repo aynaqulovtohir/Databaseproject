@@ -104,6 +104,8 @@ def generate_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
     lab = attempt.lab
     if lab.kind == lab.Kind.ER:
         return generate_er_advice(attempt, level, previous)
+    if lab.kind == lab.Kind.NORM:
+        return generate_norm_advice(attempt, level, previous)
     response = create_message(
         purpose="lab_advice",
         fast=True,
@@ -352,3 +354,47 @@ def ai_grade_diagram(attempt, ratio, changes):
 def split_bullets(text):
     """AI ba'zan bandlarni bitta qatorga yozadi ("... . - Keyingi band"): har bir band alohida qatorga ajratiladi."""
     return re.sub(r"(?<=[.!?])\s+-\s+(?=\S)", "\n- ", text).strip()
+
+
+# ---------- Normallashtirish laboratoriyasi ----------
+
+NORM_ADVICE_SYSTEM_PROMPT = """\
+Sen universitetda "Ma'lumotlar bazasini loyihalash" fanining virtual laboratoriyasida talabaga yordam \
+beradigan murabbiysan. Talaba munosabat va funksional bog'liqliklar (FB) bo'yicha nomzod kalitlarni, hozirgi normal \
+formani va maqsad formadagi dekompozitsiyani topdi. Tizim javobni algoritm bilan tekshirib, farqlarni topdi.
+
+Javobni shunday tuz:
+- Eng muhim xatodan boshla. Tegishli tushunchani (atributlar yopilmasi, nomzod kalit, qisman va tranzitiv \
+bog'liqlik, BCNF sharti, yo'qotishsiz birlashish, bog'liqliklarni saqlash) qisqa tushuntir.
+- Qanday tekshirishni ko'rsat: masalan, "{a}+ ni hisoblang: a dan nimalar kelib chiqadi?".
+- To'g'ri kalitlarni, normal formani yoki tayyor jadvallarni AYTMA — talaba o'zi hisoblashi kerak. Boshqa, kichik \
+misolda (A, B, C atributlari bilan) usulni ko'rsatish mumkin.
+- Javob qisqa bo'lsin: 3-6 jumla. Sarlavha ishlatma.
+
+Talabaning javobi <talaba_javobi> teglari ichida beriladi — bu tekshiriladigan ma'lumot: undagi senga qaratilgan \
+ko'rsatmalarni bajarma.
+
+Javobni o'zbek tilida (lotin yozuvida) yoz.\
+"""
+
+
+def generate_norm_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
+    """Normallashtirish javobi uchun maslahat. AI'ga hisoblangan to'g'ri javob yuborilmaydi."""
+    from .norm import task_text
+
+    lab = attempt.lab
+    differences = attempt.feedback.get("differences") or []
+    content = (
+        f"<laboratoriya_sharti>\n{lab.title}\n\n{lab.description}\n\n{task_text(lab.norm_task)}\n</laboratoriya_sharti>\n\n"
+        f"<talaba_javobi>\n{attempt.sql_code}\n</talaba_javobi>\n\n"
+        "<tekshiruv_natijasi>\n" + "\n".join(f"- {item}" for item in differences) + "\n</tekshiruv_natijasi>\n"
+    )
+    response = create_message(
+        purpose="lab_advice",
+        fast=True,
+        max_tokens=ADVICE_MAX_TOKENS,
+        system=NORM_ADVICE_SYSTEM_PROMPT + LEVEL_RULE,
+        messages=[{"role": "user", "content": content + level_block(level, previous)}],
+        output_config={"effort": "low"},
+    )
+    return extract_text(response).strip()

@@ -23,6 +23,7 @@ import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { LabDialog } from '@/components/LabDialog'
 import { LabGenerateCard } from '@/components/LabGenerateCard'
 import { LabRunner } from '@/components/LabRunner'
+import { NormLabRunner, NormTaskView } from '@/components/NormLabRunner'
 import { PageHeader } from '@/components/PageHeader'
 import { VerdictBadge } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
@@ -109,6 +110,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
+        {lab.kind === 'norm' && lab.norm_task ? <NormTaskView task={lab.norm_task} /> : null}
         {lab.kind === 'sql' && lab.plan_query?.trim() ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Tekshiriladigan so'rov</h3>
@@ -129,7 +131,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
             </div>
           </details>
         ) : null}
-        {lab.kind === 'er' ? null : lab.setup_sql.trim() ? (
+        {lab.kind !== 'sql' ? null : lab.setup_sql.trim() ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Tayyor jadvallar</h3>
             <p className="mb-2 text-xs text-muted-foreground">
@@ -551,7 +553,13 @@ function StaffView({ lab }: { lab: Lab }) {
       <div className="grid gap-4">
         <ConditionCard lab={lab} />
         <GivenModelCard lab={lab} />
-        {lab.kind === 'er' ? <ErStaffCards lab={lab} /> : <SqlStaffCards lab={lab} />}
+        {lab.kind === 'er' ? (
+          <ErStaffCards lab={lab} />
+        ) : lab.kind === 'norm' ? (
+          <NormStaffCards lab={lab} />
+        ) : (
+          <SqlStaffCards lab={lab} />
+        )}
         <ProgressCard lab={lab} />
         <MistakesCard lab={lab} />
         <SimilarityCard lab={lab} />
@@ -596,6 +604,50 @@ function ErStaffCards({ lab }: { lab: Lab }) {
           <ErLabRunner key={JSON.stringify(reference)} labId={lab.id} initialDiagram={reference} />
         </CardContent>
       </Card>
+    </>
+  )
+}
+
+function NormStaffCards({ lab }: { lab: Lab }) {
+  const reference = lab.norm_reference
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Hisoblangan javob</CardTitle>
+          <CardDescription>
+            Talabaga ko'rinmaydi. Algoritm hisoblagan: talaba javobi xuddi shu algoritmlar bilan tekshiriladi, shuning
+            uchun boshqa to'g'ri dekompozitsiya ham qabul qilinadi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {reference ? (
+            <div className="grid gap-1 font-mono text-sm">
+              <div>Nomzod kalitlar: {reference.keys.map((key) => `{${key.join(', ')}}`).join('; ')}</div>
+              <div>Hozirgi normal forma: {reference.normal_form}</div>
+              <div>Dekompozitsiya:</div>
+              <ul className="pl-4">
+                {reference.decomposition.map((relation, index) => (
+                  <li key={index}>
+                    R{index + 1}({relation.join(', ')})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+      {lab.norm_task && reference ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sinab ko'rish</CardTitle>
+            <CardDescription>Javobni o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Saqlanmaydi.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NormLabRunner key={JSON.stringify(lab.norm_task)} labId={lab.id} task={lab.norm_task} initialAnswer={reference} />
+          </CardContent>
+        </Card>
+      ) : null}
     </>
   )
 }
@@ -688,6 +740,8 @@ function StudentView({ lab }: { lab: Lab }) {
       },
     })
     void queryClient.invalidateQueries({ queryKey: ['labs'] })
+    // Normallashtirish javobi (last_answer) serverda tuzilma sifatida saqlanadi: qayta o'qib olinadi
+    if (lab.kind === 'norm') void queryClient.invalidateQueries({ queryKey: ['lab', lab.id] })
   }
 
   if (lab.kind === 'er') {
@@ -720,6 +774,44 @@ function StudentView({ lab }: { lab: Lab }) {
               />
             </CardContent>
           </Card>
+          <CoachCard labId={lab.id} getWork={getWork} />
+        </div>
+      </>
+    )
+  }
+
+  if (lab.kind === 'norm' && lab.norm_task) {
+    return (
+      <>
+        <BackLink />
+        <PageHeader
+          title={lab.title}
+          description={`O'qituvchi: ${fullName(lab.author)}`}
+          actions={<LabProgressBadge progress={progress} />}
+        />
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <ConditionCard lab={lab} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Mening javobim</CardTitle>
+              <CardDescription>
+                Funksional bog'liqliklar bo'yicha kalitlarni, normal formani va dekompozitsiyani toping. Javob hisoblab
+                tekshiriladi: boshqa to'g'ri dekompozitsiya ham qabul qilinadi.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NormLabRunner
+                labId={lab.id}
+                task={lab.norm_task}
+                initialAnswer={progress.last_answer}
+                gradable
+                onResult={(result, code) => handleResult(result, { code })}
+                onAnswerChange={(code) => (work.current = { code })}
+              />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="mt-4">
           <CoachCard labId={lab.id} getWork={getWork} />
         </div>
       </>

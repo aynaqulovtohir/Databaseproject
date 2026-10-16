@@ -98,9 +98,9 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
                 <TableRow key={lab.id}>
                   <TableCell className="max-w-72 truncate font-medium" title={lab.title}>
                     {lab.title}
-                    {lab.kind === 'er' ? (
+                    {lab.kind !== 'sql' ? (
                       <Badge variant="outline" className="ml-2">
-                        ER
+                        {lab.kind === 'er' ? 'ER' : 'NF'}
                       </Badge>
                     ) : null}
                   </TableCell>

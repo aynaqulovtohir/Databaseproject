@@ -242,7 +242,23 @@ export interface ErFix {
   explanation: string
 }
 
-export type LabKind = 'sql' | 'er'
+export type LabKind = 'sql' | 'er' | 'norm'
+
+/** Normallashtirish topshirig'i: munosabat atributlari, funksional bog'liqliklar va maqsad normal forma */
+export interface NormTask {
+  attributes: string[]
+  fds: { lhs: string[]; rhs: string[] }[]
+  target: '3NF' | 'BCNF'
+}
+
+export type NormalForm = '1NF' | '2NF' | '3NF' | 'BCNF'
+
+/** Talabaning normallashtirish javobi (matn ko'rinishida yuboriladi, backend tekshiradi) */
+export interface NormAnswer {
+  keys: string[] | string[][]
+  normal_form: NormalForm
+  decomposition: string[] | string[][]
+}
 
 /** Talabaning laboratoriyadagi holati */
 export interface LabProgress {
@@ -255,6 +271,8 @@ export interface LabProgress {
   /** ER laboratoriyasida: oxirgi chizilgan diagramma va oxirgi topshirishning tuzatilgan varianti */
   last_diagram?: ErDiagram | null
   last_fix?: ErFix | null
+  /** Normallashtirish laboratoriyasida: oxirgi javob */
+  last_answer?: NormAnswer | null
 }
 
 export interface Lab {
@@ -274,6 +292,10 @@ export interface Lab {
   hidden_setup_sql?: string
   /** ER laboratoriyasining namunaviy diagrammasi. Talabaga yuborilmaydi */
   reference_diagram?: ErDiagram | null
+  /** Normallashtirish laboratoriyasi topshirig'i (talabaga ko'rinadi) */
+  norm_task?: NormTask | null
+  /** O'qituvchiga: algoritm hisoblagan javob. Talabaga yuborilmaydi */
+  norm_reference?: { keys: string[][]; normal_form: NormalForm; decomposition: string[][] } | null
   /** SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL) */
   given_diagram?: ErDiagram | null
   /** Indeks laboratoriyasi: rejasi (EXPLAIN) tekshiriladigan so'rov */

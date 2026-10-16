@@ -84,6 +84,9 @@ def find_similar(lab, attempts_by_student):
 
     Qaytaradi: (o'xshash juftliklar ro'yxati, solishtirilgan talabalar soni).
     Juftlik: {"students": (a, b), "score", "shared", "shared_wrong", "gap_minutes"}."""
+    if lab.kind == "norm":
+        # Normallashtirishda to'g'ri javob hammada bir xil: o'xshashlik ko'chirish belgisi emas
+        return [], 0
     features, solved_at = {}, {}
     for student_id, attempts in attempts_by_student.items():
         correct = [attempt for attempt in attempts if attempt.is_correct]

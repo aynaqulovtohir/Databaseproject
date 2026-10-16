@@ -39,6 +39,7 @@ from .sandbox import SandboxUnavailable
 from .serializers import (
     DiagramRunSerializer,
     LabSerializer,
+    NormAnswerSerializer,
     RunSerializer,
     StudentLabSerializer,
     fix_payload,
@@ -96,7 +97,14 @@ class LabViewSet(viewsets.ModelViewSet):
         queryset = visible_labs(user).select_related("author")
         if user.is_student:
             own_attempts = LabAttempt.objects.filter(student=user).only(
-                "lab_id", "is_correct", "sql_code", "diagram", "is_submission", "fixed_diagram", "fix_explanation"
+                "lab_id",
+                "is_correct",
+                "sql_code",
+                "diagram",
+                "answer",
+                "is_submission",
+                "fixed_diagram",
+                "fix_explanation",
             )
             return queryset.prefetch_related(
                 Prefetch("attempts", queryset=own_attempts, to_attr="my_attempts"),
@@ -137,6 +145,23 @@ class LabViewSet(viewsets.ModelViewSet):
             }
             return result, {"diagram": diagram, "ratio": comparison["ratio"]}
 
+        if lab.kind == Lab.Kind.NORM:
+            from .norm import answer_text, check
+
+            serializer = NormAnswerSerializer(data=request.data, task=lab.norm_task)
+            serializer.is_valid(raise_exception=True)
+            answer = serializer.validated_data["answer"]
+            outcome = check(lab.norm_task, answer)
+            result = {
+                "is_correct": not outcome["differences"],
+                "error": None,
+                "result": None,
+                "status_message": "",
+                "differences": outcome["differences"],
+                "checked_against_solution": True,
+            }
+            return result, {"answer": answer, "sql_code": answer_text(answer), "ratio": outcome["ratio"]}
+
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         sql_code = serializer.validated_data["sql_code"]
@@ -168,6 +193,7 @@ class LabViewSet(viewsets.ModelViewSet):
             student=student,
             sql_code=payload.get("sql_code", ""),
             diagram=payload.get("diagram"),
+            answer=payload.get("answer"),
             is_correct=result["is_correct"],
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
@@ -281,6 +307,13 @@ class LabViewSet(viewsets.ModelViewSet):
             score, comment, source = grade_diagram_attempt(attempt, payload["ratio"])
             # Noto'g'ri diagramma: tuzatilgan variant faqat topshirilgandan keyin ko'rsatiladi
             result["fix"] = fix_payload(attempt)
+        elif lab.kind == Lab.Kind.NORM:
+            score, comment = auto_grade_diagram(attempt, payload["ratio"])
+            source = LabGrade.Source.AUTO
+            if not attempt.is_correct:
+                comment = "Javobda xatolar bor. Ro'yxatdagi farqlarni ko'rib chiqing, tuzating va qayta topshiring."
+            else:
+                comment = "Kalitlar, normal forma va dekompozitsiya to'g'ri."
         else:
             score, comment, source = grade_attempt(attempt)
         with transaction.atomic():
@@ -412,6 +445,7 @@ class LabViewSet(viewsets.ModelViewSet):
             starter_sql=lab.starter_sql,
             reference_diagram=lab.reference_diagram,
             given_diagram=lab.given_diagram,
+            norm_task=lab.norm_task,
             plan_query=lab.plan_query,
             plan_forbidden=lab.plan_forbidden,
             concurrent=lab.concurrent,

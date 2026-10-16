@@ -48,6 +48,13 @@ O'zbek tilida (lotin yozuvida) yoz; SQL kalit so'zlari va texnik atamalar asl ho
 
 def lab_context(lab):
     """Talabaga ham ko'rinadigan laboratoriya materiali (namunaviy yechimsiz)."""
+    if lab.kind == lab.Kind.NORM:
+        from .norm import task_text
+
+        return (
+            "Bu normallashtirish laboratoriyasi: talaba nomzod kalitlarni, hozirgi normal formani va maqsad formadagi "
+            "dekompozitsiyani topadi.\n" + task_text(lab.norm_task)
+        )
     if lab.kind == lab.Kind.ER:
         return "Bu ER-diagramma laboratoriyasi: talaba konseptual model chizadi (obyektlar, atributlar, kalitlar, kardinallik)."
     parts = []
