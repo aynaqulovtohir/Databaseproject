@@ -8,7 +8,9 @@ python manage.py collectstatic --noinput --verbosity 0
 
 # gthread: AI so'rovlari (bir necha o'n soniya) kutilayotganda ham boshqa so'rovlar xizmat qilinadi.
 # timeout AI'ning eng uzun kutishidan (asosiy va zaxira modellar) katta.
+# Boshqaruv soketi ishlatilmaydi (ortiqcha kirish nuqtasi; /app ga yozish huquqi ham yo'q).
 exec gunicorn config.wsgi:application \
+    --no-control-socket \
     --bind 0.0.0.0:8000 \
     --workers "${GUNICORN_WORKERS:-3}" \
     --threads 4 \
