@@ -173,6 +173,38 @@ def validate_lab_sql(setup_sql, solution_sql):
         raise LabSetupError("setup_sql" if outcome.setup_failed else "solution_sql", outcome.error)
 
 
+def _tables_payload(tables):
+    return [
+        {
+            "name": name,
+            "columns": [
+                {"name": column, "type": column_type, "not_null": not_null}
+                for column, (column_type, not_null) in state.columns.items()
+            ],
+            "constraints": state.constraints,
+            "row_count": len(state.rows),
+            "rows_truncated": state.rows_truncated,
+        }
+        for name, state in sorted(tables.items())
+    ]
+
+
+def try_code(lab, sql_code):
+    """Erkin sinash: kodni boshlang'ich jadvallar bilan bajaradi, lekin tekshirmaydi.
+
+    Namunaviy yechim ishga tushirilmaydi: javobdan yechim haqida hech narsa bilib bo'lmaydi.
+    """
+    outcome = run_sql(sql_code, lab.setup_sql)
+    if outcome.setup_failed:
+        raise LabSetupError("setup_sql", outcome.error)
+    return {
+        "error": _error_payload(outcome.error) if outcome.error else None,
+        "result": _result_payload(outcome.result),
+        "status_message": outcome.status_message,
+        "tables": _tables_payload(outcome.tables),
+    }
+
+
 def check_code(lab, sql_code):
     """Kodni ishga tushiradi va tekshiruv natijasini lug'at ko'rinishida qaytaradi."""
     outcome = run_sql(sql_code, lab.setup_sql)

@@ -244,6 +244,29 @@ export interface LabRunTable {
   truncated: boolean
 }
 
+export interface LabTryTableColumn {
+  name: string
+  type: string
+  not_null: boolean
+}
+
+/** Erkin sinashdan keyingi jadval holati */
+export interface LabTryTable {
+  name: string
+  columns: LabTryTableColumn[]
+  constraints: string[]
+  row_count: number
+  rows_truncated: boolean
+}
+
+/** Erkin sinash natijasi: tekshirilmaydi va urinish sifatida saqlanmaydi */
+export interface LabTryResult {
+  error: LabRunError | null
+  result: LabRunTable | null
+  status_message: string
+  tables: LabTryTable[]
+}
+
 export interface LabRunResult {
   is_correct: boolean
   error: LabRunError | null

@@ -23,7 +23,7 @@ from users.models import User
 
 from .access import visible_labs
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
-from .checker import LabSetupError, check_code
+from .checker import LabSetupError, check_code, try_code
 from .er import build_fixed, compare
 from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .research import build_export
@@ -154,8 +154,13 @@ class LabViewSet(viewsets.ModelViewSet):
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         sql_code = serializer.validated_data["sql_code"]
+        return self.execute(request, lab, check_code, sql_code)
+
+    @staticmethod
+    def execute(request, lab, runner, sql_code):
+        """`runner(lab, sql_code)` ni qum qutida bajaradi. Qaytaradi: (natija, ma'lumot) yoki (Response, None)."""
         try:
-            return check_code(lab, sql_code), {"sql_code": sql_code}
+            return runner(lab, sql_code), {"sql_code": sql_code}
         except SandboxUnavailable:
             logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
             return Response(
@@ -206,6 +211,24 @@ class LabViewSet(viewsets.ModelViewSet):
                 not result["is_correct"] and ai_usable(request.user) and ai_advice_left(request.user) > 0
             )
         return Response(result)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="try",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="lab_try",
+    )
+    def try_run(self, request, pk=None):
+        """Erkin sinash: kod bajariladi va natijasi ko'rsatiladi, lekin tekshirilmaydi va urinish hisoblanmaydi."""
+        lab = self.get_object()
+        if lab.kind != Lab.Kind.SQL:
+            raise ValidationError({"detail": "Erkin sinash faqat SQL laboratoriyalarida bor."})
+        serializer = RunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result, payload = self.execute(request, lab, try_code, serializer.validated_data["sql_code"])
+        return result if payload is None else Response(result)
 
     @action(
         detail=True,

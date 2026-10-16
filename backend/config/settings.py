@@ -119,6 +119,8 @@ REST_FRAMEWORK = {
         "login": "5/min",
         # Bitta foydalanuvchi laboratoriyada kodni ishga tushirish soni
         "lab_run": "30/min",
+        # Erkin sinash (tekshirilmaydi, urinish hisoblanmaydi)
+        "lab_try": "30/min",
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
         "blind_review": "60/min",

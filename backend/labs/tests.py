@@ -276,6 +276,70 @@ class RunTests(BaseTestCase):
         self.assertEqual(self.run_code(SOLUTION).status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class TryRunTests(BaseTestCase):
+    """Erkin sinash: natija ko'rsatiladi, lekin tekshirilmaydi va urinish saqlanmaydi."""
+
+    def setUp(self):
+        super().setUp()
+        self.auth_as(self.student_a1)
+        self.try_url = f"/api/labs/{self.lab.pk}/try/"
+
+    def test_shows_result_without_checking_or_saving(self):
+        response = self.run_code("SELECT nomi FROM kitob ORDER BY id", url=self.try_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["result"]["rows"], [["Alifbo"], ["Bahor"], ["Chaqmoq"]])
+        self.assertIsNone(response.data["error"])
+        for key in ("is_correct", "differences", "checked_against_solution", "attempt_id"):
+            self.assertNotIn(key, response.data)
+        self.assertFalse(LabAttempt.objects.exists())
+
+    def test_solution_is_never_executed(self):
+        with patch("labs.checker.run_sql", wraps=run_sql) as runner:
+            self.run_code("SELECT 1", url=self.try_url)
+        self.assertEqual([call.args[0] for call in runner.call_args_list], ["SELECT 1"])
+
+    def test_shows_tables_after_ddl(self):
+        code = "CREATE TABLE muallif (id INT PRIMARY KEY, ism TEXT NOT NULL); INSERT INTO muallif VALUES (1, 'Navoiy');"
+        response = self.run_code(code, url=self.try_url)
+        tables = {table["name"]: table for table in response.data["tables"]}
+        self.assertEqual(set(tables), {"kitob", "muallif"})
+        self.assertEqual(
+            tables["muallif"]["columns"],
+            [{"name": "id", "type": "integer", "not_null": True}, {"name": "ism", "type": "text", "not_null": True}],
+        )
+        self.assertEqual(tables["muallif"]["row_count"], 1)
+        self.assertTrue(any(item.startswith("PRIMARY KEY") for item in tables["muallif"]["constraints"]))
+        self.assertIn("INSERT", response.data["status_message"])
+
+    def test_error_gets_tip(self):
+        response = self.run_code("SELECT * FROM yoq_jadval", url=self.try_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("jadval topilmadi", response.data["error"]["tip"])
+        self.assertFalse(LabAttempt.objects.exists())
+
+    def test_platform_tables_unreachable(self):
+        response = self.run_code("SELECT username, password FROM users_user", url=self.try_url)
+        self.assertIsNotNone(response.data["error"])
+        self.assertIsNone(response.data["result"])
+
+    def test_access_rules(self):
+        self.auth_as(self.student_b)  # boshqa guruh talabasi
+        self.assertEqual(self.run_code("SELECT 1", url=self.try_url).status_code, status.HTTP_404_NOT_FOUND)
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.run_code("SELECT 1", url=self.try_url).status_code, status.HTTP_200_OK)
+        self.client.credentials()
+        self.assertEqual(self.run_code("SELECT 1", url=self.try_url).status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_only_sql_labs(self):
+        er_lab = Lab.objects.create(kind=Lab.Kind.ER, title="ER", description="ER", author=self.teacher_a)
+        er_lab.groups.add(self.group_a)
+        response = self.run_code("SELECT 1", url=f"/api/labs/{er_lab.pk}/try/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_empty_code_rejected(self):
+        self.assertEqual(self.run_code("", url=self.try_url).status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class SchemaLabTests(BaseTestCase):
     """Jadval yaratish laboratoriyasi: tuzilish va cheklovlar solishtiriladi."""
 

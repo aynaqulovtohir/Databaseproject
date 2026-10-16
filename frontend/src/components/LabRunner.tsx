@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Award, CircleCheck, CircleX, Lightbulb, Loader2, Play, Send, Sparkles } from 'lucide-react'
+import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Send, Sparkles } from 'lucide-react'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
@@ -7,7 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
-import { GRADE_SOURCE_LABELS, MAX_SCORE, type LabGrade, type LabRunResult, type LabRunTable } from '@/lib/types'
+import {
+  GRADE_SOURCE_LABELS,
+  MAX_SCORE,
+  type LabGrade,
+  type LabRunError,
+  type LabRunResult,
+  type LabRunTable,
+  type LabTryResult,
+  type LabTryTable,
+} from '@/lib/types'
 
 const MAX_SQL_LENGTH = 50_000
 
@@ -117,6 +126,31 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
   )
 }
 
+function ErrorDetails({ error }: { error: LabRunError }) {
+  return (
+    <div className="grid gap-1 text-sm">
+      <p className="font-mono text-xs break-words">
+        {error.line ? `${error.line}-qator: ` : ''}
+        {error.message}
+      </p>
+      {error.detail ? <p className="font-mono text-xs break-words">{error.detail}</p> : null}
+      {error.hint ? <p className="font-mono text-xs break-words">Hint: {error.hint}</p> : null}
+    </div>
+  )
+}
+
+function ErrorTip({ tip }: { tip: string }) {
+  return (
+    <div className="flex gap-2 rounded-lg border bg-background p-3 text-sm text-foreground">
+      <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <p>
+        <span className="font-medium">Maslahat: </span>
+        {tip}
+      </p>
+    </div>
+  )
+}
+
 function Verdict({ result }: { result: LabRunResult }) {
   if (result.is_correct) {
     return (
@@ -142,14 +176,7 @@ function Verdict({ result }: { result: LabRunResult }) {
         {error ? 'Kod xato berdi' : "Natija noto'g'ri"}
       </div>
       {error ? (
-        <div className="grid gap-1 text-sm">
-          <p className="font-mono text-xs break-words">
-            {error.line ? `${error.line}-qator: ` : ''}
-            {error.message}
-          </p>
-          {error.detail ? <p className="font-mono text-xs break-words">{error.detail}</p> : null}
-          {error.hint ? <p className="font-mono text-xs break-words">Hint: {error.hint}</p> : null}
-        </div>
+        <ErrorDetails error={error} />
       ) : (
         <p className="text-sm">Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:</p>
       )}
@@ -160,16 +187,81 @@ function Verdict({ result }: { result: LabRunResult }) {
           ))}
         </ul>
       ) : null}
-      {error?.tip ? (
-        <div className="flex gap-2 rounded-lg border bg-background p-3 text-sm text-foreground">
-          <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <p>
-            <span className="font-medium">Maslahat: </span>
-            {error.tip}
-          </p>
-        </div>
-      ) : null}
+      {error?.tip ? <ErrorTip tip={error.tip} /> : null}
       {result.ai_available && result.attempt_id ? <AiAdvice attemptId={result.attempt_id} /> : null}
+    </div>
+  )
+}
+
+function TablesSummary({ tables }: { tables: LabTryTable[] }) {
+  if (!tables.length) return null
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-medium">Bazadagi jadvallar</h3>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {tables.map((table) => (
+          <div key={table.name} className="min-w-0 rounded-lg border p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+              <span className="font-mono text-sm font-medium break-all">{table.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {table.row_count}
+                {table.rows_truncated ? '+' : ''} qator
+              </span>
+            </div>
+            <ul className="mt-2 grid gap-0.5 font-mono text-xs">
+              {table.columns.map((column) => (
+                <li key={column.name} className="break-all">
+                  {column.name} <span className="text-muted-foreground">{column.type}</span>
+                  {column.not_null ? <span className="text-muted-foreground"> NOT NULL</span> : null}
+                </li>
+              ))}
+            </ul>
+            {table.constraints.length ? (
+              <ul className="mt-2 grid gap-0.5 border-t pt-2 font-mono text-xs text-muted-foreground">
+                {table.constraints.map((constraint, index) => (
+                  <li key={index} className="break-all">
+                    {constraint}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Erkin sinash natijasi: to'g'ri/noto'g'ri deb baholanmaydi */
+function TryResult({ result }: { result: LabTryResult }) {
+  const { error } = result
+  return (
+    <div className="grid gap-4">
+      {error ? (
+        <div className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950" role="alert">
+          <div className="flex items-center gap-2 font-medium">
+            <CircleX className="size-5 shrink-0" aria-hidden="true" />
+            Kod xato berdi
+          </div>
+          <ErrorDetails error={error} />
+          {error.tip ? <ErrorTip tip={error.tip} /> : null}
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm" role="status">
+          <div className="flex items-center gap-2 font-medium">
+            <FlaskConical className="size-4 shrink-0" aria-hidden="true" />
+            Kod xatosiz bajarildi
+            {result.status_message ? (
+              <span className="font-mono text-xs font-normal text-muted-foreground">({result.status_message})</span>
+            ) : null}
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Bu sinov: natija namunaviy yechim bilan solishtirilmadi va urinish hisoblanmadi.
+      </p>
+      {result.result ? <ResultTable table={result.result} /> : null}
+      <TablesSummary tables={result.tables} />
     </div>
   )
 }
@@ -205,7 +297,7 @@ interface LabRunnerProps {
   onResult?: (result: LabRunResult, code: string) => void
 }
 
-/** SQL muharriri, "Ishga tushirish" tugmasi va natija paneli. */
+/** SQL muharriri, «Sinab ko'rish» va «Tekshirish» tugmalari va natija paneli. */
 export function LabRunner({ labId, initialCode = '', gradable = false, onResult }: LabRunnerProps) {
   const [code, setCode] = useState(initialCode)
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -221,16 +313,38 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
     },
   })
 
-  const canRun = !mutation.isPending && Boolean(code.trim())
+  // Erkin sinash: alohida so'rov, natijasi tekshiruv natijasi o'rnida ko'rsatiladi
+  const tryMutation = useMutation({
+    mutationFn: (sqlCode: string) =>
+      api<LabTryResult>(`/labs/${labId}/try/`, { method: 'POST', body: { sql_code: sqlCode } }),
+    onError: (error) => {
+      const message = fieldErrors(error).sql_code
+      if (message) setFieldError(message)
+      else toast.error(errorMessage(error))
+    },
+  })
+  const [shown, setShown] = useState<'check' | 'try'>('check')
+
+  const busy = mutation.isPending || tryMutation.isPending
+  const canRun = !busy && Boolean(code.trim())
 
   function run(mode: RunMode = 'run') {
     if (!canRun) return
     setFieldError(null)
+    setShown('check')
     mutation.mutate({ sqlCode: code, mode })
+  }
+
+  function tryCode() {
+    if (!canRun) return
+    setFieldError(null)
+    setShown('try')
+    tryMutation.mutate(code)
   }
 
   const submitting = mutation.isPending && mutation.variables?.mode === 'submit'
   const running = mutation.isPending && !submitting
+  const trying = tryMutation.isPending
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -240,7 +354,8 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      run()
+      if (event.shiftKey) tryCode()
+      else run()
     }
   }
 
@@ -273,9 +388,13 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="lg" variant="outline" disabled={!canRun} onClick={tryCode}>
+            {trying ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}
+            {trying ? 'Bajarilmoqda…' : "Sinab ko'rish"}
+          </Button>
           <Button type="submit" size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun}>
             {running ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
-            {running ? 'Bajarilmoqda…' : 'Ishga tushirish'}
+            {running ? 'Tekshirilmoqda…' : 'Tekshirish'}
           </Button>
           {gradable ? (
             <Button type="button" size="lg" disabled={!canRun} onClick={() => run('submit')}>
@@ -283,17 +402,23 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
               {submitting ? 'Baholanmoqda…' : 'Baholashga topshirish'}
             </Button>
           ) : null}
-          <span className="text-xs text-muted-foreground">Ctrl + Enter — ishga tushirish</span>
         </div>
-        {gradable ? (
-          <p className="text-xs text-muted-foreground">
-            Avval «Ishga tushirish» bilan sinab ko'ring. Tayyor bo'lgach «Baholashga topshirish»ni bosing: kodingizga
-            ball qo'yiladi. Qayta topshirish mumkin, eng yuqori ball saqlanadi.
-          </p>
-        ) : null}
+        <p className="text-xs text-muted-foreground">
+          «Sinab ko'rish» kodni bajarib natijasini ko'rsatadi, lekin tekshirmaydi va urinish hisoblanmaydi
+          (Ctrl + Shift + Enter). «Tekshirish» natijani kutilgan natija bilan solishtiradi (Ctrl + Enter).
+          {gradable
+            ? " Tayyor bo'lgach «Baholashga topshirish»ni bosing: kodingizga ball qo'yiladi. Qayta topshirish mumkin, eng yuqori ball saqlanadi."
+            : ''}
+        </p>
       </form>
 
-      {result && !mutation.isPending ? (
+      {shown === 'try' && tryMutation.data && !busy ? (
+        <div aria-live="polite">
+          <TryResult result={tryMutation.data} />
+        </div>
+      ) : null}
+
+      {shown === 'check' && result && !busy ? (
         <div className="grid gap-4" aria-live="polite">
           {result.grade ? <GradeCard grade={result.grade} best={result.best_grade} /> : null}
           <Verdict result={result} />
