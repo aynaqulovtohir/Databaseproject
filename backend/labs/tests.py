@@ -744,7 +744,7 @@ class ResearchExportTests(BaseTestCase):
             set(files),
             {
                 "urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv",
-                "kompetentlik.csv", "README.txt",
+                "ozaro_baholash.csv", "ai_sifati.csv", "kompetentlik.csv", "README.txt",
             },
         )
         everything = "".join(files.values())

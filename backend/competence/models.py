@@ -51,11 +51,22 @@ class Indicator(models.Model):
         GRADES = "grades", "O'qituvchi baholari (topshiriqlar)"
         INTERVIEW = "interview", "Talablarni aniqlash (buyurtmachi bilan suhbat)"
         CALIBRATION = "calibration", "O'z bilimini baholash aniqligi (ishonch va natija)"
+        PEER_ACCURACY = "peer_accuracy", "Hamkasb ishini baholash aniqligi (o'zaro baholash)"
+        PEER_HELPFUL = "peer_helpful", "Izohlar foydaliligi (o'zaro baholash)"
 
     # Test va so'rovnoma har bir kesimda o'lchanadi (har biriga o'z testi), qolganlari — o'quv jarayoni
     # ma'lumotlari, ular faqat tajriba oxirida bor
     QUIZ_SOURCES = (Source.QUIZ, Source.SURVEY)
-    TOPIC_SOURCES = (Source.LABS, Source.MASTERY, Source.EXPLANATION, Source.INTERVIEW, Source.CALIBRATION)
+    TOPIC_SOURCES = (
+        Source.LABS,
+        Source.MASTERY,
+        Source.EXPLANATION,
+        Source.INTERVIEW,
+        Source.CALIBRATION,
+        Source.PEER_ACCURACY,
+        Source.PEER_HELPFUL,
+    )
+    PEER_SOURCES = (Source.PEER_ACCURACY, Source.PEER_HELPFUL)
     # AI bilan bog'liq: nazorat guruhida (AI o'chirilgan) bu ko'rsatkichlar o'lchanmaydi
     AI_SOURCES = (Source.EXPLANATION, Source.INTERVIEW)
 

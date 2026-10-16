@@ -228,6 +228,72 @@ class BlindReview(models.Model):
         return f"{self.attempt} / {self.reviewer}: {self.score} (tizim: {self.ai_score})"
 
 
+class PeerReview(models.Model):
+    """O'zaro baholash: talaba guruhdoshining topshirilgan ER-diagrammasini rubrika bo'yicha anonim baholaydi
+    (labs/peer_review.py). Ikkala tomon ham bir-birining ismini ko'rmaydi; muallif izohni foydali yoki yo'qligini
+    belgilaydi. Baholash paytidagi tizim bahosi (namunaga moslik) saqlanadi — baholash aniqligi shu bilan o'lchanadi.
+    """
+
+    attempt = models.ForeignKey(
+        LabAttempt, verbose_name="baholangan ish", on_delete=models.CASCADE, related_name="peer_reviews"
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="baholovchi talaba", on_delete=models.CASCADE, related_name="peer_reviews"
+    )
+    # {"entities": 1-4, "attributes": 1-4, "relationships": 1-4, "clarity": 1-4}
+    scores = models.JSONField("mezonlar bo'yicha ballar")
+    comment = models.TextField("izoh", max_length=2000)
+    reference_ratio = models.FloatField("tizim bahosi (namunaga moslik, 0-1)")
+    # Muallifning bahosi: izoh foydali bo'ldimi (None — hali belgilamagan)
+    helpful = models.BooleanField("muallif uchun foydali", null=True, blank=True)
+    created_at = models.DateTimeField("baholangan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "o'zaro baholash"
+        verbose_name_plural = "o'zaro baholashlar"
+        ordering = ["id"]
+        constraints = [models.UniqueConstraint(fields=["attempt", "reviewer"], name="unique_peer_review")]
+
+    def __str__(self):
+        return f"{self.attempt} / {self.reviewer}"
+
+
+class AIOutputReview(models.Model):
+    """AI sifatini nazorat qilish: o'qituvchi AI yozgan matnni (maslahat yoki tushuntirish izohi) baholaydi
+    (labs/ai_quality.py). Talaba ismi ko'rsatilmaydi. Murabbiy va buyurtmachi suhbatlari bu yerga kirmaydi —
+    ular talabaga "faqat o'zingiz ko'rasiz" deb va'da qilingan.
+    """
+
+    class Kind(models.TextChoices):
+        HINT = "hint", "AI maslahati"
+        EXPLANATION = "explanation", "Tushuntirish bo'yicha AI izohi"
+
+    class Rating(models.TextChoices):
+        HELPFUL = "helpful", "Foydali va to'g'ri"
+        UNCLEAR = "unclear", "Tushunarsiz yoki juda umumiy"
+        WRONG = "wrong", "Noto'g'ri (fakt yoki tahlil xato)"
+        REVEALED = "revealed", "Javobni aytib qo'ydi"
+
+    attempt = models.ForeignKey(LabAttempt, verbose_name="urinish", on_delete=models.CASCADE, related_name="ai_reviews")
+    kind = models.CharField("turi", max_length=20, choices=Kind.choices)
+    # Maslahat darajasi (1 dan); tushuntirish izohida 0
+    level = models.PositiveSmallIntegerField("daraja", default=0)
+    rating = models.CharField("baho", max_length=10, choices=Rating.choices)
+    comment = models.TextField("izoh", blank=True, max_length=1000)
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="baholovchi", on_delete=models.CASCADE, related_name="ai_output_reviews"
+    )
+    created_at = models.DateTimeField("baholangan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "AI javobi bahosi"
+        verbose_name_plural = "AI javoblari baholari"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["attempt", "kind", "level", "reviewer"], name="unique_ai_output_review")
+        ]
+
+
 class AIAction(models.Model):
     """Talabaning AI'dan foydalanishi (maslahatdan tashqari): kunlik umumiy limitni hisoblash uchun.
 

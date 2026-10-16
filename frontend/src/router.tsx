@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { useAuth } from '@/lib/auth'
 import type { Role } from '@/lib/types'
 import { AIUsagePage } from '@/pages/admin/AIUsagePage'
+import { AIQualityPage } from '@/pages/AIQualityPage'
 import { GroupsPage } from '@/pages/admin/GroupsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
@@ -20,6 +21,7 @@ import { QuizzesPage } from '@/pages/QuizzesPage'
 import { StatisticsPage } from '@/pages/StatisticsPage'
 import { MaterialsPage } from '@/pages/MaterialsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { RiskPage } from '@/pages/RiskPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SubmissionPage } from '@/pages/SubmissionPage'
 
@@ -73,6 +75,8 @@ export const router = createBrowserRouter([
         children: [
           { path: '/statistics', element: <StatisticsPage /> },
           { path: '/competence', element: <CompetencePage /> },
+          { path: '/risk', element: <RiskPage /> },
+          { path: '/ai-quality', element: <AIQualityPage /> },
           { path: '/blind-review', element: <BlindReviewPage /> },
         ],
       },

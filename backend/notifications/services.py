@@ -14,6 +14,7 @@ from .models import Notification
 
 MAX_TITLE_LENGTH = 100
 REMINDER_WINDOW = timedelta(hours=24)
+RISK_DIGEST_INTERVAL = timedelta(days=7)
 
 
 def short_title(assignment):
@@ -69,6 +70,25 @@ def notify_new_assignment(assignment, group_ids):
 
 def notify_returned(submission):
     return notify_user(submission.student, Notification.Kind.RETURNED, submission.assignment)
+
+
+def create_risk_digests():
+    """O'qituvchilarga haftasiga bir marta: o'z guruhlarida yuqori xavfli talabalar bo'lsa, qisqa xulosa."""
+    from labs.risk import digest_text
+
+    if not telegram.is_configured():
+        return 0
+    week_ago = timezone.now() - RISK_DIGEST_INTERVAL
+    created = 0
+    teachers = reachable(User.objects.filter(role=User.Role.TEACHER)).exclude(
+        notifications__kind=Notification.Kind.RISK_DIGEST, notifications__created_at__gte=week_ago
+    )
+    for teacher in teachers.distinct():
+        text = digest_text(teacher.teaching_groups.order_by("name"))
+        if text:
+            Notification.objects.create(user=teacher, kind=Notification.Kind.RISK_DIGEST, text=text)
+            created += 1
+    return created
 
 
 def create_deadline_reminders():

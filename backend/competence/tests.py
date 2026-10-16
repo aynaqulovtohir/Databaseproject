@@ -203,13 +203,13 @@ class SeedCommandTests(BaseTestCase):
     def test_seed_creates_model_and_links_quizzes(self):
         pre = Quiz.objects.create(kind=Quiz.Kind.PRE, title="Kirish", author=self.teacher_a)
         call_command("seed_competence_model", stdout=StringIO())
-        self.assertEqual(Component.objects.count(), 4)
+        self.assertEqual(Component.objects.count(), 5)
         quiz_indicator = Indicator.objects.get(source=Indicator.Source.QUIZ)
         self.assertEqual(list(quiz_indicator.initial_quizzes.all()), [pre])
         with self.assertRaises(CommandError):
             call_command("seed_competence_model", stdout=StringIO())
         call_command("seed_competence_model", "--replace", stdout=StringIO())
-        self.assertEqual(Component.objects.count(), 4)
+        self.assertEqual(Component.objects.count(), 5)
         self.assertTrue(User.objects.filter(pk=self.teacher_a.pk).exists())
 
 

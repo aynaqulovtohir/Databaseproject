@@ -20,7 +20,8 @@ from grading.models import Grade
 from labs import mastery
 from labs.calibration import calibration
 from labs.interview import coverage
-from labs.models import InterviewMessage, Lab, LabAttempt
+from labs.models import InterviewMessage, Lab, LabAttempt, PeerReview
+from labs.peer_review import accuracy as peer_accuracy
 from quizzes.models import Question, QuizAttempt
 from quizzes.services import finalize_if_expired, likert_value, percent
 from users.models import User
@@ -35,6 +36,8 @@ LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori"}
 OVERALL_MEDIUM_FROM = 40
 OVERALL_HIGH_FROM = 70
 EXPLANATION_VALUES = {"ok": 1.0, "partial": 0.5, "wrong": 0.0}
+# O'zaro baholash ko'rsatkichlari shundan kam baholash (yoki muallif belgilagan izoh) bo'lsa hisoblanmaydi
+MIN_PEER_REVIEWS = 2
 
 
 def level(score, medium_from, high_from):
@@ -105,6 +108,12 @@ class Data:
         if stage == "final" and Indicator.Source.INTERVIEW in sources:
             for message in InterviewMessage.objects.filter(student_id__in=student_ids).only("lab_id", "student_id", "revealed"):
                 self.interviews[(message.student_id, message.lab_id)].append(message)
+
+        # Talaba yozgan o'zaro baholashlar: {talaba: [baholashlar]}
+        self.peer_reviews = defaultdict(list)
+        if stage == "final" and sources & set(Indicator.PEER_SOURCES):
+            for review in PeerReview.objects.filter(reviewer_id__in=student_ids).select_related("attempt"):
+                self.peer_reviews[review.reviewer_id].append(review)
 
         # O'qituvchi baholari: har bir topshiriq (bosqich) bo'yicha oxirgi baholangan urinish
         self.grades = defaultdict(list)
@@ -177,6 +186,12 @@ def indicator_value(indicator, student, data):
         return None
     lab_ids = {lab.pk for lab in labs}
     attempts = [attempt for attempt in data.attempts_by_student.get(student.pk, []) if attempt.lab_id in lab_ids]
+    if source in Indicator.PEER_SOURCES:
+        reviews = [review for review in data.peer_reviews.get(student.pk, []) if review.attempt.lab_id in lab_ids]
+        if source == Indicator.Source.PEER_ACCURACY:
+            return _mean([peer_accuracy(review) for review in reviews]) if len(reviews) >= MIN_PEER_REVIEWS else None
+        rated = [review.helpful for review in reviews if review.helpful is not None]
+        return 100 * sum(rated) / len(rated) if len(rated) >= MIN_PEER_REVIEWS else None
     if source == Indicator.Source.CALIBRATION:
         result = calibration(attempts)
         return result["score"] if result else None

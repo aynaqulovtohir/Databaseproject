@@ -33,7 +33,17 @@ from .quota import (
     sandbox_down_response,
 )
 from .er import build_fixed, compare
-from .models import AIAction, BlindReview, InterviewMessage, Lab, LabAttempt, LabChatMessage, LabGrade
+from .models import (
+    AIAction,
+    AIOutputReview,
+    BlindReview,
+    InterviewMessage,
+    Lab,
+    LabAttempt,
+    LabChatMessage,
+    LabGrade,
+    PeerReview,
+)
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -984,6 +994,135 @@ class LabInterviewView(APIView):
                 lab=self.lab, student=request.user, role=InterviewMessage.Role.ASSISTANT, content=answer, revealed=revealed
             )
         return Response(self.payload(), status=status.HTTP_201_CREATED)
+
+
+class LabPeerReviewView(APIView):
+    """O'zaro baholash (ER). GET — navbatdagi ish va o'z ishlariga berilgan baholar,
+    POST {attempt, scores, comment} — navbatdagi ishni baholash. Faqat talaba va faqat o'ziga ko'rinadigan laboratoriyada.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "peer_review"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_student:
+            raise PermissionDenied("O'zaro baholash faqat talaba uchun.")
+        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+        if self.lab.kind != Lab.Kind.ER:
+            raise PermissionDenied("O'zaro baholash faqat ER-diagramma laboratoriyalarida.")
+
+    def get(self, request, pk):
+        from .peer_review import state
+
+        return Response(state(self.lab, request.user))
+
+    def post(self, request, pk):
+        from .peer_review import ReviewError, create, state
+
+        attempt_id = request.data.get("attempt")
+        if isinstance(attempt_id, bool) or not isinstance(attempt_id, int):
+            raise ValidationError({"attempt": "Ish raqami butun son bo'lishi kerak."})
+        try:
+            create(self.lab, request.user, attempt_id, request.data.get("scores"), request.data.get("comment"))
+        except ReviewError as exc:
+            raise ValidationError({"detail": str(exc)})
+        return Response(state(self.lab, request.user), status=status.HTTP_201_CREATED)
+
+
+class PeerReviewHelpfulView(APIView):
+    """Ish muallifi o'ziga berilgan izohni foydali yoki yo'qligini belgilaydi: POST {helpful: true|false}."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "peer_review"
+
+    def post(self, request, pk):
+        helpful = request.data.get("helpful")
+        if not isinstance(helpful, bool):
+            raise ValidationError({"helpful": "true yoki false bo'lishi kerak."})
+        # Faqat o'z ishiga berilgan baholash (boshqasiniki — 404, mavjudligi ham oshkor qilinmaydi)
+        review = get_object_or_404(PeerReview, pk=pk, attempt__student=request.user)
+        review.helpful = helpful
+        review.save(update_fields=["helpful"])
+        return Response({"id": review.pk, "helpful": review.helpful})
+
+
+class AIQualityView(APIView):
+    """AI sifatini nazorat qilish (admin va o'qituvchi). GET — navbatdagi AI matni va xulosa,
+    POST {attempt, kind, level, rating, comment?} — baholash. O'qituvchi faqat o'z guruhlari talabalarining matnlarini ko'radi.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "blind_review"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if request.user.is_student:
+            raise PermissionDenied("AI sifatini baholash faqat admin va o'qituvchi uchun.")
+        from .statistics import allowed_groups
+
+        self.groups = allowed_groups(request.user)
+
+    def payload(self):
+        from .ai_quality import next_item, summary
+
+        return {
+            "next": next_item(self.groups, self.request.user),
+            "rated_by_me": AIOutputReview.objects.filter(reviewer=self.request.user).count(),
+            "summary": summary(self.groups),
+            "ratings": [{"value": value, "label": label} for value, label in AIOutputReview.Rating.choices],
+        }
+
+    def get(self, request):
+        return Response(self.payload())
+
+    def post(self, request):
+        from .ai_quality import outputs, scope
+
+        data = request.data
+        kind, level, rating = data.get("kind"), data.get("level"), data.get("rating")
+        comment = data.get("comment", "")
+        if rating not in AIOutputReview.Rating.values:
+            raise ValidationError({"rating": "Noma'lum baho."})
+        if not isinstance(comment, str) or len(comment) > 1000:
+            raise ValidationError({"comment": "Izoh 1000 belgidan oshmasin."})
+        attempt_id = data.get("attempt")
+        if isinstance(attempt_id, bool) or not isinstance(attempt_id, int) or isinstance(level, bool) or not isinstance(level, int):
+            raise ValidationError({"detail": "Urinish va daraja butun son bo'lishi kerak."})
+        # Faqat o'z guruhlari doirasidagi, haqiqatan mavjud AI matni baholanadi
+        attempt = get_object_or_404(scope(self.groups), pk=attempt_id)
+        if not any(item_kind == kind and item_level == level for _, item_kind, item_level, _ in outputs([attempt])):
+            raise ValidationError({"detail": "Bunday AI matni yo'q."})
+        AIOutputReview.objects.update_or_create(
+            attempt=attempt, kind=kind, level=level, reviewer=request.user,
+            defaults={"rating": rating, "comment": comment.strip()},
+        )
+        return Response(self.payload(), status=status.HTTP_201_CREATED)
+
+
+class RiskView(APIView):
+    """Erta ogohlantirish: ?group=<id> — guruh talabalarining xavf darajasi va sabablari (admin va o'qituvchi)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .risk import group_risk
+        from .statistics import allowed_groups
+
+        if request.user.is_student:
+            raise PermissionDenied("Erta ogohlantirish faqat admin va o'qituvchi uchun.")
+        group_id = request.query_params.get("group", "")
+        if not group_id.isdigit():
+            raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+        group = get_object_or_404(allowed_groups(request.user), pk=group_id)
+        return Response(group_risk(group))
 
 
 class StatisticsView(APIView):
