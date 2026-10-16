@@ -304,6 +304,9 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** O'qituvchi tanlagan mavzu (bo'sh — avtomatik) va amaldagi mavzu */
+  topic?: string
+  effective_topic?: string
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
@@ -405,6 +408,18 @@ export interface BuggyCode {
   buggy_sql: string
   bugs: string[]
   differences: string[]
+}
+
+/** Moslashuvchan o'quv yo'li (talaba) */
+export interface LearningPath {
+  topics: { topic: string; label: string; mastery: number; mastered: boolean; labs: number; solved: number }[]
+  next: { id: number; title: string; topic: string; reason: string } | null
+}
+
+/** O'qituvchi: guruh talabalari mavzular bo'yicha (foizda) */
+export interface GroupMastery {
+  topics: { topic: string; label: string }[]
+  students: (PersonShort & { group: string; mastery: Record<string, number> })[]
 }
 
 /** Loyiha himoyasi (viva) */

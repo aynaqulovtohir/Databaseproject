@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { LabDialog } from '@/components/LabDialog'
+import { LearningPathCard } from '@/components/LearningPath'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
@@ -143,6 +144,7 @@ export function LabsPage() {
           ) : null
         }
       />
+      {isStaff ? null : <LearningPathCard />}
       {content}
       {creating ? <LabDialog onClose={() => setCreating(false)} /> : null}
     </>

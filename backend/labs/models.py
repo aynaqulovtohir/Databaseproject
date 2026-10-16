@@ -6,6 +6,16 @@ MAX_SQL_LENGTH = 50_000
 
 
 class Lab(models.Model):
+    class Topic(models.TextChoices):
+        # Kurs tartibida: moslashuvchan o'quv yo'li avval oldingi mavzuni o'zlashtirishni tavsiya qiladi
+        ER = "er", "ER-model"
+        DESIGN = "design", "Jadvallarni loyihalash"
+        NORM = "norm", "Normallashtirish"
+        ER_SQL = "er_sql", "ER-modeldan jadvallarga"
+        SELECT = "select", "SELECT so'rovlari"
+        INDEX = "index", "Indekslar"
+        TRANSACTION = "transaction", "Tranzaksiyalar"
+
     class Kind(models.TextChoices):
         SQL = "sql", "SQL kod"
         ER = "er", "ER-diagramma"
@@ -40,6 +50,8 @@ class Lab(models.Model):
     # Tranzaksiya laboratoriyasi: talaba kodi (BEGIN ... COMMIT) ikki sessiyada bir vaqtda bajariladi va natija
     # ketma-ket bajarilgandagiga teng bo'lishi kerak (yo'qolgan yangilanish, "tekshir-keyin-bajar" poygasi)
     concurrent = models.BooleanField("ikki sessiyada bir vaqtda tekshiriladi", default=False)
+    # Bo'sh bo'lsa, laboratoriya turidan aniqlanadi (effective_topic)
+    topic = models.CharField("mavzu", max_length=20, choices=Topic.choices, blank=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="muallif",
@@ -56,6 +68,25 @@ class Lab(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def effective_topic(self):
+        """O'qituvchi bergan mavzu yoki laboratoriya turidan aniqlangani."""
+        if self.topic:
+            return self.topic
+        if self.kind == self.Kind.ER:
+            return self.Topic.ER
+        if self.kind == self.Kind.NORM:
+            return self.Topic.NORM
+        if self.concurrent:
+            return self.Topic.TRANSACTION
+        if self.plan_query.strip():
+            return self.Topic.INDEX
+        if self.given_diagram:
+            return self.Topic.ER_SQL
+        if "create table" in self.solution_sql.lower():
+            return self.Topic.DESIGN
+        return self.Topic.SELECT
 
 
 class LabAttempt(models.Model):

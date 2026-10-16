@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'topic', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -32,6 +32,16 @@ const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
 function fdsText(lab?: Lab) {
   return (lab?.norm_task?.fds ?? []).map((fd) => `${fd.lhs.join(', ')} -> ${fd.rhs.join(', ')}`).join('\n')
 }
+const TOPIC_OPTIONS = [
+  ['', "Avtomatik (laboratoriya turidan)"],
+  ['er', 'ER-model'],
+  ['design', 'Jadvallarni loyihalash'],
+  ['norm', 'Normallashtirish'],
+  ['er_sql', 'ER-modeldan jadvallarga'],
+  ['select', "SELECT so'rovlari"],
+  ['index', 'Indekslar'],
+  ['transaction', 'Tranzaksiyalar'],
+] as const
 const SQL_PROPS = { spellCheck: false, autoCapitalize: 'none', autoCorrect: 'off' } as const
 
 interface LabDialogProps {
@@ -57,6 +67,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
+  const [topic, setTopic] = useState(lab?.topic ?? '')
   const [normAttributes, setNormAttributes] = useState(lab?.norm_task?.attributes.join(', ') ?? '')
   const [normFds, setNormFds] = useState(fdsText(lab))
   const [normTarget, setNormTarget] = useState<'3NF' | 'BCNF'>(lab?.norm_task?.target ?? '3NF')
@@ -65,7 +76,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const common = { title: title.trim(), description, theory, groups: groupIds }
+      const common = { title: title.trim(), description, theory, topic, groups: groupIds }
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
@@ -371,6 +382,25 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               ) : null}
             </>
           )}
+          <FormField
+            id="lab_topic"
+            label="Mavzu"
+            error={errors.topic}
+            hint="Talabaning o'quv yo'li (mavzular bo'yicha o'zlashtirish va tavsiya) shu bo'yicha hisoblanadi."
+          >
+            <select
+              id="lab_topic"
+              className="h-10 justify-self-start rounded-md border bg-background px-2 text-sm"
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+            >
+              {TOPIC_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </FormField>
           <FormField id="lab_groups" label="Guruhlar" error={errors.groups}>
             <CheckList
               idPrefix="lab-group"

@@ -82,11 +82,13 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "plan_query",
             "plan_forbidden",
             "concurrent",
+            "topic",
+            "effective_topic",
             "author",
             "groups",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "effective_topic"]
 
     def get_norm_reference(self, lab):
         return reference_solution(lab.norm_task) if lab.kind == Lab.Kind.NORM and lab.norm_task else None
@@ -220,6 +222,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "norm_task",
             "plan_query",
             "concurrent",
+            "effective_topic",
             "author",
             "created_at",
             "my_progress",

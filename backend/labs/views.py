@@ -422,6 +422,26 @@ class LabViewSet(viewsets.ModelViewSet):
         labs = self.staff_labs(request)
         return Response(agreement(labs, None if request.user.is_admin else request.user))
 
+    @action(detail=False, methods=["get"])
+    def recommendations(self, request):
+        """Talaba: mavzular bo'yicha o'zlashtirish (BKT) va keyingi tavsiya etilgan laboratoriya.
+        O'qituvchi/admin: ?group=<id> guruhidagi har bir talabaning o'zlashtirishi."""
+        from .mastery import group_report, student_report
+
+        if request.user.is_student:
+            return Response(student_report(request.user, list(visible_labs(request.user))))
+        group_id = request.query_params.get("group", "")
+        if not group_id.isdigit():
+            raise ValidationError({"group": "Guruhni tanlang."})
+        from .statistics import allowed_groups
+
+        group = get_object_or_404(allowed_groups(request.user), pk=group_id)
+        labs = visible_labs(request.user).filter(groups=group)
+        students = User.objects.filter(role=User.Role.STUDENT, is_active=True, group=group).select_related("group").order_by(
+            "last_name", "first_name", "id"
+        )
+        return Response(group_report(list(students), list(labs)))
+
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):
         """Laboratoriyaning nusxasi: shart, SQL va namunaviy diagramma ko'chiriladi, urinishlar emas.
@@ -449,6 +469,7 @@ class LabViewSet(viewsets.ModelViewSet):
             plan_query=lab.plan_query,
             plan_forbidden=lab.plan_forbidden,
             concurrent=lab.concurrent,
+            topic=lab.topic,
             author=request.user,
         )
         copy.groups.set(groups)
