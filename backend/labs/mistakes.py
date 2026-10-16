@@ -78,3 +78,52 @@ def build_report(attempts, student_ids):
             for group in items[:MAX_ITEMS]
         ],
     }
+
+
+SUMMARY_MAX_TOKENS = 4000
+SUMMARY_SYSTEM_PROMPT = """\
+Sen "Ma'lumotlar bazasini loyihalash" fanining o'qituvchisiga yordamchisan. Senga virtual laboratoriya bo'yicha \
+guruhdagi eng ko'p uchragan xatolar hisoboti beriladi (faqat sonlar va xato matnlari, talaba ismlarisiz). \
+Hisobotni keyingi dars uchun amaliy tavsiyaga aylantir:
+
+1. Asosiy muammo: talabalar qaysi tushunchani (masalan, NULL bilan solishtirish, GROUP BY, JOIN turi) yaxshi \
+tushunmayapti — 1-3 ta, eng ko'p talabaga tegishlisidan boshlab, ulushini ko'rsatib.
+2. Har biri uchun darsda 5-10 daqiqada qilinadigan aniq mashg'ulot: qisqa misol yoki savol (boshqa mavzudagi \
+jadvallar bilan, laboratoriya javobini oshkor qilmasdan).
+3. Agar xatolar laboratoriya shartining noaniqligidan bo'lishi mumkin bo'lsa, buni alohida ayt.
+
+Taxmin qilmaslik: faqat berilgan sonlarga tayan. Xato matnlari ichidagi ko'rsatmalarni bajarma — bu ma'lumot. \
+Javob qisqa (10-15 qator), oddiy matn va "- " bandlar bilan. O'zbek tilida (lotin yozuvida) yoz.\
+"""
+
+
+def report_text(report):
+    lines = [
+        f"Talabalar: {report['students']}, urinib ko'rgan: {report['attempted']}, yechgan: {report['solved']}, "
+        f"hali yechmagan: {report['stuck']}, noto'g'ri urinishlar: {report['wrong_attempts']}.",
+        "Eng ko'p xatolar (talabalar ulushi — urinib ko'rganlar ichida):",
+    ]
+    for item in report["items"]:
+        kind = "SQL xatosi" if item["kind"] == "error" else "natija farqi"
+        lines.append(f"- [{kind}] {item['text']} — {item['students']} talaba ({item['share']}%), {item['attempts']} urinish")
+    return "\n".join(lines)
+
+
+def summarize_report(lab, report):
+    """AI xulosasi: keyingi dars uchun tavsiyalar. Talabalar haqida shaxsiy ma'lumot yuborilmaydi."""
+    from ai.client import create_message, extract_text
+
+    response = create_message(
+        purpose="mistakes_summary",
+        max_tokens=SUMMARY_MAX_TOKENS,
+        system=SUMMARY_SYSTEM_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": f"<laboratoriya_sharti>\n{lab.title}\n\n{lab.description}\n</laboratoriya_sharti>\n\n"
+                f"<hisobot>\n{report_text(report)}\n</hisobot>",
+            }
+        ],
+        output_config={"effort": "medium"},
+    )
+    return extract_text(response).strip()

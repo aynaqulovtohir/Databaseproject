@@ -1,5 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Copy, Lightbulb, Pencil, ShieldCheck, Trash2, TriangleAlert, Users } from 'lucide-react'
+import {
+  ArrowLeft,
+  BookOpen,
+  Copy,
+  Lightbulb,
+  Loader2,
+  Pencil,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -138,6 +150,31 @@ function ConditionCard({ lab }: { lab: Lab }) {
 // ---------- Admin va o'qituvchi ----------
 
 /** Eng ko'p uchraydigan xatolar: o'qituvchi keyingi darsda nimani qayta tushuntirishni ko'radi. */
+/** Hisobotning AI xulosasi: keyingi dars uchun tavsiyalar (AI'ga faqat anonim sonlar yuboriladi) */
+function MistakesSummary({ labId, group }: { labId: number; group: string }) {
+  const summary = useMutation({
+    mutationFn: () =>
+      api<{ summary: string }>(`/labs/${labId}/mistakes/summary/${group ? `?group=${group}` : ''}`, { method: 'POST' }),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+  return (
+    <div className="grid gap-2 border-t pt-3">
+      <Button
+        type="button"
+        variant="outline"
+        className="justify-self-start"
+        disabled={summary.isPending}
+        onClick={() => summary.mutate()}
+      >
+        {summary.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
+        AI xulosasi: keyingi darsda nima qilish kerak
+      </Button>
+      {summary.data ? <p className="text-sm whitespace-pre-wrap">{summary.data.summary}</p> : null}
+      <p className="text-xs text-muted-foreground">AI'ga faqat shu hisobotdagi sonlar yuboriladi, talabalar ismi emas.</p>
+    </div>
+  )
+}
+
 function MistakesCard({ lab }: { lab: Lab }) {
   const { groups } = useGroupOptions()
   const [group, setGroup] = useState('')
@@ -197,6 +234,7 @@ function MistakesCard({ lab }: { lab: Lab }) {
             </li>
           ))}
         </ol>
+        <MistakesSummary key={group} labId={lab.id} group={group} />
       </div>
     )
   }

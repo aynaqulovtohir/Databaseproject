@@ -346,3 +346,28 @@ class GenerationTests(BaseTestCase):
 
 
 SETUP_ONLY = "CREATE TABLE t (id INT);"
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key")
+class MistakesSummaryTests(BaseTestCase):
+    def test_summary_sends_only_anonymous_numbers(self):
+        self.client.force_authenticate(self.student_a1)
+        self.run_code("SELECT nom FROM kitob")
+        self.client.force_authenticate(self.teacher_a)
+        url = f"{self.url}mistakes/summary/"
+        with patch("ai.client.create_message", return_value=ai_text("- NULL bilan ishlashni takrorlang")) as create_message:
+            response = self.client.post(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["summary"], "- NULL bilan ishlashni takrorlang")
+        payload = json.dumps(create_message.call_args.kwargs, ensure_ascii=False)
+        self.assertIn("1 talaba (100.0%)", payload)
+        for secret in ("student_a1", "Zuhriddin", "A-guruh"):
+            self.assertNotIn(secret, payload)
+
+        self.client.force_authenticate(self.student_a1)
+        self.assertEqual(self.client.post(url, format="json").status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_nothing_to_summarize(self):
+        self.client.force_authenticate(self.teacher_a)
+        response = self.client.post(f"{self.url}mistakes/summary/", format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

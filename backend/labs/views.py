@@ -509,9 +509,7 @@ class LabViewSet(viewsets.ModelViewSet):
         data, failure = self.run_generation(request, lab, generate_buggy)
         return failure or Response(data)
 
-    @action(detail=True, methods=["get"])
-    def mistakes(self, request, pk=None):
-        """O'qituvchi uchun: eng ko'p uchraydigan xatolar (?group=<id> — bitta guruh bo'yicha)."""
+    def mistakes_report(self, request):
         if request.user.is_student:
             raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
         lab = self.get_object()
@@ -525,7 +523,31 @@ class LabViewSet(viewsets.ModelViewSet):
             "pk", flat=True
         )
         attempts = LabAttempt.objects.filter(lab=lab).only("student_id", "is_correct", "feedback").order_by("id")
-        return Response(build_report(attempts, student_ids))
+        return lab, build_report(attempts, student_ids)
+
+    @action(detail=True, methods=["get"])
+    def mistakes(self, request, pk=None):
+        """O'qituvchi uchun: eng ko'p uchraydigan xatolar (?group=<id> — bitta guruh bo'yicha)."""
+        return Response(self.mistakes_report(request)[1])
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="mistakes/summary",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def mistakes_summary(self, request, pk=None):
+        """Xatolar hisobotining AI xulosasi: keyingi dars uchun tavsiyalar (?group=<id>)."""
+        from .mistakes import summarize_report
+
+        lab, report = self.mistakes_report(request)
+        if not report["wrong_attempts"]:
+            raise ValidationError({"detail": "Hali noto'g'ri urinishlar yo'q: xulosa qilinadigan narsa yo'q."})
+        try:
+            return Response({"summary": summarize_report(lab, report)})
+        except AIError as exc:
+            return ai_error_response(exc, "hisobot")
 
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
