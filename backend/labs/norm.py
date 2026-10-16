@@ -3,7 +3,7 @@
 O'qituvchi munosabat atributlarini, FB larni va maqsad normal formani (3NF yoki BCNF) beradi. Talaba:
 1) barcha nomzod kalitlarni, 2) munosabatning hozirgi (eng yuqori) normal formasini, 3) maqsad formadagi
 dekompozitsiyani topadi. Hammasi AI'siz, hisoblab tekshiriladi:
-- atributlar yopilmasi (closure), nomzod kalitlar — barcha to'plamlarni ko'rib chiqish (atributlar <= 12 ta);
+- atributlar yopilmasi (closure), nomzod kalitlar — barcha to'plamlarni ko'rib chiqish (atributlar <= 10 ta);
 - normal forma: 2NF (qisman bog'liqlik yo'q), 3NF, BCNF;
 - dekompozitsiya: har bir jadval maqsad formada (FB lar jadvalga proyeksiya qilinadi), yo'qotishsiz birlashish
   (chase testi) va 3NF uchun bog'liqliklarning saqlanishi.
@@ -12,7 +12,7 @@ Talabaga farqlar aytiladi, lekin to'g'ri javob (kalitlar, jadvallar) oshkor qili
 import re
 from itertools import combinations
 
-MAX_ATTRIBUTES = 12
+MAX_ATTRIBUTES = 10
 MAX_FDS = 30
 MAX_RELATIONS = 10
 NORMAL_FORMS = ("1NF", "2NF", "3NF", "BCNF")
@@ -186,6 +186,7 @@ def normal_form(attributes, fds):
 
 
 def satisfies(attributes, fds, target):
+    """attributes — munosabat yoki uning qismi (jadval); fds — asl FB lar: qism uchun X+ ∩ R_i ishlatiladi."""
     rank = NORMAL_FORMS.index
     return rank(normal_form(attributes, fds)) >= rank(target)
 
@@ -284,15 +285,12 @@ def check(task, answer):
     if covered != attributes:
         differences.append(f"Dekompozitsiya barcha atributlarni qamramaydi: {_set_text(attributes - covered)} yo'q.")
         parts["decomposition"] = False
-    for index, relation in enumerate(relations, start=1):
-        projected = project(fds, relation)
-        if not satisfies(relation, projected, task["target"]):
+    for index, relation in enumerate(dict.fromkeys(relations), start=1):
+        # Jadval asl FB lar bilan tekshiriladi (X+ ∩ R_i): proyeksiya ro'yxatini (2^n tagacha FB) qurib, unda qayta
+        # hisoblash shart emas — natija bir xil, lekin ataylab katta javob bilan serverni band qilib bo'lmaydi
+        if not satisfies(relation, fds, task["target"]):
             violation = next(
-                (
-                    (lhs, rhs)
-                    for lhs, rhs in projected
-                    if not closure(lhs, projected) >= relation
-                ),
+                ((lhs, rhs) for lhs, rhs in project(fds, relation) if not closure(lhs, fds) >= relation),
                 None,
             )
             reason = (

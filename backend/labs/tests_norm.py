@@ -77,7 +77,7 @@ class NormAlgorithmTests(SimpleTestCase):
             ("a, a", "a -> a", "3NF"),
             ("a, b", "a -> b", "4NF"),
             ("a; drop", "a -> b", "3NF"),
-            (", ".join(f"x{i}" for i in range(13)), "x0 -> x1", "3NF"),
+            (", ".join(f"x{i}" for i in range(11)), "x0 -> x1", "3NF"),
         ):
             with self.assertRaises(NormError, msg=(attributes, fds, target)):
                 parse_task(attributes, fds, target)
@@ -171,3 +171,20 @@ class NormSeedLabsTests(SimpleTestCase):
             forms.append(reference["normal_form"])
         # Qisman bog'liqlik (1NF), tranzitiv (2NF) va BCNF emas, lekin 3NF
         self.assertEqual(forms, ["1NF", "2NF", "3NF"])
+
+
+class NormWorstCaseTests(SimpleTestCase):
+    def test_largest_allowed_answer_is_checked_quickly(self):
+        """Atributlar, FB va jadvallar soni chegarada: tekshiruv serverni band qilmasligi kerak."""
+        import time
+
+        from .norm import MAX_ATTRIBUTES, MAX_FDS, MAX_RELATIONS
+
+        names = [f"x{index}" for index in range(MAX_ATTRIBUTES)]
+        fds = "\n".join(f"{names[index % 5]}, {names[(index + 1) % 5]} -> {names[5 + index % 5]}" for index in range(MAX_FDS))
+        task = parse_task(", ".join(names), fds, "3NF")
+        relations = [", ".join(names[: MAX_ATTRIBUTES - index % 3]) for index in range(MAX_RELATIONS)]
+        answer = parse_answer({"keys": [", ".join(names)] * MAX_RELATIONS, "normal_form": "1NF", "decomposition": relations}, task)
+        started = time.monotonic()
+        check(task, answer)
+        self.assertLess(time.monotonic() - started, 2.0)

@@ -214,7 +214,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 id="lab_norm_attributes"
                 label="Munosabat atributlari"
                 error={errors.norm_task}
-                hint="Vergul bilan, lotin harflarida (2–12 ta). Talabaga ko'rinadi."
+                hint="Vergul bilan, lotin harflarida (2–10 ta). Talabaga ko'rinadi."
               >
                 <Input
                   id="lab_norm_attributes"
