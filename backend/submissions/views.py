@@ -39,8 +39,10 @@ class AssignmentSubmissionsView(APIView):
                 # Bitta talabaning barcha urinishlari
                 submissions = submissions.filter(student_id=student_id).order_by("-attempt_number")
             else:
-                # Har bir talabaning faqat oxirgi urinishi
-                submissions = submissions.order_by("student_id", "-attempt_number").distinct("student_id")
+                # Har bir talabaning (bosqichli loyihada — har bir bosqich bo'yicha) faqat oxirgi urinishi
+                submissions = submissions.order_by("student_id", "stage_id", "-attempt_number").distinct(
+                    "student_id", "stage_id"
+                )
 
         return Response(SubmissionSerializer(submissions, many=True, context={"request": request}).data)
 
@@ -51,25 +53,32 @@ class AssignmentSubmissionsView(APIView):
 
         serializer = SubmissionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        stage = self.get_stage(assignment, serializer.validated_data["stage"])
 
         try:
             with transaction.atomic():
                 last_submission = (
                     Submission.objects.select_for_update()
-                    .filter(assignment=assignment, student=request.user)
+                    .filter(assignment=assignment, student=request.user, stage=stage)
                     .order_by("-attempt_number")
                     .first()
                 )
                 if last_submission and last_submission.status == Submission.Status.GRADED:
+                    what = "Bu bosqich" if stage else "Bu topshiriq"
                     raise ValidationError(
-                        {"detail": "Bu topshiriq baholangan. Qayta topshirish uchun o'qituvchi uni qaytarishi kerak."}
+                        {"detail": f"{what} baholangan. Qayta topshirish uchun o'qituvchi uni qaytarishi kerak."}
                     )
+                if stage and stage.order > 0 and not Submission.objects.filter(
+                    assignment=assignment, student=request.user, stage__order=stage.order - 1
+                ).exists():
+                    raise ValidationError({"detail": "Avval oldingi bosqichni topshiring."})
                 submission = Submission.objects.create(
                     assignment=assignment,
                     student=request.user,
+                    stage=stage,
                     sql_code=serializer.validated_data["sql_code"],
                     attempt_number=(last_submission.attempt_number + 1) if last_submission else 1,
-                    is_late=timezone.now() > assignment.deadline,
+                    is_late=timezone.now() > (stage.deadline if stage else assignment.deadline),
                 )
         except IntegrityError:
             # Bir vaqtda ikki marta yuborilgan (masalan, tugma ikki marta bosilgan)
@@ -82,6 +91,21 @@ class AssignmentSubmissionsView(APIView):
             SubmissionSerializer(submission, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+    @staticmethod
+    def get_stage(assignment, stage_id):
+        stages = assignment.stages.all()
+        if not stages.exists():
+            if stage_id is not None:
+                raise ValidationError({"stage": "Bu topshiriq bosqichlarga bo'linmagan."})
+            return None
+        if stage_id is None:
+            raise ValidationError({"stage": "Qaysi bosqichni topshirayotganingizni tanlang."})
+        stage = stages.filter(pk=stage_id).first()
+        if stage is None:
+            raise ValidationError({"stage": "Bunday bosqich yo'q."})
+        return stage
 
 
 class AssignmentMissingStudentsView(APIView):

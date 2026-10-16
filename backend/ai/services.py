@@ -25,16 +25,43 @@ class AnalysisResult(BaseModel):
     score_rationale: str
 
 
+def rubric_text(assignment, stage):
+    """Shu yechim baholanadigan rubrika mezonlari (bosqichli loyihada — faqat shu bosqichniki)."""
+    from learning.rubric import criteria_for
+
+    criteria = criteria_for(assignment, stage)
+    if not criteria:
+        return ""
+    lines = [
+        f"- {item['name']} ({item['points']} ball)" + (f": {item['description']}" if item["description"] else "")
+        for item in criteria
+    ]
+    total = sum(item["points"] for item in criteria)
+    return (
+        f"Rubrika (jami {total} ball):\n" + "\n".join(lines)
+        + "\nTaklif qilinadigan ballni baribir 0–100 shkalada ber: 100 — shu mezonlarning barchasi to'liq bajarilgan."
+    )
+
+
 def build_analysis_messages(submission):
     """AI'ga yuboriladigan matn. Talaba haqida hech qanday ma'lumot qo'shilmaydi."""
     assignment = submission.assignment
+    stage = submission.stage
+    description = assignment.description
+    if stage:
+        description += (
+            f"\n\nBu yechim loyihaning {stage.order + 1}-bosqichi uchun: «{stage.title}»."
+            + (f"\nBosqich sharti: {stage.description}" if stage.description else "")
+            + "\nFaqat shu bosqich talablarini baholang."
+        )
+    criteria = "\n\n".join(part for part in (assignment.grading_criteria.strip(), rubric_text(assignment, stage)) if part)
     return [
         {
             "role": "user",
             "content": prompts.ANALYSIS_USER_TEMPLATE.format(
                 title=assignment.title,
-                description=assignment.description,
-                grading_criteria=assignment.grading_criteria.strip() or prompts.NO_CRITERIA_TEXT,
+                description=description,
+                grading_criteria=criteria or prompts.NO_CRITERIA_TEXT,
                 sql_code=submission.sql_code,
             ),
         }

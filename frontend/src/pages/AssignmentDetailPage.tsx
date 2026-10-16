@@ -9,6 +9,7 @@ import { AssignmentDialog } from '@/components/AssignmentDialog'
 import { ChatPanel } from '@/components/ChatPanel'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
+import { GradeBreakdown, RubricList } from '@/components/ProjectPlan'
 import { SqlCode } from '@/components/SqlCode'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { DeadlineBadge, SubmissionStatusBadge } from '@/components/SubmissionBadges'
@@ -21,7 +22,7 @@ import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime, isPast } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
-import { MAX_SCORE, type Assignment, type MissingStudent, type Submission } from '@/lib/types'
+import { type Assignment, type AssignmentStage, type MissingStudent, type Submission } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -39,6 +40,19 @@ function BackLink() {
   )
 }
 
+function stageCriteria(assignment: Assignment, stage: AssignmentStage | null) {
+  return assignment.rubric.filter((item) => item.stage === (stage ? stage.order : null))
+}
+
+function stagePoints(assignment: Assignment, stage: AssignmentStage) {
+  return stageCriteria(assignment, stage).reduce((sum, item) => sum + item.points, 0)
+}
+
+function stageName(assignment: Assignment, stageId: number | null) {
+  const stage = assignment.stages.find((item) => item.id === stageId)
+  return stage ? `${stage.order + 1}. ${stage.title}` : ''
+}
+
 function ConditionCard({ assignment, children }: { assignment: Assignment; children?: ReactNode }) {
   return (
     <Card>
@@ -51,6 +65,22 @@ function ConditionCard({ assignment, children }: { assignment: Assignment; child
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{assignment.description}</p>
+        {assignment.stages.length ? (
+          <ol className="grid gap-1.5 text-sm">
+            {assignment.stages.map((stage) => (
+              <li key={stage.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span>
+                  <span className="font-medium">{stage.order + 1}-bosqich.</span> {stage.title}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDateTime(stage.deadline)} · {stagePoints(assignment, stage)} ball
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <RubricList criteria={assignment.rubric} />
+        )}
         {children}
       </CardContent>
     </Card>
@@ -97,12 +127,16 @@ function StaffView({ assignment }: { assignment: Assignment }) {
   } else if (!submissions.data.length) {
     submissionsContent = <EmptyState icon={Inbox} title="Hali yechim kelmagan" />
   } else {
-    const rows = [...submissions.data].sort((a, b) => fullName(a.student).localeCompare(fullName(b.student)))
+    const order = (submission: Submission) => assignment.stages.find((stage) => stage.id === submission.stage)?.order ?? 0
+    const rows = [...submissions.data].sort(
+      (a, b) => fullName(a.student).localeCompare(fullName(b.student)) || order(a) - order(b),
+    )
     submissionsContent = (
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Talaba</TableHead>
+            {assignment.stages.length ? <TableHead>Bosqich</TableHead> : null}
             <TableHead>Holat</TableHead>
             <TableHead className="text-right">Urinish</TableHead>
             <TableHead className="text-right">Ball</TableHead>
@@ -114,11 +148,16 @@ function StaffView({ assignment }: { assignment: Assignment }) {
           {rows.map((submission) => (
             <TableRow key={submission.id}>
               <TableCell className="font-medium">{fullName(submission.student)}</TableCell>
+              {assignment.stages.length ? (
+                <TableCell className="text-xs">{stageName(assignment, submission.stage)}</TableCell>
+              ) : null}
               <TableCell>
                 <SubmissionStatusBadge submission={submission} />
               </TableCell>
               <TableCell className="text-right tabular-nums">{submission.attempt_number}</TableCell>
-              <TableCell className="text-right tabular-nums">{submission.grade?.score ?? '—'}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {submission.grade ? `${submission.grade.score} / ${submission.grade.max_score}` : '—'}
+              </TableCell>
               <TableCell>{formatDateTime(submission.submitted_at)}</TableCell>
               <TableCell className="text-right">
                 <Button asChild variant="outline" size="lg">
@@ -175,8 +214,15 @@ function StaffView({ assignment }: { assignment: Assignment }) {
       />
       <div className="grid gap-4">
         <ConditionCard assignment={assignment}>
+          {assignment.stages.map((stage) => (
+            <RubricList
+              key={stage.id}
+              criteria={stageCriteria(assignment, stage)}
+              title={`${stage.order + 1}-bosqich rubrikasi: ${stage.title}`}
+            />
+          ))}
           <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-            <div className="font-medium">Baholash mezonlari</div>
+            <div className="font-medium">Yashirin baholash izohlari</div>
             <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
               {assignment.grading_criteria?.trim() || 'Kiritilmagan.'}
             </p>
@@ -186,7 +232,10 @@ function StaffView({ assignment }: { assignment: Assignment }) {
         <Card>
           <CardHeader>
             <CardTitle>Yechimlar</CardTitle>
-            <CardDescription>Har bir talabaning oxirgi urinishi ko'rsatiladi.</CardDescription>
+            <CardDescription>
+              Har bir talabaning {assignment.stages.length ? 'har bir bosqich bo\'yicha ' : ''}oxirgi urinishi
+              ko'rsatiladi.
+            </CardDescription>
           </CardHeader>
           <CardContent>{submissionsContent}</CardContent>
         </Card>
@@ -220,10 +269,13 @@ function ResultBanner({ submission }: { submission: Submission }) {
     return (
       <Alert>
         <AlertTitle>
-          Baho: {submission.grade.score} / {MAX_SCORE}
+          Baho: {submission.grade.score} / {submission.grade.max_score}
         </AlertTitle>
         <AlertDescription className="whitespace-pre-wrap">
-          {submission.grade.comment || "O'qituvchi izoh qoldirmagan."}
+          <GradeBreakdown grade={submission.grade} />
+          <p className={submission.grade.rubric_scores?.length ? 'mt-2' : ''}>
+            {submission.grade.comment || "O'qituvchi izoh qoldirmagan."}
+          </p>
         </AlertDescription>
       </Alert>
     )
@@ -279,15 +331,27 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
   )
 }
 
-function SubmitForm({ assignment, isRetry }: { assignment: Assignment; isRetry: boolean }) {
+function SubmitForm({
+  assignment,
+  stage = null,
+  isRetry,
+}: {
+  assignment: Assignment
+  stage?: AssignmentStage | null
+  isRetry: boolean
+}) {
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const late = isPast(assignment.deadline)
+  const late = isPast(stage ? stage.deadline : assignment.deadline)
+  const fieldId = stage ? `sql_code_${stage.id}` : 'sql_code'
 
   const mutation = useMutation({
     mutationFn: () =>
-      api<Submission>(`/assignments/${assignment.id}/submissions/`, { method: 'POST', body: { sql_code: code } }),
+      api<Submission>(`/assignments/${assignment.id}/submissions/`, {
+        method: 'POST',
+        body: { sql_code: code, stage: stage ? stage.id : null },
+      }),
     onSuccess: (submission) => {
       toast.success('Yechim topshirildi')
       setCode('')
@@ -320,11 +384,11 @@ function SubmitForm({ assignment, isRetry }: { assignment: Assignment; isRetry: 
         </Alert>
       ) : null}
       <div className="grid gap-1.5">
-        <label htmlFor="sql_code" className="text-sm font-medium">
+        <label htmlFor={fieldId} className="text-sm font-medium">
           SQL kod
         </label>
         <Textarea
-          id="sql_code"
+          id={fieldId}
           className="max-h-[32rem] min-h-48 font-mono text-sm md:text-xs"
           placeholder={'CREATE TABLE ...'}
           spellCheck={false}
@@ -349,6 +413,37 @@ function SubmitForm({ assignment, isRetry }: { assignment: Assignment; isRetry: 
   )
 }
 
+/** Bitta bosqich (yoki bosqichsiz topshiriq) bo'yicha talaba ishi: natija, topshirish formasi, urinishlar. */
+function StageWork({
+  assignment,
+  stage,
+  attempts,
+}: {
+  assignment: Assignment
+  stage: AssignmentStage | null
+  attempts: Submission[]
+}) {
+  // Urinishlar yangisidan eskisiga qarab keladi
+  const latest = attempts.at(0)
+  const canSubmit = !latest || latest.status !== 'graded'
+  return (
+    <div className="grid gap-4">
+      {latest ? <ResultBanner submission={latest} /> : null}
+      {canSubmit ? <SubmitForm assignment={assignment} stage={stage} isRetry={Boolean(latest)} /> : null}
+      {attempts.length ? (
+        <div>
+          <h3 className="mb-2 text-sm font-medium">Urinishlarim</h3>
+          <ul className="grid gap-2">
+            {attempts.map((submission, index) => (
+              <AttemptItem key={submission.id} submission={submission} defaultOpen={index === 0} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function StudentView({ assignment }: { assignment: Assignment }) {
   const user = useUser()
   const submissions = useQuery({
@@ -361,26 +456,8 @@ function StudentView({ assignment }: { assignment: Assignment }) {
     work = <ListSkeleton rows={2} />
   } else if (submissions.isError) {
     work = <ErrorState error={submissions.error} onRetry={() => void submissions.refetch()} />
-  } else {
-    // Urinishlar yangisidan eskisiga qarab keladi
-    const latest = submissions.data.at(0)
-    const canSubmit = !latest || latest.status !== 'graded'
-    work = (
-      <div className="grid gap-4">
-        {latest ? <ResultBanner submission={latest} /> : null}
-        {canSubmit ? <SubmitForm assignment={assignment} isRetry={Boolean(latest)} /> : null}
-        {submissions.data.length ? (
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Urinishlarim</h3>
-            <ul className="grid gap-2">
-              {submissions.data.map((submission, index) => (
-                <AttemptItem key={submission.id} submission={submission} defaultOpen={index === 0} />
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-    )
+  } else if (!assignment.stages.length) {
+    work = <StageWork assignment={assignment} stage={null} attempts={submissions.data} />
   }
 
   return (
@@ -389,16 +466,53 @@ function StudentView({ assignment }: { assignment: Assignment }) {
       <PageHeader title={assignment.title} description={`O'qituvchi: ${fullName(assignment.author)}`} />
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="grid gap-4">
-          <ConditionCard assignment={assignment} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Mening yechimim</CardTitle>
-              <CardDescription>
-                Har bir topshirish alohida urinish sifatida saqlanadi va AI tomonidan tahlil qilinadi.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>{work}</CardContent>
-          </Card>
+          <ConditionCard assignment={assignment}>
+            {assignment.my_stages?.total_score != null ? (
+              <p className="text-sm font-medium">
+                Loyiha bo'yicha jami: {assignment.my_stages.total_score} / 100
+                <span className="font-normal text-muted-foreground"> (baholangan bosqichlar)</span>
+              </p>
+            ) : null}
+          </ConditionCard>
+          {assignment.stages.length && submissions.data ? (
+            assignment.stages.map((stage) => {
+              const attempts = submissions.data.filter((submission) => submission.stage === stage.id)
+              const previous = assignment.stages.find((item) => item.order === stage.order - 1)
+              const locked = Boolean(previous) && !submissions.data.some((submission) => submission.stage === previous!.id)
+              return (
+                <Card key={stage.id}>
+                  <CardHeader>
+                    <CardTitle>
+                      {stage.order + 1}-bosqich. {stage.title}
+                    </CardTitle>
+                    <CardDescription className="flex flex-wrap items-center gap-2">
+                      <span>Muddat: {formatDateTime(stage.deadline)}</span>
+                      <DeadlineBadge deadline={stage.deadline} />
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    {stage.description ? <p className="text-sm whitespace-pre-wrap">{stage.description}</p> : null}
+                    <RubricList criteria={stageCriteria(assignment, stage)} title="Bu bosqich qanday baholanadi" />
+                    {locked ? (
+                      <p className="text-sm text-muted-foreground">Avval {previous!.order + 1}-bosqichni topshiring.</p>
+                    ) : (
+                      <StageWork assignment={assignment} stage={stage} attempts={attempts} />
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Mening yechimim</CardTitle>
+                <CardDescription>
+                  Har bir topshirish alohida urinish sifatida saqlanadi va AI tomonidan tahlil qilinadi.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>{work ?? <ListSkeleton rows={2} />}</CardContent>
+            </Card>
+          )}
         </div>
         {user.ai_enabled ? (
           <Card>

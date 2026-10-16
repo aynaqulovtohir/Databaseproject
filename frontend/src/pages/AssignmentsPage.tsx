@@ -62,7 +62,19 @@ export function AssignmentsPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 className="min-w-0 font-medium">{assignment.title}</h2>
                 <span className="inline-flex flex-wrap items-center gap-1.5">
-                  {assignment.my_submission ? (
+                  {assignment.my_stages ? (
+                    <>
+                      <Badge variant="outline" className="tabular-nums">
+                        {assignment.my_stages.items.filter((item) => item.status).length} / {assignment.my_stages.items.length}{' '}
+                        bosqich
+                      </Badge>
+                      {assignment.my_stages.total_score !== null ? (
+                        <Badge variant="outline" className="tabular-nums">
+                          {assignment.my_stages.total_score} / {MAX_SCORE}
+                        </Badge>
+                      ) : null}
+                    </>
+                  ) : assignment.my_submission ? (
                     <>
                       <SubmissionStatusBadge submission={assignment.my_submission} />
                       {assignment.my_submission.score !== null ? (

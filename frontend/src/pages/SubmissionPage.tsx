@@ -19,7 +19,7 @@ import { api, ApiError } from '@/lib/api'
 import { fullName } from '@/lib/auth'
 import { applyFormError } from '@/lib/forms'
 import { formatDateTime } from '@/lib/format'
-import { MAX_SCORE, type Assignment, type Submission } from '@/lib/types'
+import { MAX_SCORE, type Assignment, type RubricCriterion, type Submission } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -35,7 +35,7 @@ function useReviewMutation(submission: Submission, request: () => Promise<Submis
       void queryClient.invalidateQueries({ queryKey: ['submissions', submission.assignment] })
     },
     onError: (error) => {
-      applyFormError(error, ['score', 'comment'], setErrors)
+      applyFormError(error, ['score', 'rubric_scores', 'comment'], setErrors)
       // Talaba shu orada yangi urinish topshirgan bo'lishi mumkin
       void queryClient.invalidateQueries({ queryKey: ['submissions', submission.assignment] })
     },
@@ -43,24 +43,49 @@ function useReviewMutation(submission: Submission, request: () => Promise<Submis
   return { mutation, errors }
 }
 
-function GradeForm({ submission, disabled }: { submission: Submission; disabled: boolean }) {
+function GradeForm({
+  submission,
+  criteria,
+  disabled,
+}: {
+  submission: Submission
+  /** Shu yechim baholanadigan rubrika mezonlari (bo'sh bo'lsa — oddiy 0–100 ball) */
+  criteria: RubricCriterion[]
+  disabled: boolean
+}) {
   const analysis = useAnalysis(submission.id)
   const [score, setScore] = useState(submission.grade ? String(submission.grade.score) : '')
+  const [criterionScores, setCriterionScores] = useState<string[]>(
+    criteria.map((_, index) => {
+      const value = submission.grade?.rubric_scores?.[index]?.score
+      return value === undefined ? '' : String(value)
+    }),
+  )
   const [comment, setComment] = useState(submission.grade?.comment ?? '')
   const suggested = analysis.data?.status === 'done' ? analysis.data.suggested_score : null
+  const useRubric = criteria.length > 0
+  const maxScore = useRubric ? criteria.reduce((sum, item) => sum + item.points, 0) : MAX_SCORE
 
   const { mutation, errors } = useReviewMutation(
     submission,
     () =>
       api<Submission>(`/submissions/${submission.id}/grade/`, {
         method: 'PUT',
-        body: { score: Number(score), comment },
+        body: useRubric
+          ? { rubric_scores: criterionScores.map((value) => Number(value)), comment }
+          : { score: Number(score), comment },
       }),
     submission.grade ? 'Baho yangilandi' : "Baho qo'yildi",
   )
 
-  const scoreNumber = Number(score)
-  const scoreValid = score.trim() !== '' && Number.isInteger(scoreNumber) && scoreNumber >= 0 && scoreNumber <= MAX_SCORE
+  const isValid = (value: string, max: number) => {
+    const number = Number(value)
+    return value.trim() !== '' && Number.isInteger(number) && number >= 0 && number <= max
+  }
+  const scoreValid = useRubric
+    ? criteria.every((item, index) => isValid(criterionScores[index], item.points))
+    : isValid(score, MAX_SCORE)
+  const rubricSum = criterionScores.reduce((sum, value) => sum + (Number(value) || 0), 0)
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -69,6 +94,52 @@ function GradeForm({ submission, disabled }: { submission: Submission; disabled:
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
+      {useRubric ? (
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-medium">Rubrika bo'yicha ballar</legend>
+          {criteria.map((item, index) => (
+            <div key={index} className="flex items-center justify-between gap-3">
+              <label htmlFor={`criterion_${index}`} className="min-w-0 text-sm">
+                {item.name}
+                {item.description ? <span className="block text-xs text-muted-foreground">{item.description}</span> : null}
+              </label>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Input
+                  id={`criterion_${index}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={item.points}
+                  step={1}
+                  className="h-9 w-20"
+                  disabled={disabled}
+                  aria-invalid={criterionScores[index] !== '' && !isValid(criterionScores[index], item.points)}
+                  value={criterionScores[index]}
+                  onChange={(event) =>
+                    setCriterionScores((current) => current.map((value, i) => (i === index ? event.target.value : value)))
+                  }
+                />
+                <span className="w-10 text-xs text-muted-foreground tabular-nums">/ {item.points}</span>
+              </div>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-t pt-2 text-sm">
+            <span className="font-medium tabular-nums">
+              Jami: {rubricSum} / {maxScore}
+            </span>
+            {suggested != null ? (
+              <span className="text-xs text-muted-foreground">
+                AI taklifi: {Math.round((suggested * maxScore) / MAX_SCORE)} / {maxScore}
+              </span>
+            ) : null}
+          </div>
+          {errors.rubric_scores ? (
+            <p className="text-xs text-destructive" role="alert">
+              {errors.rubric_scores}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : (
       <FormField id="score" label={`Ball (0–${MAX_SCORE})`} error={errors.score}>
         <div className="flex flex-wrap items-center gap-2">
           <Input
@@ -91,6 +162,7 @@ function GradeForm({ submission, disabled }: { submission: Submission; disabled:
           ) : null}
         </div>
       </FormField>
+      )}
       <FormField id="grade_comment" label="Izoh" error={errors.comment} hint="Ixtiyoriy. Talabaga ko'rinadi.">
         <Textarea
           id="grade_comment"
@@ -159,8 +231,14 @@ function Review({ submission }: { submission: Submission }) {
       api<Submission[]>(`/assignments/${submission.assignment}/submissions/?student=${submission.student.id}`),
   })
 
+  // Bosqichli loyihada urinishlar bosqich bo'yicha alohida
+  const stageAttempts = attempts.data?.filter((attempt) => attempt.stage === submission.stage)
+  const stage = assignment.data?.stages.find((item) => item.id === submission.stage) ?? null
+  const criteria = assignment.data
+    ? assignment.data.rubric.filter((item) => item.stage === (stage ? stage.order : null))
+    : null
   // Backend faqat oxirgi urinishni baholashga ruxsat beradi
-  const latestId = attempts.data?.at(0)?.id
+  const latestId = stageAttempts?.at(0)?.id
   const isLatest = latestId === undefined || latestId === submission.id
   const returned = submission.status === 'returned'
 
@@ -175,13 +253,13 @@ function Review({ submission }: { submission: Submission }) {
       </Link>
       <PageHeader
         title={fullName(submission.student)}
-        description={`${submission.attempt_number}-urinish · ${formatDateTime(submission.submitted_at)}`}
+        description={`${stage ? `${stage.order + 1}-bosqich: ${stage.title} · ` : ''}${submission.attempt_number}-urinish · ${formatDateTime(submission.submitted_at)}`}
         actions={<SubmissionStatusBadge submission={submission} />}
       />
 
-      {attempts.data && attempts.data.length > 1 ? (
+      {stageAttempts && stageAttempts.length > 1 ? (
         <nav className="mb-4 flex flex-wrap gap-2" aria-label="Urinishlar">
-          {[...attempts.data].reverse().map((attempt) => (
+          {[...stageAttempts].reverse().map((attempt) => (
             <Link
               key={attempt.id}
               to={`/submissions/${attempt.id}`}
@@ -242,7 +320,11 @@ function Review({ submission }: { submission: Submission }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <GradeForm submission={submission} disabled={!isLatest} />
+              {criteria ? (
+                <GradeForm key={submission.id} submission={submission} criteria={criteria} disabled={!isLatest} />
+              ) : (
+                <ListSkeleton rows={1} />
+              )}
             </CardContent>
           </Card>
           {returned ? null : (

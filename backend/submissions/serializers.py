@@ -32,6 +32,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "id",
             "assignment",
             "student",
+            "stage",
             "sql_code",
             "attempt_number",
             "is_late",
@@ -54,6 +55,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
 
 class SubmissionCreateSerializer(serializers.Serializer):
+    # Bosqichli loyihada bosqich id'si (view tekshiradi: shu topshiriqqa tegishlimi)
+    stage = serializers.IntegerField(required=False, allow_null=True, default=None)
     sql_code = serializers.CharField(
         max_length=MAX_SQL_CODE_LENGTH,
         trim_whitespace=False,

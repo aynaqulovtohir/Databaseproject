@@ -16,6 +16,10 @@ class Grade(models.Model):
     score = models.PositiveSmallIntegerField(
         "ball", validators=[MinValueValidator(0), MaxValueValidator(MAX_SCORE)]
     )
+    # Rubrika bo'yicha baholanganda: [{"name", "points", "score"}] (o'sha paytdagi mezonlar nusxasi); score — yig'indi
+    rubric_scores = models.JSONField("mezonlar bo'yicha ballar", null=True, blank=True)
+    # Bosqich bahosi bosqich mezonlari ballari yig'indisidan oshmaydi; bosqichsiz topshiriqda 100
+    max_score = models.PositiveSmallIntegerField("eng yuqori ball", default=MAX_SCORE)
     comment = models.TextField("izoh", blank=True)
     # Baho qo'yilgan paytdagi AI taklifi (statistika uchun; talabaga ko'rinmaydi)
     ai_suggested_score = models.PositiveSmallIntegerField("AI taklif qilgan ball", null=True, blank=True)

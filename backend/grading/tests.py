@@ -240,3 +240,187 @@ class ReturnTests(BaseTestCase):
         response = self.grade(70)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "graded")
+
+
+def future(days):
+    return (timezone.now() + timedelta(days=days)).isoformat()
+
+
+RUBRIC = [
+    {"name": "ER-model", "points": 30, "description": "Obyektlar va bog'lanishlar", "stage": 0},
+    {"name": "Jadvallar", "points": 40, "description": "Kalitlar va cheklovlar", "stage": 1},
+    {"name": "Normallashtirish", "points": 30, "description": "", "stage": 1},
+]
+STAGES = [
+    {"title": "ER-model", "description": "Konseptual model", "deadline": None},
+    {"title": "Jadvallar", "description": "CREATE TABLE", "deadline": None},
+]
+
+
+class ProjectStagesTests(BaseTestCase):
+    """Bosqichli loyiha va rubrika: yaratish, topshirish, mezonlar bo'yicha baholash, talabaga ko'rinishi."""
+
+    def auth_as(self, user):
+        # Login cheklovi (daqiqasiga 5) bu testlarda ko'p almashinuvga xalaqit bermasin
+        self.client.force_authenticate(user)
+
+    def create_project(self, rubric=RUBRIC, stages=STAGES):
+        self.auth_as(self.teacher)
+        stages = [{**stage, "deadline": future(3 + index * 7)} for index, stage in enumerate(stages)]
+        return self.client.post(
+            "/api/assignments/",
+            {
+                "title": "Yakuniy loyiha",
+                "description": "Do'kon bazasi",
+                "grading_criteria": "MAXFIY-MEZON",
+                "groups": [self.group.pk],
+                "rubric": rubric,
+                "stages": stages,
+            },
+            format="json",
+        )
+
+    def make_project(self):
+        response = self.create_project()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        project = Assignment.objects.get(pk=response.data["id"])
+        return project, list(project.stages.all())
+
+    def submit(self, project, stage, code=SQL):
+        self.auth_as(self.student)
+        return self.client.post(
+            f"/api/assignments/{project.pk}/submissions/", {"sql_code": code, "stage": stage and stage.pk}, format="json"
+        )
+
+    def test_create_validates_rubric_and_stages(self):
+        bad = [
+            ([{**RUBRIC[0], "points": 50}, *RUBRIC[1:]], "yig'indisi"),
+            ([{**item, "stage": 0} for item in RUBRIC], "2-bosqich"),
+            ([{**RUBRIC[0], "stage": 5}, *RUBRIC[1:]], "bosqichni"),
+            ([{**RUBRIC[0], "name": ""}, *RUBRIC[1:]], "nomi"),
+            ([], "rubrika kerak"),
+        ]
+        for rubric, message in bad:
+            response = self.create_project(rubric=rubric)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, rubric)
+            self.assertIn(message, str(response.data["rubric"]), rubric)
+        # Muddatlar tartibi
+        self.auth_as(self.teacher)
+        response = self.client.post(
+            "/api/assignments/",
+            {
+                "title": "X", "description": "Y", "groups": [self.group.pk], "rubric": RUBRIC,
+                "stages": [{**STAGES[0], "deadline": future(10)}, {**STAGES[1], "deadline": future(5)}],
+            },
+            format="json",
+        )
+        self.assertIn("stages", response.data)
+
+    def test_project_deadline_is_last_stage_and_student_sees_rubric(self):
+        project, stages = self.make_project()
+        self.assertEqual(project.deadline, stages[-1].deadline)
+        self.assertEqual(project.rubric[1], {**RUBRIC[1]})
+        self.auth_as(self.student)
+        data = self.client.get(f"/api/assignments/{project.pk}/").data
+        self.assertEqual([stage["title"] for stage in data["stages"]], ["ER-model", "Jadvallar"])
+        self.assertEqual(len(data["rubric"]), 3)
+        self.assertNotIn("grading_criteria", data)
+        self.assertNotIn("MAXFIY-MEZON", str(data))
+
+    def test_stage_rules_on_submit(self):
+        project, (first, second) = self.make_project()
+        self.assertIn("stage", self.submit(project, None).data)
+        self.assertIn("oldingi bosqich", str(self.submit(project, second).data))
+        response = self.submit(project, first)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["stage"], first.pk)
+        self.assertEqual(self.submit(project, second).status_code, status.HTTP_201_CREATED)
+        # Boshqa topshiriqning bosqichi
+        self.assertIn("stage", self.submit(self.assignment, first).data)
+        # Urinishlar bosqich bo'yicha alohida raqamlanadi
+        self.submit(project, first)
+        numbers = Submission.objects.filter(assignment=project).values_list("stage__order", "attempt_number")
+        self.assertEqual(sorted(numbers), [(0, 1), (0, 2), (1, 1)])
+
+    def test_rubric_grading_per_stage(self):
+        project, (first, second) = self.make_project()
+        first_id = self.submit(project, first).data["id"]
+        second_id = self.submit(project, second).data["id"]
+        AIAnalysis.objects.filter(submission_id=second_id).update(status=AIAnalysis.Status.DONE, suggested_score=50)
+        self.auth_as(self.teacher)
+        url = lambda pk: f"/api/submissions/{pk}/grade/"
+        # Mezonlar soni va chegaralari
+        self.assertIn("rubric_scores", self.client.put(url(second_id), {"score": 60}, format="json").data)
+        self.assertIn("rubric_scores", self.client.put(url(second_id), {"rubric_scores": [41, 30]}, format="json").data)
+        self.assertIn("rubric_scores", self.client.put(url(second_id), {"rubric_scores": [10]}, format="json").data)
+        response = self.client.put(url(second_id), {"rubric_scores": [35, 20], "comment": "Yaxshi"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        grade = Grade.objects.get(submission_id=second_id)
+        self.assertEqual((grade.score, grade.max_score), (55, 70))
+        self.assertEqual([item["name"] for item in grade.rubric_scores], ["Jadvallar", "Normallashtirish"])
+        # AI 0–100 shkalada 50 deb baholagan: bosqichning 70 balidan 35
+        self.assertEqual(grade.ai_suggested_score, 35)
+        self.client.put(url(first_id), {"rubric_scores": [25]}, format="json")
+
+        self.auth_as(self.student)
+        data = self.client.get(f"/api/assignments/{project.pk}/").data["my_stages"]
+        self.assertEqual(data["total_score"], 80)
+        self.assertEqual([(item["score"], item["max_score"]) for item in data["items"]], [(25, 30), (55, 70)])
+        mine = self.client.get(f"/api/submissions/{second_id}/").data["grade"]
+        self.assertEqual(mine["rubric_scores"][0], {"name": "Jadvallar", "points": 40, "score": 35})
+        self.assertNotIn("ai_suggested_score", mine)
+
+    def test_graded_stage_blocks_resubmit_but_other_stage_open(self):
+        project, (first, second) = self.make_project()
+        first_id = self.submit(project, first).data["id"]
+        self.auth_as(self.teacher)
+        self.client.put(f"/api/submissions/{first_id}/grade/", {"rubric_scores": [30]}, format="json")
+        self.assertIn("baholangan", str(self.submit(project, first).data))
+        self.assertEqual(self.submit(project, second).status_code, status.HTTP_201_CREATED)
+
+    def test_staff_list_shows_latest_per_stage(self):
+        project, (first, second) = self.make_project()
+        self.submit(project, first)
+        self.submit(project, first)
+        self.submit(project, second)
+        self.auth_as(self.teacher)
+        data = self.client.get(f"/api/assignments/{project.pk}/submissions/").data
+        self.assertEqual(sorted((item["stage"], item["attempt_number"]) for item in data), [(first.pk, 2), (second.pk, 1)])
+
+    def test_structure_locked_after_submissions(self):
+        project, (first, _) = self.make_project()
+        self.submit(project, first)
+        self.auth_as(self.teacher)
+        url = f"/api/assignments/{project.pk}/"
+        changed_points = [{**RUBRIC[0], "points": 20}, {**RUBRIC[1], "points": 50}, RUBRIC[2]]
+        self.assertIn("rubric", self.client.patch(url, {"rubric": changed_points}, format="json").data)
+        self.assertIn("stages", self.client.patch(url, {"stages": [{**STAGES[0], "deadline": future(3)}]}, format="json").data)
+        # Nomi va izohini, bosqich matni va muddatini o'zgartirish mumkin
+        renamed = [{**RUBRIC[0], "name": "Konseptual model"}, *RUBRIC[1:]]
+        new_stages = [{**STAGES[0], "title": "Model", "deadline": future(4)}, {**STAGES[1], "deadline": future(12)}]
+        response = self.client.patch(url, {"rubric": renamed, "stages": new_stages}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        first.refresh_from_db()
+        self.assertEqual(first.title, "Model")
+        self.assertTrue(Submission.objects.filter(stage=first).exists())
+
+    def test_simple_rubric_without_stages(self):
+        self.auth_as(self.teacher)
+        rubric = [{"name": "To'g'rilik", "points": 60}, {"name": "Uslub", "points": 40}]
+        Assignment.objects.filter(pk=self.assignment.pk).update(rubric=[{**item, "description": "", "stage": None} for item in rubric])
+        response = self.client.put(self.grade_url, {"rubric_scores": [50, 30]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["grade"]["score"], 80)
+        self.assertEqual(response.data["grade"]["max_score"], 100)
+
+    def test_ai_prompt_has_stage_and_its_rubric_only(self):
+        from ai.services import build_analysis_messages
+
+        project, (first, second) = self.make_project()
+        self.submit(project, first)
+        submission = Submission.objects.get(pk=self.submit(project, second).data["id"])
+        text = build_analysis_messages(submission)[0]["content"]
+        self.assertIn("2-bosqichi", text)
+        self.assertIn("Normallashtirish (30 ball)", text)
+        self.assertNotIn("ER-model (30 ball)", text)
+        self.assertNotIn(self.student.username, text)
