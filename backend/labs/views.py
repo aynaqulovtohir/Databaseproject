@@ -1,11 +1,9 @@
 """Virtual laboratoriya API'lari."""
 import logging
 from collections import defaultdict
-from datetime import datetime, time
 
-from django.conf import settings
 from django.db import transaction
-from django.db.models import Prefetch, Sum
+from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -25,8 +23,17 @@ from .access import visible_labs
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code, try_code
 from .mistakes import build_report
+from .quota import (
+    ai_advice_left,
+    ai_error_response,
+    ai_grades_left,
+    ai_usable,
+    record_ai_action,
+    refuse_ai,
+    sandbox_down_response,
+)
 from .er import build_fixed, compare
-from .models import BlindReview, Lab, LabAttempt, LabGrade
+from .models import AIAction, BlindReview, Lab, LabAttempt, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -39,28 +46,6 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def ai_advice_left(student):
-    """Talaba bugun yana nechta AI maslahati olishi mumkin (har bir daraja alohida sanaladi)."""
-    today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).aggregate(
-        total=Sum("ai_hint_level")
-    )["total"]
-    return max(0, settings.LAB_AI_DAILY_LIMIT - (used or 0))
-
-
-def ai_grades_left(student):
-    """Talaba bugun yana nechta topshirig'ini AI baholashi mumkin (undan keyin avtomatik baho)."""
-    today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, is_submission=True, created_at__gte=today_start).count()
-    # Hozirgina saqlangan urinishning o'zi ham hisobga kirgan
-    return settings.LAB_AI_GRADES_DAILY_LIMIT - used + 1
-
-
-def ai_usable(student):
-    """AI shu talabaga ishlatiladimi: sozlangan va guruhida o'chirilmagan."""
-    return is_configured() and student.ai_allowed
 
 
 def grade_attempt(attempt):
@@ -230,6 +215,47 @@ class LabViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         result, payload = self.execute(request, lab, try_code, serializer.validated_data["sql_code"])
         return result if payload is None else Response(result)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="explain-plan",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="lab_ai",
+    )
+    def explain_plan(self, request, pk=None):
+        """Indeks laboratoriyasi: {sql_code, mode}. mode="explain" — rejaning AI tushuntirishi (indeks aytilmaydi);
+        mode="suggest" — yechgan talabaga AI muqobil indeksi, qum qutida o'lchab solishtiriladi."""
+        from .plan_ai import explain_plan, suggest_index
+
+        lab = self.get_object()
+        if lab.kind != Lab.Kind.SQL or not lab.plan_query.strip():
+            raise ValidationError({"detail": "Reja tushuntirishi faqat indeks (EXPLAIN) laboratoriyasida bor."})
+        mode = request.data.get("mode", "explain")
+        if mode not in ("explain", "suggest"):
+            raise ValidationError({"mode": "Rejim explain yoki suggest bo'lishi kerak."})
+        serializer = RunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if (
+            mode == "suggest"
+            and request.user.is_student
+            and not LabAttempt.objects.filter(lab=lab, student=request.user, is_correct=True).exists()
+        ):
+            raise PermissionDenied("Muqobil indeks taklifi laboratoriyani to'g'ri yechgandan keyin ochiladi.")
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+        runner = suggest_index if mode == "suggest" else explain_plan
+        try:
+            data = runner(lab, serializer.validated_data["sql_code"])
+        except SandboxUnavailable:
+            logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
+            return sandbox_down_response()
+        except AIError as exc:
+            return ai_error_response(exc, "reja")
+        record_ai_action(request.user, AIAction.Kind.PLAN_SUGGEST if mode == "suggest" else AIAction.Kind.PLAN_EXPLAIN)
+        return Response(data)
 
     @action(
         detail=True,

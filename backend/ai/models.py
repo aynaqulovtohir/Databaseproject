@@ -87,6 +87,14 @@ class AIUsage(models.Model):
         LAB_GRADE = "lab_grade", "SQL baholash"
         ER_ADVICE = "er_advice", "ER maslahati"
         ER_GRADE = "er_grade", "ER baholash"
+        PLAN_EXPLAIN = "plan_explain", "EXPLAIN tushuntirishi"
+        PLAN_SUGGEST = "plan_suggest", "Indeks taklifi (tekshiriladi)"
+        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
+        SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
+        VIVA = "viva", "Loyiha himoyasi"
+        VARIANT = "variant", "Topshiriq varianti"
+        BUGGY_CODE = "buggy_code", "Xatoli kod yaratish"
+        MISTAKES_SUMMARY = "mistakes_summary", "Xatolar xulosasi"
         OTHER = "other", "Boshqa"
 
     purpose = models.CharField("maqsad", max_length=20, choices=Purpose.choices, default=Purpose.OTHER)

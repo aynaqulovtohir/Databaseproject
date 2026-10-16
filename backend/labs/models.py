@@ -152,3 +152,28 @@ class BlindReview(models.Model):
 
     def __str__(self):
         return f"{self.attempt} / {self.reviewer}: {self.score} (tizim: {self.ai_score})"
+
+
+class AIAction(models.Model):
+    """Talabaning AI'dan foydalanishi (maslahatdan tashqari): kunlik umumiy limitni hisoblash uchun.
+
+    Matn saqlanmaydi — faqat kim, qaysi turdagi so'rov va qachon.
+    """
+
+    class Kind(models.TextChoices):
+        PLAN_EXPLAIN = "plan_explain", "EXPLAIN tushuntirishi"
+        PLAN_SUGGEST = "plan_suggest", "Indeks taklifi"
+        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
+        SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
+        VIVA = "viva", "Loyiha himoyasi"
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="ai_actions"
+    )
+    kind = models.CharField("turi", max_length=20, choices=Kind.choices)
+    created_at = models.DateTimeField("vaqti", auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "AI so'rovi (talaba)"
+        verbose_name_plural = "AI so'rovlari (talabalar)"
+        ordering = ["-id"]

@@ -366,6 +366,30 @@ export interface LabRunResult {
   fix?: ErFix | null
 }
 
+/** Indeks laboratoriyasi: qum qutida o'lchangan reja */
+export interface PlanMeasure {
+  ok: boolean
+  error: string
+  plan: string[]
+  /** Rejalashtiruvchi baholagan narx (shartli birlik) */
+  cost: number | null
+  /** Rejada qolgan taqiqlangan tugunlar haqida xabarlar */
+  remaining: string[]
+}
+
+export interface PlanExplanation {
+  explanation: string
+  before: PlanMeasure
+  after: PlanMeasure
+}
+
+export interface PlanSuggestion {
+  explanation: string
+  index_sql: string
+  suggestion: PlanMeasure
+  mine: PlanMeasure
+}
+
 /** O'qituvchi ko'radigan talaba holati */
 export interface LabStudentProgress extends PersonShort {
   group: string

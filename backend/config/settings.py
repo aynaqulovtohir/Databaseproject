@@ -124,6 +124,11 @@ REST_FRAMEWORK = {
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
         "blind_review": "60/min",
+        # AI yordamlari (EXPLAIN tushuntirishi, murabbiy, yechimni tushuntirish, himoya): kunlik limitdan tashqari
+        # qisqa vaqtda ko'p so'rov yuborib serverni band qilmaslik uchun
+        "lab_ai": "10/min",
+        # O'qituvchi uchun AI yaratish (variant, xatoli kod, xulosa): har biri qum qutida bir necha marta ishlaydi
+        "ai_generate": "6/min",
         # Testda javoblarni oraliq saqlash
         "quiz_save": "120/min",
     },

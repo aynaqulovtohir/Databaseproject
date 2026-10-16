@@ -575,7 +575,13 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
         </CardHeader>
         <CardContent>
           {/* Laboratoriya tahrirlansa, muharrir yangi namunaviy yechim bilan qayta ochiladi */}
-          <LabRunner key={lab.solution_sql} labId={lab.id} initialCode={lab.solution_sql ?? ''} />
+          <LabRunner
+            key={lab.solution_sql}
+            labId={lab.id}
+            initialCode={lab.solution_sql ?? ''}
+            planAssistant={Boolean(lab.plan_query?.trim())}
+            solved
+          />
         </CardContent>
       </Card>
     </>
@@ -585,6 +591,7 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
 // ---------- Talaba ----------
 
 function StudentView({ lab }: { lab: Lab }) {
+  const user = useUser()
   const queryClient = useQueryClient()
   const progress = lab.my_progress ?? { attempts: 0, solved: false }
 
@@ -663,6 +670,8 @@ function StudentView({ lab }: { lab: Lab }) {
               initialCode={lab.my_progress?.last_code ?? ''}
               gradable
               onResult={(result, code) => handleResult(result, { code })}
+              planAssistant={Boolean(lab.plan_query?.trim()) && user.ai_enabled}
+              solved={progress.solved}
             />
           </CardContent>
         </Card>

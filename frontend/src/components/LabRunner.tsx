@@ -3,6 +3,7 @@ import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Se
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
+import { PlanAssistant } from '@/components/PlanAssistant'
 import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -361,10 +362,21 @@ interface LabRunnerProps {
   gradable?: boolean
   /** Har bir ishga tushirish yoki topshirishdan keyin chaqiriladi */
   onResult?: (result: LabRunResult, code: string) => void
+  /** Indeks laboratoriyasida: AI reja yordamchisi ko'rsatiladi (AI yoqilgan bo'lsa) */
+  planAssistant?: boolean
+  /** Laboratoriya yechilganmi: AI muqobil indeksi faqat shundan keyin ochiladi */
+  solved?: boolean
 }
 
 /** SQL muharriri, «Sinab ko'rish» va «Tekshirish» tugmalari va natija paneli. */
-export function LabRunner({ labId, initialCode = '', gradable = false, onResult }: LabRunnerProps) {
+export function LabRunner({
+  labId,
+  initialCode = '',
+  gradable = false,
+  onResult,
+  planAssistant = false,
+  solved = false,
+}: LabRunnerProps) {
   const [code, setCode] = useState(initialCode)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -477,6 +489,8 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
             : ''}
         </p>
       </form>
+
+      {planAssistant ? <PlanAssistant labId={labId} code={code} solved={solved} /> : null}
 
       {shown === 'try' && tryMutation.data && !busy ? (
         <div aria-live="polite">
