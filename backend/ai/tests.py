@@ -537,3 +537,68 @@ class GeminiProviderTests(DataMixin, TestCase):
         with patch("ai.client.requests.post", return_value=self.gemini_response(json.dumps(GOOD_RESULT))):
             self.assertTrue(worker.process_next())
         self.assertEqual(AIAnalysis.objects.get(submission=self.submission).model_name, "gemini-sinov")
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key")
+class AIUsageTests(DataMixin, APITestCase):
+    """Har bir AI so'rovi hisobga olinadi; hisobotni faqat admin ko'radi."""
+
+    def auth_as(self, user):
+        cache.clear()
+        response = self.client.post("/api/auth/login/", {"username": user.username, "password": PASSWORD})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+    def test_successful_and_failed_requests_are_recorded_without_personal_data(self):
+        from .models import AIUsage
+
+        with patch("ai.client.get_client", return_value=fake_client()):
+            analyze_submission(self.submission)
+        with patch("ai.client.get_client", return_value=fake_client(stop_reason="refusal")):
+            with self.assertRaises(AIPermanentError):
+                chat_reply(self.assignment, [], "Savol")
+        ok, failed = AIUsage.objects.order_by("id")
+        self.assertEqual((ok.purpose, ok.ok, ok.input_tokens, ok.output_tokens), ("analysis", True, 1200, 800))
+        self.assertEqual((failed.purpose, failed.ok), ("chat", False))
+        self.assertIn("AIPermanentError", failed.error)
+        stored = " ".join(str(value) for value in AIUsage.objects.values_list("model_name", "error"))
+        for secret in ("maxfiy_login", "Maxfiyism", SQL[:20], "Savol"):
+            self.assertNotIn(secret, stored)
+
+    @override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="")
+    def test_not_configured_is_not_recorded(self):
+        from .models import AIUsage
+
+        with self.assertRaises(AINotConfigured):
+            analyze_submission(self.submission)
+        self.assertFalse(AIUsage.objects.exists())
+
+    def test_recording_failure_does_not_break_answer(self):
+        with patch("ai.models.AIUsage.objects.create", side_effect=RuntimeError("baza band")):
+            with patch("ai.client.get_client", return_value=fake_client()):
+                result, _, _ = analyze_submission(self.submission)
+        self.assertEqual(result.suggested_score, 55)
+
+    @override_settings(AI_PRICE_INPUT_PER_MTOK=1.0, AI_PRICE_OUTPUT_PER_MTOK=4.0)
+    def test_report_for_admin_only(self):
+        from .models import AIUsage
+
+        AIUsage.objects.create(purpose="lab_advice", model_name="m1", input_tokens=500_000, output_tokens=250_000)
+        AIUsage.objects.create(purpose="lab_advice", model_name="m1", ok=False, error="x")
+        old = AIUsage.objects.create(purpose="chat", input_tokens=10, output_tokens=10)
+        AIUsage.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=400))
+
+        self.auth_as(self.teacher_a)
+        self.assertEqual(self.client.get("/api/ai/usage/").status_code, status.HTTP_403_FORBIDDEN)
+        self.auth_as(self.student)
+        self.assertEqual(self.client.get("/api/ai/usage/").status_code, status.HTTP_403_FORBIDDEN)
+
+        self.auth_as(self.admin)
+        for bad in ("0", "366", "abc", "-1"):
+            self.assertEqual(self.client.get("/api/ai/usage/", {"days": bad}).status_code, 400)
+        data = self.client.get("/api/ai/usage/", {"days": 7}).data
+        self.assertEqual(len(data["daily"]), 7)
+        self.assertEqual(data["period"], {"requests": 2, "failed": 1, "input_tokens": 500_000, "output_tokens": 250_000, "cost": 1.5})
+        self.assertEqual(data["today"]["requests"], 2)
+        self.assertEqual(data["by_purpose"][0]["label"], "SQL maslahati")
+        self.assertTrue(data["price"]["configured"])
+        self.assertEqual(data["daily"][-1]["requests"], 2)

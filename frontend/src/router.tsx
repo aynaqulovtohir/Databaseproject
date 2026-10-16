@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuth } from '@/lib/auth'
 import type { Role } from '@/lib/types'
+import { AIUsagePage } from '@/pages/admin/AIUsagePage'
 import { GroupsPage } from '@/pages/admin/GroupsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/users', element: <UsersPage /> },
           { path: '/groups', element: <GroupsPage /> },
+          { path: '/ai-usage', element: <AIUsagePage /> },
         ],
       },
       {

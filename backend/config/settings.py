@@ -181,6 +181,10 @@ GEMINI_FALLBACK_MODELS = env.list("GEMINI_FALLBACK_MODELS", default=["gemini-3.5
 # AI kerak bo'lgan testlar kalitni override_settings bilan o'zi beradi va javobni mock qiladi.
 if len(sys.argv) > 1 and sys.argv[1] == "test":
     ANTHROPIC_API_KEY = GEMINI_API_KEY = ""
+# Xarajat hisoboti uchun narx: 1 million token uchun AQSh dollarida (tarif sahifasidan olinadi).
+# 0 bo'lsa (masalan, bepul tarifda), hisobotda faqat tokenlar ko'rsatiladi.
+AI_PRICE_INPUT_PER_MTOK = env.float("AI_PRICE_INPUT_PER_MTOK", default=0.0)
+AI_PRICE_OUTPUT_PER_MTOK = env.float("AI_PRICE_OUTPUT_PER_MTOK", default=0.0)
 # Bitta talaba kuniga yubora oladigan chat xabarlari soni
 AI_CHAT_DAILY_LIMIT = env.int("AI_CHAT_DAILY_LIMIT", default=30)
 

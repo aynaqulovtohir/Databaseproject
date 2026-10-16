@@ -61,14 +61,43 @@ def get_client():
     )
 
 
-def create_message(**params):
-    """Modelga so'rov yuboradi va xatolarni o'zimizning turlarga o'tkazadi.
+def _record_usage(purpose, response=None, error=None):
+    """So'rov hisobini yozadi. Hisobni yozib bo'lmasa ham AI javobi talabaga yetkaziladi."""
+    from .models import AIUsage
 
+    try:
+        usage = getattr(response, "usage", None)
+        AIUsage.objects.create(
+            purpose=purpose if purpose in AIUsage.Purpose.values else AIUsage.Purpose.OTHER,
+            model_name=str(getattr(response, "model", "") or current_model())[:100],
+            input_tokens=getattr(usage, "input_tokens", 0) or 0,
+            output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            ok=error is None,
+            error=f"{type(error).__name__}: {error}"[:200] if error else "",
+        )
+    except Exception:  # noqa: BLE001 — hisob yozilmasligi asosiy ishni to'xtatmasin
+        logger.exception("AI so'rovi hisobini yozib bo'lmadi")
+
+
+def create_message(purpose="other", **params):
+    """Modelga so'rov yuboradi, xatolarni o'zimizning turlarga o'tkazadi va so'rov hisobini yozadi.
+
+    purpose — so'rov maqsadi (AIUsage.Purpose): xarajat hisobotida shu bo'yicha ajratiladi.
     Parametrlar Anthropic API ko'rinishida beriladi (system, messages, max_tokens,
     output_config); Gemini tanlangan bo'lsa, ular shu yerda Gemini ko'rinishiga o'tkaziladi.
     """
-    if uses_gemini():
-        return _create_gemini_message(**params)
+    if not is_configured():
+        raise AINotConfigured("AI uchun API kalit .env faylida ko'rsatilmagan.")
+    try:
+        response = _create_gemini_message(**params) if uses_gemini() else _create_anthropic_message(**params)
+    except AIError as exc:
+        _record_usage(purpose, error=exc)
+        raise
+    _record_usage(purpose, response)
+    return response
+
+
+def _create_anthropic_message(**params):
     client = get_client()
     try:
         response = client.messages.create(model=settings.AI_MODEL, **params)
@@ -214,6 +243,7 @@ def _create_gemini_message(*, max_tokens, system, messages, output_config=None):
 
     usage = data.get("usageMetadata") or {}
     return SimpleNamespace(
+        model=model,
         content=[SimpleNamespace(type="text", text=text)],
         stop_reason="end_turn",
         usage=SimpleNamespace(

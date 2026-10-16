@@ -495,6 +495,29 @@ export interface Agreement {
   bands: { min: number; mark: number }[]
 }
 
+// ---------- AI xarajati ----------
+
+export interface AIUsageTotals {
+  requests: number
+  failed: number
+  input_tokens: number
+  output_tokens: number
+  /** AQSh dollari (narx sozlanmagan bo'lsa 0) */
+  cost: number
+}
+
+export interface AIUsageReport {
+  days: number
+  price: { input_per_mtok: number; output_per_mtok: number; configured: boolean }
+  today: AIUsageTotals
+  month: AIUsageTotals
+  previous_month: AIUsageTotals
+  period: AIUsageTotals
+  daily: (AIUsageTotals & { date: string })[]
+  by_purpose: (AIUsageTotals & { purpose: string; label: string })[]
+  by_model: (AIUsageTotals & { model: string })[]
+}
+
 // ---------- Statistika ----------
 
 export interface StatisticsLab {

@@ -105,6 +105,7 @@ def generate_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
     if lab.kind == lab.Kind.ER:
         return generate_er_advice(attempt, level, previous)
     response = create_message(
+        purpose="lab_advice",
         max_tokens=ADVICE_MAX_TOKENS,
         system=SYSTEM_PROMPT + LEVEL_RULE,
         messages=[
@@ -171,6 +172,7 @@ def ai_grade(attempt):
     else:
         check_result = "Noto'g'ri.\n" + describe_feedback(attempt.feedback)
     response = create_message(
+        purpose="lab_grade",
         max_tokens=GRADE_MAX_TOKENS,
         system=GRADE_SYSTEM_PROMPT,
         messages=[
@@ -294,6 +296,7 @@ def generate_er_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
     differences = attempt.feedback.get("differences") or []
     check_result = "Diagramma namunadan farq qiladi:\n" + "\n".join(f"- {item}" for item in differences)
     response = create_message(
+        purpose="er_advice",
         max_tokens=ADVICE_MAX_TOKENS,
         system=ER_ADVICE_SYSTEM_PROMPT + LEVEL_RULE,
         messages=[{"role": "user", "content": _er_message(attempt, check_result) + level_block(level, previous)}],
@@ -325,6 +328,7 @@ def ai_grade_diagram(attempt, ratio, changes):
             + "\nTizim kiritgan tuzatishlar:\n" + "\n".join(f"- {item}" for item in changes)
         )
     response = create_message(
+        purpose="er_grade",
         max_tokens=GRADE_MAX_TOKENS,
         system=ER_GRADE_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": _er_message(attempt, check_result)}],
