@@ -266,6 +266,8 @@ export interface Lab {
   theory: string
   /** Har bir ishga tushirishdan oldin bajariladigan tayyor jadvallar */
   setup_sql: string
+  /** Talaba muharririda dastlab turadigan kod (masalan, «AI yozgan xatoli kod — xatoni toping») */
+  starter_sql?: string
   /** Talabaga yuborilmaydi */
   solution_sql?: string
   /** Yashirin test ma'lumotlari. Talabaga yuborilmaydi */
@@ -374,6 +376,13 @@ export const EXPLANATION_VERDICTS: Record<ExplanationVerdict, { label: string; c
   ok: { label: 'Tushuntirish mos', className: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' },
   partial: { label: 'Qisman mos', className: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
   wrong: { label: 'Mos emas', className: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200' },
+}
+
+/** O'qituvchi uchun: AI yozgan, qum qutida tekshirilgan xatoli kod */
+export interface BuggyCode {
+  buggy_sql: string
+  bugs: string[]
+  differences: string[]
 }
 
 /** Laboratoriya murabbiyi bilan yozishma */

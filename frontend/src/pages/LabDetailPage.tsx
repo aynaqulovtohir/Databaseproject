@@ -9,6 +9,7 @@ import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { LabDialog } from '@/components/LabDialog'
+import { LabGenerateCard } from '@/components/LabGenerateCard'
 import { LabRunner } from '@/components/LabRunner'
 import { PageHeader } from '@/components/PageHeader'
 import { VerdictBadge } from '@/components/SelfExplain'
@@ -22,6 +23,7 @@ import { api, ApiError, errorMessage } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
+import { supportsGeneration } from '@/lib/labs'
 import {
   GRADE_SOURCE_LABELS,
   MAX_SCORE,
@@ -596,6 +598,7 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
           />
         </CardContent>
       </Card>
+      {supportsGeneration(lab) ? <LabGenerateCard lab={lab} /> : null}
     </>
   )
 }
@@ -626,7 +629,10 @@ function StudentView({ lab }: { lab: Lab }) {
   const queryClient = useQueryClient()
   const progress = lab.my_progress ?? { attempts: 0, solved: false }
   // Murabbiyga savol bilan yuboriladigan hozirgi ish: holat emas, ref — har bir harfda qayta chizilmasin
-  const work = useRef<LabWork>({ code: progress.last_code ?? '', diagram: progress.last_diagram ?? null })
+  const work = useRef<LabWork>({
+    code: progress.last_code || lab.starter_sql || '',
+    diagram: progress.last_diagram ?? null,
+  })
   const getWork = () => work.current
 
   function handleResult(result: LabRunResult, work: { code?: string; diagram?: ErDiagram }) {
@@ -703,7 +709,7 @@ function StudentView({ lab }: { lab: Lab }) {
           <CardContent>
             <LabRunner
               labId={lab.id}
-              initialCode={lab.my_progress?.last_code ?? ''}
+              initialCode={lab.my_progress?.last_code || lab.starter_sql || ''}
               gradable
               onResult={(result, code) => handleResult(result, { code })}
               planAssistant={Boolean(lab.plan_query?.trim()) && user.ai_enabled}

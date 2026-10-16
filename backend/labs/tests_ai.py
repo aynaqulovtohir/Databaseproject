@@ -267,3 +267,82 @@ class SelfExplanationTests(BaseTestCase):
         self.correct.refresh_from_db()
         self.assertEqual(self.correct.explanation_verdict, "")
         self.assertFalse(AIAction.objects.exists())
+
+
+VARIANT = {
+    "title": "Qimmat dorilar",
+    "description": "Narxi 20 va undan yuqori dorilarni narxi kamayish tartibida chiqaring",
+    "setup_sql": "CREATE TABLE dori (id INT PRIMARY KEY, nomi VARCHAR(100) NOT NULL, narx INT);\n"
+    "INSERT INTO dori VALUES (1, 'Aspirin', 10), (2, 'Analgin', 30), (3, 'Yod', 20);",
+    "solution_sql": "SELECT nomi, narx FROM dori WHERE narx >= 20 ORDER BY narx DESC;",
+    "hidden_setup_sql": "",
+}
+
+
+@override_settings(AI_PROVIDER="anthropic", ANTHROPIC_API_KEY="test-key")
+class GenerationTests(BaseTestCase):
+    """AI yozgan variant va xatoli kod saqlashdan oldin qum qutida tekshiriladi."""
+
+    def post(self, action, **body):
+        return self.client.post(f"/api/labs/{self.lab.pk}/{action}/", body, format="json")
+
+    def test_variant_is_verified_and_saved_as_draft(self):
+        self.auth_as(self.teacher_a)
+        with patch("labs.generate.create_message", return_value=ai_json(VARIANT)) as create_message:
+            response = self.post("generate-variant", domain="dorixona")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        variant = Lab.objects.get(pk=response.data["id"])
+        self.assertEqual(variant.title, "Qimmat dorilar (AI varianti)")
+        self.assertEqual(list(variant.groups.all()), [])  # talabalarga hali ko'rinmaydi
+        self.assertEqual(variant.author, self.teacher_a)
+        self.assertIn("dorixona", json.dumps(create_message.call_args.kwargs, ensure_ascii=False))
+
+    def test_broken_variant_is_retried_with_error_then_rejected(self):
+        broken = {**VARIANT, "solution_sql": "SELECT nomi FROM yoq_jadval"}
+        self.auth_as(self.teacher_a)
+        with patch("labs.generate.create_message", return_value=ai_json(broken)) as create_message:
+            response = self.post("generate-variant")
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(create_message.call_count, 2)
+        retry_messages = create_message.call_args.kwargs["messages"]
+        self.assertIn("Tizim tekshiruvi o'tmadi", retry_messages[-1]["content"])
+        self.assertEqual(Lab.objects.count(), 1)
+
+    def test_empty_result_variant_is_rejected(self):
+        empty = {**VARIANT, "solution_sql": "SELECT nomi FROM dori WHERE narx > 1000"}
+        self.auth_as(self.teacher_a)
+        with patch("labs.generate.create_message", return_value=ai_json(empty)):
+            self.assertEqual(self.post("generate-variant").status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_buggy_code_must_run_and_fail_the_check(self):
+        self.auth_as(self.teacher_a)
+        buggy = {"buggy_sql": "SELECT nomi, narx FROM kitob WHERE narx > 20 ORDER BY narx DESC", "bugs": [">= kerak"]}
+        with patch("labs.generate.create_message", return_value=ai_json(buggy)):
+            response = self.post("generate-buggy")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["bugs"], [">= kerak"])
+        self.assertTrue(response.data["differences"])
+
+        for bad in ("SELECT nomi, narx FROM kitob WHERE narx >= 20 ORDER BY narx DESC", "SELEKT 1"):
+            with patch("labs.generate.create_message", return_value=ai_json({"buggy_sql": bad, "bugs": []})):
+                self.assertEqual(self.post("generate-buggy").status_code, status.HTTP_422_UNPROCESSABLE_ENTITY, bad)
+
+    def test_starter_code_is_shown_to_student(self):
+        self.auth_as(self.teacher_a)
+        response = self.client.patch(self.url, {"starter_sql": "SELECT * FROM kitob"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.url).data["starter_sql"], "SELECT * FROM kitob")
+
+    def test_permissions_and_supported_labs(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.post("generate-buggy").status_code, status.HTTP_403_FORBIDDEN)
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.post("generate-buggy").status_code, status.HTTP_404_NOT_FOUND)
+        no_solution = Lab.objects.create(title="x", description="y", setup_sql=SETUP_ONLY, author=self.teacher_a)
+        self.auth_as(self.teacher_a)
+        response = self.client.post(f"/api/labs/{no_solution.pk}/generate-variant/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+SETUP_ONLY = "CREATE TABLE t (id INT);"

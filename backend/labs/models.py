@@ -17,6 +17,8 @@ class Lab(models.Model):
     theory = models.TextField("nazariya va namuna", blank=True, max_length=20_000)
     # Har bir ishga tushirishdan oldin bajariladi: tayyor jadvallar va ma'lumotlar
     setup_sql = models.TextField("boshlang'ich jadvallar (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
+    # Talaba muharririda dastlab turadigan kod (masalan, "AI yozgan xatoli yechim — xatoni toping" mashqi)
+    starter_sql = models.TextField("boshlang'ich kod (talabaga)", blank=True, max_length=MAX_SQL_LENGTH)
     # Talabaga ko'rinmaydi; talaba natijasi shu yechim natijasi bilan solishtiriladi
     solution_sql = models.TextField("namunaviy yechim (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # Talabaga ko'rinmaydi. To'g'ri chiqqan kod shu ma'lumotlarda ham namunaviy yechim bilan solishtiriladi:

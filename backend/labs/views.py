@@ -409,6 +409,7 @@ class LabViewSet(viewsets.ModelViewSet):
             setup_sql=lab.setup_sql,
             solution_sql=lab.solution_sql,
             hidden_setup_sql=lab.hidden_setup_sql,
+            starter_sql=lab.starter_sql,
             reference_diagram=lab.reference_diagram,
             given_diagram=lab.given_diagram,
             plan_query=lab.plan_query,
@@ -418,6 +419,95 @@ class LabViewSet(viewsets.ModelViewSet):
         )
         copy.groups.set(groups)
         return Response(LabSerializer(copy, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
+    def generation_lab(self, request):
+        """O'qituvchi/admin uchun AI yaratish mumkin bo'lgan laboratoriya (aks holda xato)."""
+        from .generate import supports_generation
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        if not supports_generation(lab):
+            raise ValidationError(
+                {"detail": "AI yaratish faqat namunaviy yechimi bor oddiy SQL laboratoriyasi uchun (indeks, tranzaksiya "
+                 "va ER → SQL laboratoriyalaridan tashqari)."}
+            )
+        if not is_configured():
+            raise ValidationError({"detail": "AI hali sozlanmagan."})
+        return lab
+
+    def run_generation(self, request, lab, generator, *args):
+        """Qaytaradi: (natija, None) yoki (None, xato javobi)."""
+        from .generate import GenerationError
+
+        try:
+            return generator(lab, *args), None
+        except GenerationError as exc:
+            return None, Response(
+                {"detail": f"AI ikki urinishda ham tekshiruvdan o'tadigan natija bera olmadi: {exc}"},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        except SandboxUnavailable:
+            logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
+            return None, sandbox_down_response()
+        except LabSetupError as exc:
+            return None, Response(
+                {"detail": f"Laboratoriya sozlamasida xato ({exc.field}): {exc}"}, status=status.HTTP_409_CONFLICT
+            )
+        except AIError as exc:
+            return None, ai_error_response(exc, "so'rov")
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="generate-variant",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def generate_variant(self, request, pk=None):
+        """AI yangi sohada variant yozadi; qum qutida tekshirilgach, guruhlarsiz qoralama sifatida saqlanadi.
+
+        {"domain": "kasalxona"} — ixtiyoriy soha. O'qituvchi variantni ko'rib chiqib, guruhlarga o'zi beradi.
+        """
+        from .generate import generate_variant
+
+        lab = self.generation_lab(request)
+        domain = request.data.get("domain", "")
+        if not isinstance(domain, str) or len(domain) > 100:
+            raise ValidationError({"domain": "Soha nomi 100 belgidan oshmasin."})
+        data, failure = self.run_generation(request, lab, generate_variant, domain)
+        if failure:
+            return failure
+        title_length = Lab._meta.get_field("title").max_length
+        variant = Lab.objects.create(
+            kind=Lab.Kind.SQL,
+            title=f"{data['title']} (AI varianti)"[:title_length],
+            description=data["description"],
+            theory=lab.theory,
+            setup_sql=data["setup_sql"],
+            solution_sql=data["solution_sql"],
+            hidden_setup_sql=data["hidden_setup_sql"],
+            author=request.user,
+        )
+        return Response(LabSerializer(variant, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="generate-buggy",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="ai_generate",
+    )
+    def generate_buggy(self, request, pk=None):
+        """"Xatoni top" mashqi: xatosiz bajariladigan, lekin noto'g'ri natija beradigan kod (saqlanmaydi).
+
+        O'qituvchi uni ko'rib chiqib, laboratoriyaning boshlang'ich kodi (starter_sql) sifatida o'zi saqlaydi.
+        """
+        from .generate import generate_buggy
+
+        lab = self.generation_lab(request)
+        data, failure = self.run_generation(request, lab, generate_buggy)
+        return failure or Response(data)
 
     @action(detail=True, methods=["get"])
     def mistakes(self, request, pk=None):

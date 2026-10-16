@@ -30,6 +30,13 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         max_length=MAX_SQL_LENGTH,
         error_messages={"max_length": SQL_TOO_LONG},
     )
+    starter_sql = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        max_length=MAX_SQL_LENGTH,
+        error_messages={"max_length": SQL_TOO_LONG},
+    )
     hidden_setup_sql = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -47,6 +54,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "description",
             "theory",
             "setup_sql",
+            "starter_sql",
             "solution_sql",
             "hidden_setup_sql",
             "reference_diagram",
@@ -92,6 +100,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["reference_diagram"] = diagram
         # ER laboratoriyasida SQL ishlatilmaydi
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
+        attrs["starter_sql"] = ""
         attrs["given_diagram"] = None
         attrs["concurrent"] = False
         return attrs
@@ -164,6 +173,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "description",
             "theory",
             "setup_sql",
+            "starter_sql",
             "given_diagram",
             "plan_query",
             "concurrent",
