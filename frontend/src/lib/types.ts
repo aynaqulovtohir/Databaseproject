@@ -431,6 +431,45 @@ export interface QuizStudentResult extends PersonShort {
   submitted_at: string | null
 }
 
+// ---------- Ko'r baholash ----------
+
+/** O'qituvchiga talaba ismi va tizim bahosisiz ko'rsatiladigan ish */
+export interface BlindReviewItem {
+  attempt_id: number
+  lab: Pick<Lab, 'id' | 'title' | 'kind' | 'description' | 'setup_sql' | 'solution_sql' | 'reference_diagram'>
+  code: string
+  diagram: ErDiagram | null
+  is_correct: boolean
+  check: { error: { message: string; tip?: string } | null; differences: string[] }
+}
+
+export interface BlindReviewQueue {
+  item: BlindReviewItem | null
+  remaining: number
+  reviewed: number
+}
+
+export interface AgreementStats {
+  count: number
+  pearson_r?: number | null
+  mean_abs_diff?: number
+  /** Tizim − o'qituvchi: musbat bo'lsa tizim yumshoqroq */
+  mean_diff?: number
+  limits_of_agreement?: [number, number] | null
+  within_10?: number
+  band_agreement?: number
+  weighted_kappa?: number | null
+  system_mean?: number
+  teacher_mean?: number
+}
+
+export interface Agreement {
+  overall: AgreementStats
+  by_source: Record<LabGrade['source'], AgreementStats>
+  pairs: { lab_id: number; lab_kind: LabKind; system: number; teacher: number; source: LabGrade['source'] }[]
+  bands: { min: number; mark: number }[]
+}
+
 // ---------- Statistika ----------
 
 export interface StatisticsLab {

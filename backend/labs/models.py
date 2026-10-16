@@ -107,3 +107,32 @@ class LabGrade(models.Model):
 
     def __str__(self):
         return f"{self.lab} / {self.student}: {self.score}"
+
+
+class BlindReview(models.Model):
+    """Ko'r baholash: o'qituvchi topshirilgan ishni AI bahosini va talaba ismini ko'rmasdan baholaydi.
+
+    Keyin ikki baho o'rtasidagi moslik hisoblanadi (blind_review.py). Baho qo'yilgan paytdagi AI bahosi
+    shu yerda saqlanadi: talaba keyin qayta topshirsa ham solishtiriladigan juftlik o'zgarmaydi.
+    Baho bir marta qo'yiladi va o'zgartirilmaydi (keyin AI bahosini ko'rib "tuzatish" natijani buzadi).
+    """
+
+    attempt = models.ForeignKey(
+        LabAttempt, verbose_name="urinish", on_delete=models.CASCADE, related_name="blind_reviews"
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="baholovchi", on_delete=models.CASCADE, related_name="blind_reviews"
+    )
+    score = models.PositiveSmallIntegerField("o'qituvchi bahosi")
+    ai_score = models.PositiveSmallIntegerField("tizim bahosi")
+    ai_source = models.CharField("tizim bahosi manbasi", max_length=10, choices=LabGrade.Source.choices)
+    created_at = models.DateTimeField("baholangan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ko'r baholash"
+        verbose_name_plural = "ko'r baholashlar"
+        ordering = ["id"]
+        constraints = [models.UniqueConstraint(fields=["attempt", "reviewer"], name="unique_blind_review")]
+
+    def __str__(self):
+        return f"{self.attempt} / {self.reviewer}: {self.score} (tizim: {self.ai_score})"

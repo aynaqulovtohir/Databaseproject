@@ -21,7 +21,7 @@ from django.utils import timezone
 from users.models import User
 
 from .checker import ERROR_TIPS
-from .models import LabAttempt, LabGrade
+from .models import BlindReview, LabAttempt, LabGrade
 
 QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy", "survey": "sorovnoma"}
 QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
@@ -54,6 +54,23 @@ ANSWER_COLUMNS = [
     "maksimal_ball",
     "togri",
     "javob",
+]
+
+REVIEW_COLUMNS = [
+    "talaba",
+    "guruh",
+    "ai_yoqilgan",
+    "laboratoriya_id",
+    "laboratoriya",
+    "laboratoriya_turi",
+    "baholovchi",
+    "tizim_ball",
+    "tizim_manbasi",
+    "oqituvchi_ball",
+    "farq",
+    "tizim_baho",
+    "oqituvchi_baho",
+    "baholangan",
 ]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
@@ -247,6 +264,16 @@ javob                       faqat likert savolida: 1 — mutlaqo qo'shilmayman, 
                             3 — betarafman, 4 — qo'shilaman, 5 — to'liq qo'shilaman
                             (javob berilmagan bo'lsa bo'sh)
 
+baholash_mosligi.csv — ko'r baholash: tizim va o'qituvchi bahosi juftliklari
+--------------------------------------------------------------------------
+O'qituvchi ishni talaba ismi va tizim bahosini ko'rmasdan baholagan.
+baholovchi                  baholovchi taxallusi (O-...)
+tizim_ball                  o'qituvchi baholagan paytdagi tizim bahosi (0-100)
+tizim_manbasi               ai (sun'iy intellekt) yoki auto (avtomatik tekshiruv)
+oqituvchi_ball              o'qituvchi bahosi (0-100)
+farq                        tizim_ball − oqituvchi_ball (musbat — tizim yumshoqroq)
+tizim_baho, oqituvchi_baho  5 ballik shkalada: 86+ → 5, 71-85 → 4, 55-70 → 3, 0-54 → 2
+
 Xato toifalari
 --------------
 Baza xatolari (kod ishlamadi):
@@ -262,6 +289,44 @@ Namunadan farqlar (kod ishladi, natija boshqacha):
 def pseudonym(user_id):
     digest = hmac.new(settings.SECRET_KEY.encode(), f"lab-research:{user_id}".encode(), hashlib.sha256)
     return "T-" + digest.hexdigest()[:8].upper()
+
+
+def reviewer_pseudonym(user_id):
+    digest = hmac.new(settings.SECRET_KEY.encode(), f"lab-reviewer:{user_id}".encode(), hashlib.sha256)
+    return "O-" + digest.hexdigest()[:6].upper()
+
+
+def _review_rows(labs):
+    from .blind_review import band
+
+    rows = []
+    reviews = (
+        BlindReview.objects.filter(attempt__lab__in=labs)
+        .select_related("attempt__lab", "attempt__student__group")
+        .order_by("attempt__lab_id", "id")
+    )
+    for review in reviews:
+        attempt = review.attempt
+        student = attempt.student
+        rows.append(
+            [
+                pseudonym(student.pk),
+                student.group.name if student.group else "",
+                _flag(attempt.ai_enabled),
+                attempt.lab_id,
+                attempt.lab.title,
+                attempt.lab.kind,
+                reviewer_pseudonym(review.reviewer_id),
+                review.ai_score,
+                review.ai_source,
+                review.score,
+                review.ai_score - review.score,
+                band(review.ai_score),
+                band(review.score),
+                _local(review.created_at),
+            ]
+        )
+    return rows
 
 
 def error_category(error):
@@ -497,6 +562,7 @@ def build_export(labs, quizzes=None):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
+        zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs)))
         if quizzes is not None:
             quiz_rows, answer_rows = _quiz_rows(quizzes)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))

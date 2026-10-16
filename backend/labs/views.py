@@ -24,7 +24,7 @@ from .access import visible_labs
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code
 from .er import build_fixed, compare
-from .models import Lab, LabAttempt, LabGrade
+from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -270,6 +270,73 @@ class LabViewSet(viewsets.ModelViewSet):
         response = HttpResponse(build_export(labs, visible_quizzes(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+    def staff_labs(self, request):
+        """Admin — barcha, o'qituvchi — o'z laboratoriyalari; ?lab=<id> bilan bittasi."""
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        labs = visible_labs(request.user)
+        lab_id = request.query_params.get("lab")
+        if lab_id:
+            if not lab_id.isdigit():
+                raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+            labs = labs.filter(pk=lab_id)
+        return labs
+
+    @action(
+        detail=False,
+        methods=["get", "post"],
+        url_path="blind-review",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="blind_review",
+    )
+    def blind_review(self, request):
+        """Ko'r baholash. GET — navbatdagi ish (talaba ismi va AI bahosisiz), POST {attempt, score} — baho.
+
+        Baho bir marta qo'yiladi va o'zgartirilmaydi.
+        """
+        from .blind_review import item_payload, queue
+
+        labs = self.staff_labs(request)
+        if request.method == "GET":
+            pending = queue(labs, request.user)
+            reviewed = BlindReview.objects.filter(reviewer=request.user, attempt__lab__in=labs).count()
+            return Response(
+                {
+                    "item": item_payload(pending[0]) if pending else None,
+                    "remaining": len(pending),
+                    "reviewed": reviewed,
+                }
+            )
+
+        attempt_id, score = request.data.get("attempt"), request.data.get("score")
+        if not isinstance(attempt_id, int) or isinstance(attempt_id, bool):
+            raise ValidationError({"attempt": "Urinish raqami butun son bo'lishi kerak."})
+        if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 100:
+            raise ValidationError({"score": "Ball 0 dan 100 gacha butun son bo'lsin."})
+        # Faqat navbatdagi ishlar: o'z laboratoriyasidagi, hozir baho sifatida turgan urinish
+        grade = LabGrade.objects.filter(lab__in=labs, attempt_id=attempt_id).first()
+        if grade is None:
+            raise ValidationError({"attempt": "Bu ish ko'r baholash navbatida yo'q."})
+        review, created = BlindReview.objects.get_or_create(
+            attempt_id=attempt_id,
+            reviewer=request.user,
+            defaults={"score": score, "ai_score": grade.score, "ai_source": grade.source},
+        )
+        if not created:
+            return Response(
+                {"detail": "Bu ishni allaqachon baholagansiz: ko'r baholash natijasi o'zgartirilmaydi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response({"saved": True}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="blind-review/agreement")
+    def blind_review_agreement(self, request):
+        """AI va o'qituvchi baholari mosligi. O'qituvchi — o'zi baholagan ishlar, admin — hamma baholovchilar."""
+        from .blind_review import agreement
+
+        labs = self.staff_labs(request)
+        return Response(agreement(labs, None if request.user.is_admin else request.user))
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):

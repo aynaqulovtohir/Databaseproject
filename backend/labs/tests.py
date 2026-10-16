@@ -6,14 +6,14 @@ import json
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from ai.client import AITransientError
 from users.models import StudentGroup, User
 
-from .models import Lab, LabAttempt, LabGrade
+from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .sandbox import run_sql
 
 PASSWORD = "Kuchli-Parol-2026"
@@ -664,7 +664,8 @@ class ResearchExportTests(BaseTestCase):
         response, (files, tables) = self.export(self.admin)
         self.assertIn("attachment;", response["Content-Disposition"])
         self.assertEqual(
-            set(files), {"urinishlar.csv", "xulosa.csv", "testlar.csv", "test_javoblari.csv", "README.txt"}
+            set(files),
+            {"urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv", "README.txt"},
         )
         everything = "".join(files.values())
         for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):
@@ -1029,3 +1030,133 @@ class DuplicateLabTests(BaseTestCase):
         self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 403)
         self.auth_as(self.teacher_b)
         self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 404)
+
+
+class BlindReviewTests(BaseTestCase):
+    """Ko'r baholash: ish ism va AI bahosisiz beriladi, baho bir marta qo'yiladi, moslik to'g'ri hisoblanadi."""
+
+    review_url = "/api/labs/blind-review/"
+
+    def setUp(self):
+        super().setUp()
+        self.grades = []
+        for student, score, source in ((self.student_a1, 90, "ai"), (self.student_a2, 40, "auto")):
+            attempt = LabAttempt.objects.create(
+                lab=self.lab, student=student, sql_code=f"SELECT {score};", is_correct=score > 50,
+                feedback={"differences": ["Natijadagi qatorlar soni farq qiladi"]}, is_submission=True,
+            )
+            self.grades.append(
+                LabGrade.objects.create(
+                    lab=self.lab, student=student, attempt=attempt, score=score, source=source,
+                    comment="MAXFIY-AI-IZOH",
+                )
+            )
+
+    def auth_as(self, user):
+        cache.clear()  # login cheklovi xalaqit bermasin
+        super().auth_as(user)
+
+    def review(self, attempt_id, score):
+        return self.client.post(self.review_url, {"attempt": attempt_id, "score": score}, format="json")
+
+    def test_student_cannot_review(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.review_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.review(self.grades[0].attempt_id, 100).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.get(self.review_url + "agreement/").status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_item_hides_student_and_system_grade(self):
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["remaining"], data["reviewed"]), (2, 0))
+        text = str(data)
+        for secret in ("MAXFIY-AI-IZOH", "Zuhriddin", "student_a", "'score'", "source", str(self.student_a1.pk) + ","):
+            self.assertNotIn(secret, text)
+        self.assertIn(data["item"]["code"], {"SELECT 90;", "SELECT 40;"})
+        self.assertEqual(data["item"]["check"]["differences"], ["Natijadagi qatorlar soni farq qiladi"])
+
+    def test_review_is_saved_once_with_snapshot(self):
+        self.auth_as(self.teacher_a)
+        attempt_id = self.grades[0].attempt_id
+        self.assertEqual(self.review(attempt_id, 70).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.review(attempt_id, 95).status_code, status.HTTP_409_CONFLICT)
+        review = BlindReview.objects.get()
+        self.assertEqual((review.score, review.ai_score, review.ai_source), (70, 90, "ai"))
+        # Talaba keyin qayta topshirib, bahosi o'zgarsa ham juftlik o'zgarmaydi
+        LabGrade.objects.filter(pk=self.grades[0].pk).update(score=100)
+        review.refresh_from_db()
+        self.assertEqual(review.ai_score, 90)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["remaining"], data["reviewed"]), (1, 1))
+        self.assertEqual(data["item"]["attempt_id"], self.grades[1].attempt_id)
+
+    def test_invalid_input(self):
+        self.auth_as(self.teacher_a)
+        attempt_id = self.grades[0].attempt_id
+        for score in (101, -1, "80", True, 7.5, None):
+            self.assertEqual(self.review(attempt_id, score).status_code, status.HTTP_400_BAD_REQUEST, score)
+        self.assertEqual(self.review(str(attempt_id), 50).status_code, status.HTTP_400_BAD_REQUEST)
+        # Baholanmagan (navbatda yo'q) urinish
+        other = LabAttempt.objects.create(lab=self.lab, student=self.student_a1, is_correct=False)
+        self.assertEqual(self.review(other.pk, 50).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.review_url, {"lab": "1 OR 1=1"}).status_code, 400)
+        self.assertFalse(BlindReview.objects.exists())
+
+    def test_other_teacher_cannot_see_or_review(self):
+        self.auth_as(self.teacher_b)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["item"], data["remaining"]), (None, 0))
+        self.assertEqual(self.review(self.grades[0].attempt_id, 50).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(BlindReview.objects.exists())
+
+    def test_agreement_visibility_and_export(self):
+        import csv
+        import io
+        import zipfile
+
+        self.auth_as(self.teacher_a)
+        self.review(self.grades[0].attempt_id, 80)
+        self.auth_as(self.admin)
+        self.review(self.grades[1].attempt_id, 45)
+
+        # O'qituvchi faqat o'zi baholagan ishlar juftligini ko'radi, admin — hammasini
+        self.auth_as(self.teacher_a)
+        mine = self.client.get(self.review_url + "agreement/").data
+        self.assertEqual(mine["overall"]["count"], 1)
+        self.assertEqual(mine["pairs"], [{"lab_id": self.lab.pk, "lab_kind": "sql", "system": 90, "teacher": 80, "source": "ai"}])
+        self.auth_as(self.admin)
+        everything = self.client.get(self.review_url + "agreement/").data
+        self.assertEqual(everything["overall"]["count"], 2)
+        self.assertEqual(everything["overall"]["mean_diff"], 2.5)  # (10 + -5) / 2
+        self.assertEqual(everything["by_source"]["auto"]["count"], 1)
+
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+        rows = list(csv.DictReader(io.StringIO(archive.read("baholash_mosligi.csv").decode("utf-8-sig")), delimiter=";"))
+        self.assertEqual([(row["tizim_ball"], row["oqituvchi_ball"], row["farq"]) for row in rows], [("90", "80", "10"), ("40", "45", "-5")])
+        self.assertEqual([(row["tizim_baho"], row["oqituvchi_baho"]) for row in rows], [("5", "4"), ("2", "2")])
+        self.assertTrue(all(row["baholovchi"].startswith("O-") for row in rows))
+        self.assertNotIn("teacher_a", archive.read("baholash_mosligi.csv").decode("utf-8-sig"))
+
+
+class AgreementMathTests(TestCase):
+    def test_statistics(self):
+        from .blind_review import agreement_stats, band, pearson, weighted_kappa
+
+        self.assertEqual([band(score) for score in (100, 86, 85, 71, 70, 55, 54, 0)], [5, 5, 4, 4, 3, 3, 2, 2])
+        self.assertAlmostEqual(pearson([1, 2, 3], [2, 4, 6]), 1.0)
+        self.assertIsNone(pearson([5, 5], [1, 2]))
+        self.assertEqual(weighted_kappa([2, 3, 4, 5], [2, 3, 4, 5]), 1.0)
+        # Qarama-qarshi baholar — manfiy kappa
+        self.assertLess(weighted_kappa([2, 2, 5, 5], [5, 5, 2, 2]), 0)
+
+        class Review:
+            def __init__(self, ai_score, score):
+                self.ai_score, self.score = ai_score, score
+
+        stats = agreement_stats([Review(90, 80), Review(60, 60), Review(30, 50)])
+        self.assertEqual(stats["count"], 3)
+        self.assertEqual(stats["mean_abs_diff"], 10.0)
+        self.assertEqual(stats["mean_diff"], -3.3)
+        self.assertEqual(stats["band_agreement"], 0.667)
+        self.assertEqual(stats["within_10"], 0.667)
+        self.assertEqual(agreement_stats([]), {"count": 0})

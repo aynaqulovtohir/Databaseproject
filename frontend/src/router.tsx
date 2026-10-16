@@ -8,6 +8,7 @@ import { GroupsPage } from '@/pages/admin/GroupsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
+import { BlindReviewPage } from '@/pages/BlindReviewPage'
 import { HomePage } from '@/pages/HomePage'
 import { LabDetailPage } from '@/pages/LabDetailPage'
 import { LabsPage } from '@/pages/LabsPage'
@@ -67,7 +68,10 @@ export const router = createBrowserRouter([
       { path: '/quizzes/:id', element: <QuizDetailPage /> },
       {
         element: <RequireRole roles={['admin', 'teacher']} />,
-        children: [{ path: '/statistics', element: <StatisticsPage /> }],
+        children: [
+          { path: '/statistics', element: <StatisticsPage /> },
+          { path: '/blind-review', element: <BlindReviewPage /> },
+        ],
       },
       {
         element: <RequireRole roles={['admin']} />,
