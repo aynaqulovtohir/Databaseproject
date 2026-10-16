@@ -12,7 +12,7 @@ from django.db import transaction
 
 from users.models import StudentGroup, User
 
-from ...checker import LabSetupError, validate_lab_sql, validate_plan
+from ...checker import LabSetupError, validate_concurrent, validate_lab_sql, validate_plan
 from ...design_labs import ALL_LABS
 from ...er import DiagramError, validate_diagram
 from ...models import Lab
@@ -49,6 +49,8 @@ class Command(BaseCommand):
                     )
                     if lab_data.get("given_diagram"):
                         validate_diagram(lab_data["given_diagram"])
+                    if lab_data.get("concurrent"):
+                        validate_concurrent(lab_data["setup_sql"], lab_data["solution_sql"])
                     if lab_data.get("plan_query"):
                         validate_plan(
                             lab_data["setup_sql"],

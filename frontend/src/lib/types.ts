@@ -228,6 +228,8 @@ export interface Lab {
   plan_query?: string
   /** Vergul bilan: rejada bo'lmasligi kerak bo'lgan tugunlar. Faqat admin va o'qituvchiga */
   plan_forbidden?: string
+  /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
+  concurrent?: boolean
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
@@ -269,6 +271,17 @@ export interface LabTryTable {
   rows_truncated: boolean
 }
 
+/** Tranzaksiya laboratoriyasi: ikki sessiyaning vaqt chizig'idagi bitta voqea */
+export interface LabConcurrentStep {
+  session: 'A' | 'B'
+  sql: string
+  /** ok — bajarildi; waiting — qulf kutmoqda; resumed — kutishdan keyin bajarildi; error — xato */
+  status: 'ok' | 'waiting' | 'resumed' | 'error'
+  columns: string[]
+  rows: (string | null)[][]
+  message: string
+}
+
 /** Erkin sinash natijasi: tekshirilmaydi va urinish sifatida saqlanmaydi */
 export interface LabTryResult {
   error: LabRunError | null
@@ -277,6 +290,8 @@ export interface LabTryResult {
   tables: LabTryTable[]
   /** Indeks laboratoriyasida: so'rov rejasi qatorlari */
   plan: string[] | null
+  /** Tranzaksiya laboratoriyasida: ikki sessiyaning vaqt chizig'i */
+  steps?: LabConcurrentStep[]
 }
 
 export interface LabRunResult {
@@ -289,6 +304,8 @@ export interface LabRunResult {
   checked_against_solution: boolean
   /** Indeks laboratoriyasida: so'rov rejasi qatorlari */
   plan?: string[] | null
+  /** Tranzaksiya laboratoriyasida: ikki sessiyaning vaqt chizig'i */
+  steps?: LabConcurrentStep[]
   /** Faqat talabada: saqlangan urinish id'si */
   attempt_id: number | null
   ai_available: boolean

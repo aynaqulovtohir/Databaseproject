@@ -1867,3 +1867,130 @@ class IndexLabsTests(BaseTestCase):
         response = self.run_code("CREATE INDEX ON foydalanuvchi (email)")
         self.assertTrue(response.data["is_correct"], response.data["differences"])
         self.assertTrue(response.data["plan"])
+
+
+LOST_UPDATE = (
+    "BEGIN; SELECT balans FROM hisob WHERE id = 1; "
+    "UPDATE hisob SET balans = (SELECT balans FROM hisob WHERE id = 1) - 100000 WHERE id = 1; "
+    "INSERT INTO amaliyot (hisob_id, summa) VALUES (1, 100000); COMMIT;"
+)
+
+
+class TransactionLabsTests(BaseTestCase):
+    """Tranzaksiyalar: kod ikki sessiyada bir vaqtda bajariladi (sandbox.run_concurrent, transaction_labs.py)."""
+
+    @staticmethod
+    def tx_lab(number):
+        from .transaction_labs import TRANSACTION_LABS
+
+        data = dict(TRANSACTION_LABS[number - 1])
+        data.pop("theory")
+        return Lab(**data)
+
+    def check(self, number, code):
+        from .checker import check_code
+
+        return check_code(self.tx_lab(number), code)
+
+    def test_split_statements(self):
+        from .sandbox import split_statements
+
+        script = "BEGIN; SELECT $$a;b$$, 'x;''y' -- izoh; z\n; /* ; */ SELECT \"q;w\" FROM t;; COMMIT"
+        self.assertEqual(split_statements(script), ["BEGIN", "SELECT $$a;b$$, 'x;''y'", 'SELECT "q;w" FROM t', "COMMIT"])
+
+    def test_answers_are_judged(self):
+        cases = [
+            (1, self.tx_lab(1).solution_sql, True),
+            (1, LOST_UPDATE, False),
+            (1, LOST_UPDATE.replace("WHERE id = 1;", "WHERE id = 1 FOR UPDATE;", 1), True),
+            (2, self.tx_lab(2).solution_sql, True),
+            (
+                2,
+                "BEGIN; WITH s AS (UPDATE mahsulot SET qoldiq = qoldiq - 1 WHERE id = 1 AND qoldiq > 0 RETURNING id) "
+                "INSERT INTO buyurtma (mahsulot_id) SELECT id FROM s; COMMIT;",
+                True,
+            ),
+            (
+                2,
+                "BEGIN; INSERT INTO buyurtma (mahsulot_id) SELECT 1 WHERE (SELECT qoldiq FROM mahsulot WHERE id = 1) > 0; "
+                "UPDATE mahsulot SET qoldiq = qoldiq - 1 WHERE id = 1 AND qoldiq > 0; COMMIT;",
+                False,
+            ),
+        ]
+        for number, code, correct in cases:
+            self.assertEqual(self.check(number, code)["is_correct"], correct, code)
+
+    def test_messages_explain_the_problem(self):
+        from .checker import CONCURRENCY_MISMATCH
+
+        self.assertEqual(self.check(1, LOST_UPDATE)["differences"], [CONCURRENCY_MISMATCH])
+        no_transaction = self.check(1, "UPDATE hisob SET balans = balans - 100000 WHERE id = 1;")
+        self.assertIn("BEGIN", no_transaction["differences"][0])
+        serializable = self.check(
+            1,
+            "BEGIN ISOLATION LEVEL SERIALIZABLE; UPDATE hisob SET balans = balans - 100000 WHERE id = 1; "
+            "INSERT INTO amaliyot (hisob_id, summa) VALUES (1, 100000); COMMIT;",
+        )
+        self.assertIn("B sessiyasida", serializable["error"]["message"])
+        self.assertIn("Serializatsiya", serializable["error"]["tip"])
+
+    def test_timeline_shows_lost_update(self):
+        from .checker import try_code
+
+        result = try_code(self.tx_lab(1), LOST_UPDATE)
+        steps = [(step["session"], step["status"], step["rows"]) for step in result["steps"]]
+        # B ham eski qiymatni (500000) o'qidi va A ning qulfini kutdi
+        self.assertIn(("B", "ok", [["500000.00"]]), steps)
+        self.assertIn("waiting", [status for session, status, _ in steps if session == "B"])
+        balance = next(table for table in result["tables"] if table["name"] == "hisob")
+        self.assertEqual(balance["row_count"], 2)
+        self.assertNotIn("is_correct", result)
+
+    def test_sandbox_limits_hold(self):
+        from . import sandbox
+        from .sandbox import run_concurrent
+
+        setup = self.tx_lab(1).setup_sql
+        self.assertIn("buyruq", run_concurrent("SELECT 1;" * 25, setup).error.message)
+        slow = run_concurrent("BEGIN; SELECT pg_sleep(20); COMMIT;", setup)
+        self.assertIsNotNone(slow.error)
+        copy = run_concurrent("BEGIN; COPY hisob FROM STDIN; COMMIT;", setup)
+        self.assertIn("COPY", copy.error.message)
+        big = "BEGIN; CREATE TABLE t (s TEXT);" + "INSERT INTO t SELECT repeat('x', 500) FROM generate_series(1, 20000);" * 15 + "COMMIT;"
+        with patch.object(sandbox, "MAX_STORAGE_BYTES", sandbox._storage_used_now() + 5 * 1024 * 1024):
+            self.assertIn("juda ko'p ma'lumot", run_concurrent(big).error.message)
+        self.assertIsNone(run_sql("SELECT 1").error)
+
+    def test_theory_examples_run_and_hide_solutions(self):
+        import re
+
+        from .transaction_labs import TRANSACTION_LABS
+
+        for lab_data in TRANSACTION_LABS:
+            examples = re.findall(r"```sql\n(.*?)```", lab_data["theory"], re.DOTALL)
+            self.assertTrue(examples, lab_data["title"])
+            for code in examples:
+                self.assertIsNone(run_sql(code).error, lab_data["title"])
+                self.assertIsNone(re.search(r"\b(hisob|mahsulot|buyurtma|amaliyot)\b", code), lab_data["title"])
+
+    def test_api_visibility_and_validation(self):
+        from .transaction_labs import TRANSACTION_LABS
+
+        lab_data = TRANSACTION_LABS[0]
+        self.auth_as(self.teacher_a)
+        fields = {"setup_sql": lab_data["setup_sql"], "concurrent": True}
+        response = self.client.patch(self.url, {**fields, "solution_sql": LOST_UPDATE}, format="json")
+        self.assertIn("solution_sql", response.data)
+        response = self.client.patch(
+            self.url, {**fields, "solution_sql": lab_data["solution_sql"], "plan_query": "SELECT 1"}, format="json"
+        )
+        self.assertIn("concurrent", response.data)
+        response = self.client.patch(self.url, {**fields, "solution_sql": lab_data["solution_sql"]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        self.auth_as(self.student_a1)
+        self.assertTrue(self.client.get(self.url).data["concurrent"])
+        response = self.run_code(LOST_UPDATE)
+        self.assertFalse(response.data["is_correct"])
+        self.assertTrue(response.data["steps"])
+        self.assertTrue(LabAttempt.objects.filter(student=self.student_a1, is_correct=False).exists())

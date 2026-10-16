@@ -1,8 +1,9 @@
 """Talaba kodini ishga tushirib, namunaviy yechim bilan solishtiradi va xatoni tushuntiradi."""
 import re
 from collections import Counter
+from types import SimpleNamespace
 
-from .sandbox import SqlError, run_sql
+from .sandbox import SqlError, run_concurrent, run_sql, split_statements
 
 MAX_DISPLAY_ROWS = 100
 MAX_DIFFERENCES = 8
@@ -39,6 +40,13 @@ ERROR_TIPS = {
     "(yoki o'chirilayotgan qatorga boshqa jadval bog'langan).",
     "23505": "UNIQUE yoki PRIMARY KEY buzildi: bunday qiymat jadvalda allaqachon bor.",
     "23514": "CHECK cheklovi buzildi: qiymat ustunga qo'yilgan shartga to'g'ri kelmaydi.",
+    "40001": "Serializatsiya xatosi: tranzaksiya parallel tranzaksiya bilan to'qnashdi va bekor qilindi. Haqiqiy "
+    "dasturda bunday tranzaksiya qayta uriniladi; bu laboratoriyada esa qatorni qulflang yoki o'zgarishni bitta "
+    "atomar buyruq bilan qiling.",
+    "40P01": "O'zaro qulflanish (deadlock): ikki tranzaksiya bir-birining qulfini kutib qoldi va biri bekor qilindi. "
+    "Qatorlarni har doim bir xil tartibda qulflang.",
+    "55P03": "Qulfni kutish vaqti tugadi: boshqa tranzaksiya qatorni uzoq vaqt qulflab turdi.",
+    "25P02": "Tranzaksiya avvalgi xato tufayli bekor qilingan: undagi keyingi buyruqlar bajarilmaydi.",
     "57014": "Kod juda uzoq ishladi. Cheksiz sikl yoki shartsiz JOIN (juda ko'p qator) yo'qligini tekshiring.",
 }
 
@@ -285,6 +293,8 @@ def try_code(lab, sql_code):
 
     Namunaviy yechim ishga tushirilmaydi: javobdan yechim haqida hech narsa bilib bo'lmaydi.
     """
+    if getattr(lab, "concurrent", False):
+        return try_concurrent(lab, sql_code)
     outcome = run_sql(sql_code, lab.setup_sql, lab.plan_query)
     if outcome.setup_failed:
         raise LabSetupError("setup_sql", outcome.error)
@@ -315,8 +325,121 @@ def _passes_hidden(lab, sql_code, ordered):
     return not differences and not _compare_tables(student.tables, expected.tables)
 
 
+TRANSACTION_START = re.compile(r"^(BEGIN|START\s+TRANSACTION)\b", re.IGNORECASE)
+TRANSACTION_END = re.compile(r"^(COMMIT|END)\b", re.IGNORECASE)
+CONCURRENCY_MISMATCH = (
+    "Kod ketma-ket ishlaganda to'g'ri, lekin ikki sessiya bir vaqtda ishlaganda natija boshqacha chiqdi: "
+    "bir sessiya ikkinchisi hali COMMIT qilmagan eski qiymatni o'qib, uning o'zgarishini yo'qotdi (yoki ikkalasi "
+    "bir xil shartni bir vaqtda tekshirdi). Vaqt chizig'iga qarang: qaysi sessiya nimani o'qidi?"
+)
+
+
+def _transaction_format_error(sql_code):
+    statements = split_statements(sql_code)
+    if len(statements) < 2 or not TRANSACTION_START.match(statements[0]) or not TRANSACTION_END.match(statements[-1]):
+        return "Kod bitta tranzaksiya bo'lsin: BEGIN bilan boshlanib, COMMIT bilan tugasin."
+    return None
+
+
+def _steps_payload(outcome):
+    return [
+        {
+            "session": step.session,
+            "sql": step.sql,
+            "status": step.status,
+            "columns": step.columns,
+            "rows": [list(row) for row in step.rows],
+            "message": step.message,
+        }
+        for step in outcome.steps
+    ]
+
+
+def _concurrent_error(outcome):
+    payload = _error_payload(outcome.error)
+    if outcome.error_session:
+        payload["message"] = f"{outcome.error_session} sessiyasida: {payload['message']}"
+    return payload
+
+
+def _twice(sql_code):
+    """Kod ketma-ket ikki marta (avval A, keyin B) — parallel natija shunga teng bo'lishi kerak."""
+    statements = ";\n".join(split_statements(sql_code))
+    return f"{statements};\n{statements};"
+
+
+def check_concurrent(lab, sql_code):
+    """Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda bajariladi.
+
+    To'g'ri bo'lishi uchun: (1) ketma-ket ikki marta bajarilgandagi natija namunaviy yechimnikiga teng;
+    (2) parallel natija ketma-ket natijaga teng (serializatsiya).
+    """
+    base = {"result": None, "status_message": "", "checked_against_solution": True, "plan": None, "steps": []}
+    format_error = _transaction_format_error(sql_code)
+    if format_error:
+        return {**base, "is_correct": False, "error": None, "differences": [format_error]}
+
+    concurrent = run_concurrent(sql_code, lab.setup_sql)
+    if concurrent.setup_failed:
+        raise LabSetupError("setup_sql", concurrent.error)
+    base["steps"] = _steps_payload(concurrent)
+    if concurrent.error:
+        return {**base, "is_correct": False, "error": _concurrent_error(concurrent), "differences": []}
+
+    expected = run_sql(_twice(lab.solution_sql), lab.setup_sql)
+    if expected.error:
+        raise LabSetupError("solution_sql", expected.error)
+    serial = run_sql(_twice(sql_code), lab.setup_sql)
+    if serial.error:
+        return {**base, "is_correct": False, "error": _error_payload(serial.error), "differences": []}
+    differences = _compare_tables(serial.tables, expected.tables)
+    if differences:
+        differences = ["Kod ketma-ket ishlaganda ham natija kutilganidan farq qiladi:"] + differences
+    elif _compare_tables(concurrent.tables, expected.tables):
+        differences = [CONCURRENCY_MISMATCH]
+    return {**base, "is_correct": not differences, "error": None, "differences": differences[:MAX_DIFFERENCES]}
+
+
+def try_concurrent(lab, sql_code):
+    """Erkin sinash: ikki sessiyada bajarib vaqt chizig'i va jadvallarni ko'rsatadi, tekshirmaydi."""
+    format_error = _transaction_format_error(sql_code)
+    if format_error:
+        return {
+            "error": {"message": format_error, "sqlstate": "", "detail": "", "hint": "", "line": None, "tip": ""},
+            "result": None,
+            "status_message": "",
+            "tables": [],
+            "plan": None,
+            "steps": [],
+        }
+    outcome = run_concurrent(sql_code, lab.setup_sql)
+    if outcome.setup_failed:
+        raise LabSetupError("setup_sql", outcome.error)
+    return {
+        "error": _concurrent_error(outcome) if outcome.error else None,
+        "result": None,
+        "status_message": "",
+        "tables": _tables_payload(outcome.tables),
+        "plan": None,
+        "steps": _steps_payload(outcome),
+    }
+
+
+def validate_concurrent(setup_sql, solution_sql):
+    """Tranzaksiya laboratoriyasi: namunaviy yechim to'g'ri formatda va parallel ishlaganda ham to'g'ri."""
+    format_error = _transaction_format_error(solution_sql)
+    if format_error:
+        raise LabSetupError("solution_sql", SqlError(format_error))
+    result = check_concurrent(SimpleNamespace(setup_sql=setup_sql, solution_sql=solution_sql), solution_sql)
+    if not result["is_correct"]:
+        problem = (result["error"] or {}).get("message") or result["differences"][0]
+        raise LabSetupError("solution_sql", SqlError(f"Namunaviy yechim ikki sessiyada noto'g'ri ishladi: {problem}"))
+
+
 def check_code(lab, sql_code):
     """Kodni ishga tushiradi va tekshiruv natijasini lug'at ko'rinishida qaytaradi."""
+    if getattr(lab, "concurrent", False):
+        return check_concurrent(lab, sql_code)
     outcome = run_sql(sql_code, lab.setup_sql, lab.plan_query)
     if outcome.setup_failed:
         raise LabSetupError("setup_sql", outcome.error)

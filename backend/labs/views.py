@@ -386,6 +386,7 @@ class LabViewSet(viewsets.ModelViewSet):
             given_diagram=lab.given_diagram,
             plan_query=lab.plan_query,
             plan_forbidden=lab.plan_forbidden,
+            concurrent=lab.concurrent,
             author=request.user,
         )
         copy.groups.set(groups)
