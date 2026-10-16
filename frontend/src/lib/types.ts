@@ -224,6 +224,10 @@ export interface Lab {
   reference_diagram?: ErDiagram | null
   /** SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL) */
   given_diagram?: ErDiagram | null
+  /** Indeks laboratoriyasi: rejasi (EXPLAIN) tekshiriladigan so'rov */
+  plan_query?: string
+  /** Vergul bilan: rejada bo'lmasligi kerak bo'lgan tugunlar. Faqat admin va o'qituvchiga */
+  plan_forbidden?: string
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
@@ -271,6 +275,8 @@ export interface LabTryResult {
   result: LabRunTable | null
   status_message: string
   tables: LabTryTable[]
+  /** Indeks laboratoriyasida: so'rov rejasi qatorlari */
+  plan: string[] | null
 }
 
 export interface LabRunResult {
@@ -281,6 +287,8 @@ export interface LabRunResult {
   /** Namunaviy yechimdan farqlar */
   differences: string[]
   checked_against_solution: boolean
+  /** Indeks laboratoriyasida: so'rov rejasi qatorlari */
+  plan?: string[] | null
   /** Faqat talabada: saqlangan urinish id'si */
   attempt_id: number | null
   ai_available: boolean

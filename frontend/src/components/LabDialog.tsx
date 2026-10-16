@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -44,6 +44,8 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [setupSql, setSetupSql] = useState(lab?.setup_sql ?? '')
   const [solutionSql, setSolutionSql] = useState(lab?.solution_sql ?? '')
   const [hiddenSql, setHiddenSql] = useState(lab?.hidden_setup_sql ?? '')
+  const [planQuery, setPlanQuery] = useState(lab?.plan_query ?? '')
+  const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [groupIds, setGroupIds] = useState<number[]>(lab?.groups ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -60,6 +62,8 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               solution_sql: solutionSql,
               hidden_setup_sql: hiddenSql,
               given_diagram: givenDiagram.entities.length ? cleanDiagram(givenDiagram) : null,
+              plan_query: planQuery,
+              plan_forbidden: planForbidden,
             }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
@@ -236,6 +240,39 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   {...SQL_PROPS}
                 />
               </FormField>
+              <FormField
+                id="lab_plan_query"
+                label="Rejasi tekshiriladigan so'rov (indeks laboratoriyasi, ixtiyoriy)"
+                error={errors.plan_query}
+                hint="Talaba kodidan keyin shu so'rovning EXPLAIN rejasi olinadi (so'rov bajarilmaydi). Talabaga ko'rinadi. Namunaviy yechim indeks yaratishi kerak."
+              >
+                <Textarea
+                  id="lab_plan_query"
+                  className="max-h-40 min-h-16 font-mono text-sm md:text-xs"
+                  placeholder="SELECT id FROM foydalanuvchi WHERE email = '...'"
+                  maxLength={5000}
+                  aria-invalid={Boolean(errors.plan_query)}
+                  value={planQuery}
+                  onChange={(event) => setPlanQuery(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              {planQuery.trim() ? (
+                <FormField
+                  id="lab_plan_forbidden"
+                  label="Rejada bo'lmasligi kerak"
+                  error={errors.plan_forbidden}
+                  hint="Vergul bilan: Seq Scan, Sort, Bitmap Heap Scan."
+                >
+                  <Input
+                    id="lab_plan_forbidden"
+                    maxLength={200}
+                    aria-invalid={Boolean(errors.plan_forbidden)}
+                    value={planForbidden}
+                    onChange={(event) => setPlanForbidden(event.target.value)}
+                  />
+                </FormField>
+              ) : null}
             </>
           )}
           <FormField id="lab_groups" label="Guruhlar" error={errors.groups}>

@@ -36,6 +36,11 @@ ROLE_PREFIX = "labrun_"
 # Bitta ishga tushirishning vaqtinchalik fayllari (katta saralash, hash) uchun disk chegarasi.
 # Bu sozlamani faqat superuser o'zgartira oladi, talaba kodi uni oshira olmaydi.
 TEMP_FILE_LIMIT = "64MB"
+# Qum quti bazasi va vaqtinchalik fayllarning umumiy disk chegarasi. Server ma'lumotlari tmpfs'da (512m);
+# PostgreSQL'da sxema bo'yicha kvota yo'q, shuning uchun kod bajarilayotganda hajm muntazam tekshiriladi va
+# oshsa, kod to'xtatiladi: aks holda bitta talaba bir necha soniyada diskni to'ldirib, hammaga xalaqit beradi
+MAX_STORAGE_BYTES = 256 * 1024 * 1024
+STORAGE_CHECK_SECONDS = 0.5
 # Talaba rolidan yopiladigan tizim ro'yxatlari: ular laboratoriya uchun kerak emas,
 # lekin serverdagi boshqa bazalar, foydalanuvchilar va sessiyalar haqida ma'lumot beradi
 HIDDEN_CATALOG_VIEWS = (
@@ -92,6 +97,13 @@ class TableState:
 
 
 @dataclass
+class PlanNode:
+    node_type: str
+    relation: str = ""
+    index: str = ""
+
+
+@dataclass
 class RunOutcome:
     error: SqlError | None = None
     # Oxirgi natija qaytargan buyruq (odatda SELECT) natijasi
@@ -102,6 +114,13 @@ class RunOutcome:
     tables: dict[str, TableState] = field(default_factory=dict)
     # True bo'lsa, xato talaba kodida emas, boshlang'ich jadvallarda (setup_sql)
     setup_failed: bool = False
+    # explain_sql berilganda: so'rov rejasi (EXPLAIN, xarajatlarsiz) qatorlari va rejadagi tugunlar
+    plan: list[str] = field(default_factory=list)
+    plan_nodes: list[PlanNode] = field(default_factory=list)
+    # Rejalashtiruvchi baholagan umumiy narx (shartli birlik): taqqoslash uchun
+    plan_cost: float | None = None
+    # Rejani olib bo'lmadi (masalan, talaba jadvalni o'chirib yuborgan)
+    plan_error: SqlError | None = None
 
 
 def _connect(dbname, **overrides):
@@ -223,16 +242,43 @@ def _error_from_result(result, script):
     )
 
 
-def _execute_script(runner, script):
+def _storage_used(admin):
+    """Qum quti bazasi fayllari (commit qilinmagan ma'lumot ham) va vaqtinchalik fayllar hajmi, baytda."""
+    return admin.execute(
+        "SELECT pg_database_size(current_database())"
+        " + coalesce((SELECT sum(size) FROM pg_ls_tmpdir()), 0)"
+    ).fetchone()[0]
+
+
+def _storage_used_now():
+    with _connect(settings.LAB_SANDBOX_DB) as admin:
+        return _storage_used(admin)
+
+
+def _execute_script(runner, script, admin=None):
     """Bir nechta buyruqdan iborat skriptni bajaradi. Qaytaradi: (xato, oxirgi natija, holat).
 
     Natija qatorma-qator qabul qilinadi, shuning uchun juda katta natija
-    server xotirasini to'ldirib qo'ymaydi.
+    server xotirasini to'ldirib qo'ymaydi. `admin` berilsa, disk hajmi ham kuzatiladi.
     """
     pgconn = runner.pgconn
     deadline = time.monotonic() + SCRIPT_TIMEOUT_SECONDS
     timed_out = False
     cancelled = False
+    too_much_data = False
+    next_storage_check = time.monotonic() + STORAGE_CHECK_SECONDS
+
+    def check_storage():
+        nonlocal too_much_data, next_storage_check
+        if admin is None or cancelled or time.monotonic() < next_storage_check:
+            return
+        next_storage_check = time.monotonic() + STORAGE_CHECK_SECONDS
+        try:
+            if _storage_used(admin) > MAX_STORAGE_BYTES:
+                too_much_data = True
+                cancel()
+        except psycopg.Error:
+            logger.warning("Qum quti hajmini tekshirib bo'lmadi", exc_info=True)
 
     def cancel():
         nonlocal cancelled, deadline
@@ -248,6 +294,7 @@ def _execute_script(runner, script):
         """Keyingi natijani kutadi; vaqt tugasa buyruqni bekor qiladi."""
         nonlocal timed_out
         while pgconn.is_busy():
+            check_storage()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 if cancelled:
@@ -257,7 +304,7 @@ def _execute_script(runner, script):
                 timed_out = True
                 cancel()
                 continue
-            select.select([pgconn.socket], [], [], min(remaining, 1.0))
+            select.select([pgconn.socket], [], [], min(remaining, STORAGE_CHECK_SECONDS))
             pgconn.consume_input()
         return pgconn.get_result()
 
@@ -272,6 +319,7 @@ def _execute_script(runner, script):
         pgconn.send_query(script.encode("utf-8"))
         pgconn.set_single_row_mode()
         while (result := next_result()) is not None:
+            check_storage()
             status = result.status
             if status in (pq.ExecStatus.SINGLE_TUPLE, pq.ExecStatus.TUPLES_OK):
                 if current is None:
@@ -308,7 +356,12 @@ def _execute_script(runner, script):
     except (psycopg.Error, OSError) as exc:
         error = error or SqlError(message=f"Ulanish uzildi: {exc}")
 
-    if too_many_rows:
+    if too_much_data:
+        error = SqlError(
+            message=f"Kod juda ko'p ma'lumot yozdi ({MAX_STORAGE_BYTES // (1024 * 1024)} MB dan ortiq) va to'xtatildi.",
+            hint="Laboratoriya uchun kichik ma'lumot yetarli: generate_series va INSERT dagi qatorlar sonini kamaytiring.",
+        )
+    elif too_many_rows:
         error = SqlError(
             message=f"So'rov juda ko'p qator qaytardi ({MAX_RECEIVED_ROWS} tadan ortiq), shuning uchun to'xtatildi.",
             hint="WHERE sharti yoki LIMIT qo'shing; JOIN shartini tekshiring.",
@@ -370,8 +423,42 @@ def _read_tables(admin, schema):
     return tables
 
 
-def run_sql(script, setup_sql=""):
-    """`setup_sql` dan keyin `script` ni toza sxemada bajaradi va natijani qaytaradi."""
+def _plan_nodes(node):
+    nodes = [PlanNode(node.get("Node Type", ""), node.get("Relation Name", ""), node.get("Index Name", ""))]
+    for child in node.get("Plans", []):
+        nodes += _plan_nodes(child)
+    return nodes
+
+
+def _explain(runner, query, outcome):
+    """So'rov rejasini talaba sessiyasida (uning cheklangan roli bilan) oladi.
+
+    Admin ulanishida emas: rejalashtirish paytida IMMUTABLE funksiyalar bajarilishi mumkin, talaba esa o'z
+    funksiyasini view orqali qo'yib qo'yishi mumkin. RESET ALL — talaba SET enable_seqscan = off kabi
+    sozlamalar bilan rejani "aldamasligi" uchun (ulanish parametrlari, masalan search_path, saqlanib qoladi).
+    """
+    if runner.closed:
+        outcome.plan_error = SqlError(message="So'rov rejasini olib bo'lmadi: ulanish uzilgan.")
+        return
+    try:
+        runner.execute("RESET ALL")
+        document = runner.execute(f"EXPLAIN (FORMAT JSON) {query}").fetchone()[0]
+        outcome.plan_nodes = _plan_nodes(document[0]["Plan"])
+        outcome.plan_cost = float(document[0]["Plan"]["Total Cost"])
+        outcome.plan = [row[0] for row in runner.execute(f"EXPLAIN (COSTS OFF) {query}").fetchall()]
+    except psycopg.Error as exc:
+        diag = exc.diag
+        outcome.plan_error = SqlError(
+            message=(diag.message_primary if diag else None) or str(exc).splitlines()[0],
+            sqlstate=(diag.sqlstate if diag else None) or "",
+        )
+
+
+def run_sql(script, setup_sql="", explain_sql=""):
+    """`setup_sql` dan keyin `script` ni toza sxemada bajaradi va natijani qaytaradi.
+
+    `explain_sql` berilsa, skriptdan keyin shu so'rovning rejasi ham olinadi (so'rovning o'zi bajarilmaydi).
+    """
     _ensure_database()
     role = ROLE_PREFIX + uuid.uuid4().hex[:20]
     password = secrets.token_hex(24)
@@ -403,12 +490,14 @@ def run_sql(script, setup_sql=""):
             )
             try:
                 if setup_sql.strip():
-                    setup_error, _, _ = _execute_script(runner, setup_sql)
+                    setup_error, _, _ = _execute_script(runner, setup_sql, admin)
                     if setup_error:
                         outcome.error = setup_error
                         outcome.setup_failed = True
                         return outcome
-                outcome.error, outcome.result, outcome.status_message = _execute_script(runner, script)
+                outcome.error, outcome.result, outcome.status_message = _execute_script(runner, script, admin)
+                if explain_sql.strip() and outcome.error is None:
+                    _explain(runner, explain_sql, outcome)
             finally:
                 runner.close()
             if outcome.error is None:
