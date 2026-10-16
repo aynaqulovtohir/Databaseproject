@@ -94,6 +94,8 @@ export interface AssignmentStage {
   id: number
   /** 0 dan boshlab */
   order: number
+  /** Talaba nima topshiradi: SQL kod yoki ER-diagramma */
+  kind: 'sql' | 'er'
   title: string
   description: string
   deadline: string
@@ -172,7 +174,10 @@ export interface Submission {
   student: PersonShort
   /** Bosqichli loyihada bosqich id'si */
   stage: number | null
+  /** ER-diagramma bosqichida bo'sh */
   sql_code: string
+  /** ER-diagramma bosqichida chizilgan diagramma */
+  diagram: ErDiagram | null
   attempt_number: number
   is_late: boolean
   status: SubmissionStatus
@@ -679,3 +684,4 @@ export interface Statistics {
   ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
   groups: StatisticsGroup[]
 }
+

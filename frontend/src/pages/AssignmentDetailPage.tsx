@@ -8,6 +8,7 @@ import { AnalysisPanel } from '@/components/AnalysisPanel'
 import { AssignmentDialog } from '@/components/AssignmentDialog'
 import { ChatPanel } from '@/components/ChatPanel'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { ErEditor } from '@/components/ErEditor'
 import { PageHeader } from '@/components/PageHeader'
 import { GradeBreakdown, RubricList } from '@/components/ProjectPlan'
 import { SqlCode } from '@/components/SqlCode'
@@ -22,7 +23,8 @@ import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime, isPast } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
-import { type Assignment, type AssignmentStage, type MissingStudent, type Submission } from '@/lib/types'
+import { type Assignment, type AssignmentStage, type ErDiagram, type MissingStudent, type Submission } from '@/lib/types'
+import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -317,7 +319,7 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
       {/* Tahlil faqat urinish ochilganda so'raladi */}
       {open ? (
         <div className="grid gap-4 border-t p-3">
-          <SqlCode code={submission.sql_code} />
+          {submission.diagram ? <ErEditor value={submission.diagram} /> : <SqlCode code={submission.sql_code} />}
           {/* Tajribaning nazorat guruhida AI ko'rsatilmaydi */}
           {user.ai_enabled ? (
             <div>
@@ -342,19 +344,24 @@ function SubmitForm({
 }) {
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
+  const [diagram, setDiagram] = useState<ErDiagram>(EMPTY_DIAGRAM)
   const [error, setError] = useState<string | null>(null)
   const late = isPast(stage ? stage.deadline : assignment.deadline)
   const fieldId = stage ? `sql_code_${stage.id}` : 'sql_code'
+  const isDiagram = stage?.kind === 'er'
 
   const mutation = useMutation({
     mutationFn: () =>
       api<Submission>(`/assignments/${assignment.id}/submissions/`, {
         method: 'POST',
-        body: { sql_code: code, stage: stage ? stage.id : null },
+        body: isDiagram
+          ? { diagram: cleanDiagram(diagram), stage: stage!.id }
+          : { sql_code: code, stage: stage ? stage.id : null },
       }),
     onSuccess: (submission) => {
       toast.success('Yechim topshirildi')
       setCode('')
+      setDiagram(EMPTY_DIAGRAM)
       queryClient.setQueryData<Submission[]>(['submissions', assignment.id], (current) => [
         submission,
         ...(current ?? []),
@@ -362,7 +369,7 @@ function SubmitForm({
       void queryClient.invalidateQueries({ queryKey: ['assignments'] })
     },
     onError: (caught) => {
-      const message = fieldErrors(caught).sql_code
+      const message = fieldErrors(caught).sql_code ?? fieldErrors(caught).diagram
       if (message) setError(message)
       else toast.error(errorMessage(caught))
       // Holat o'zgargan bo'lishi mumkin (masalan, o'qituvchi baholab qo'ygan)
@@ -383,6 +390,17 @@ function SubmitForm({
           <AlertDescription>Muddat o'tgan: yechim «kechikkan» deb belgilanadi.</AlertDescription>
         </Alert>
       ) : null}
+      {isDiagram ? (
+        <div className="grid gap-1.5">
+          <span className="text-sm font-medium">ER-diagramma</span>
+          <ErEditor value={diagram} onChange={setDiagram} />
+          {error ? (
+            <p className="text-xs text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      ) : (
       <div className="grid gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
           SQL kod
@@ -405,7 +423,8 @@ function SubmitForm({
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="lg" className="justify-self-start" disabled={mutation.isPending || !code.trim()}>
+      )}
+      <Button type="submit" size="lg" className="justify-self-start" disabled={mutation.isPending || (isDiagram ? !diagram.entities.length : !code.trim())}>
         {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
         {isRetry ? 'Yangi urinishni topshirish' : 'Yechimni topshirish'}
       </Button>
@@ -464,7 +483,13 @@ function StudentView({ assignment }: { assignment: Assignment }) {
     <>
       <BackLink />
       <PageHeader title={assignment.title} description={`O'qituvchi: ${fullName(assignment.author)}`} />
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      {/* ER-diagramma chizish uchun keng joy kerak: bunday loyihada AI yordamchi yon ustunda emas, pastda */}
+      <div
+        className={cn(
+          'grid items-start gap-4',
+          !assignment.stages.some((stage) => stage.kind === 'er') && 'xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]',
+        )}
+      >
         <div className="grid gap-4">
           <ConditionCard assignment={assignment}>
             {assignment.my_stages?.total_score != null ? (

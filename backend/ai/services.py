@@ -43,6 +43,18 @@ def rubric_text(assignment, stage):
     )
 
 
+def solution_text(submission):
+    """Yechim matni: SQL kod yoki ER-diagrammaning matnli ko'rinishi."""
+    if submission.diagram:
+        from labs.er import diagram_to_text
+
+        return (
+            "Bu yechim SQL emas, konseptual ER-diagramma (obyektlar, atributlar, bog'lanishlar va kardinallik). "
+            "Uni ER-modellash qoidalari bo'yicha bahola.\n\n" + diagram_to_text(submission.diagram)
+        )
+    return submission.sql_code
+
+
 def build_analysis_messages(submission):
     """AI'ga yuboriladigan matn. Talaba haqida hech qanday ma'lumot qo'shilmaydi."""
     assignment = submission.assignment
@@ -62,7 +74,7 @@ def build_analysis_messages(submission):
                 title=assignment.title,
                 description=description,
                 grading_criteria=criteria or prompts.NO_CRITERIA_TEXT,
-                sql_code=submission.sql_code,
+                sql_code=solution_text(submission),
             ),
         }
     ]

@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AnalysisPanel, useAnalysis } from '@/components/AnalysisPanel'
+import { ErEditor } from '@/components/ErEditor'
 import { FormField } from '@/components/FormField'
 import { PageHeader } from '@/components/PageHeader'
 import { SqlCode } from '@/components/SqlCode'
@@ -281,10 +282,10 @@ function Review({ submission }: { submission: Submission }) {
         <div className="grid gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>SQL kod</CardTitle>
+              <CardTitle>{submission.diagram ? 'ER-diagramma' : 'SQL kod'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <SqlCode code={submission.sql_code} />
+              {submission.diagram ? <ErEditor value={submission.diagram} /> : <SqlCode code={submission.sql_code} />}
             </CardContent>
           </Card>
           <Card>

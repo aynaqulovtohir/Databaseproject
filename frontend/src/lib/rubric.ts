@@ -3,6 +3,7 @@
 export const RUBRIC_TOTAL = 100
 
 export interface StageDraft {
+  kind: 'sql' | 'er'
   title: string
   description: string
   /** datetime-local qiymati */
