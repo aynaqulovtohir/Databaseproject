@@ -136,6 +136,7 @@ ATTEMPT_COLUMNS = [
     "togri",
     "xato_turlari",
     "ai_maslahat",
+    "maslahat_darajasi",
     "kod_qatorlari",
     "kod_belgilari",
 ]
@@ -154,6 +155,8 @@ SUMMARY_COLUMNS = [
     "baza_xatolari",
     "natija_farqlari",
     "ai_maslahatlar",
+    "maslahat_darajalari_jami",
+    "eng_yuqori_maslahat_darajasi",
     "maslahatdan_keyin_yechdi",
     "topshirishlar",
     "eng_yuqori_baho",
@@ -196,6 +199,9 @@ natija                      togri | baza_xatosi (kod xato berdi) | natija_farqli
 togri                       1 / 0
 xato_turlari                xato toifalari, vergul bilan (pastdagi ro'yxatga qarang)
 ai_maslahat                 talaba shu urinish uchun AI maslahatini olganmi: 1 / 0
+maslahat_darajasi           olingan eng batafsil maslahat darajasi: 0 — olinmagan, 1 — yo'naltiruvchi
+                            savol, 2 — tushuncha nomi, 3 — aniq ko'rsatma (darajalar joriy etilishidan
+                            oldingi maslahatlar 3 deb yoziladi, chunki ular darhol batafsil berilgan)
 kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
 
 xulosa.csv — har bir talaba va laboratoriya
@@ -207,7 +213,9 @@ togri_gacha_urinishlar      birinchi to'g'ri urinishgacha (u ham kiradi) urinish
 yechish_vaqti_daqiqa        birinchi urinishdan birinchi to'g'ri urinishgacha
 baza_xatolari               kod xato bergan urinishlar soni
 natija_farqlari             kod ishlagan, lekin natija farq qilgan urinishlar soni
-ai_maslahatlar              olingan AI maslahatlari soni
+ai_maslahatlar              olingan AI maslahatlari soni (maslahat olingan urinishlar)
+maslahat_darajalari_jami    barcha urinishlardagi maslahat darajalari yig'indisi (jami so'ralgan yordam)
+eng_yuqori_maslahat_darajasi  urinishlardagi eng yuqori maslahat darajasi (0 — maslahat olinmagan)
 maslahatdan_keyin_yechdi    AI maslahatidan keyingi urinishlardan biri to'g'ri bo'lganmi: 1 / 0
                             (maslahat olinmagan bo'lsa bo'sh)
 topshirishlar               baholashga topshirishlar soni
@@ -278,6 +286,13 @@ def attempt_outcome(attempt):
     return "baza_xatosi" if attempt.feedback.get("error") else "natija_farqli"
 
 
+def hint_level(attempt):
+    """Olingan maslahat darajasi (0-3). Darajalargacha bo'lgan maslahat to'liq (3) hisoblanadi."""
+    if attempt.ai_hint_level:
+        return attempt.ai_hint_level
+    return 3 if attempt.ai_advice else 0
+
+
 def _local(moment):
     return timezone.localtime(moment).strftime("%Y-%m-%d %H:%M:%S") if moment else ""
 
@@ -318,6 +333,8 @@ def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
         "baza_xatolari": sum(1 for attempt in attempts if attempt.feedback.get("error")),
         "natija_farqlari": sum(1 for attempt in attempts if attempt_outcome(attempt) == "natija_farqli"),
         "ai_maslahatlar": sum(1 for attempt in attempts if attempt.ai_advice),
+        "maslahat_darajalari_jami": sum(hint_level(attempt) for attempt in attempts),
+        "eng_yuqori_maslahat_darajasi": max((hint_level(attempt) for attempt in attempts), default=0),
         "maslahatdan_keyin_yechdi": "",
         "topshirishlar": sum(1 for attempt in attempts if attempt.is_submission),
         "eng_yuqori_baho": grade.score if grade else "",
@@ -447,6 +464,7 @@ def build_export(labs, quizzes=None):
                         _flag(attempt.is_correct),
                         ",".join(attempt_categories(attempt)),
                         _flag(attempt.ai_advice),
+                        hint_level(attempt),
                         len(attempt.sql_code.splitlines()),
                         len(attempt.sql_code),
                     ]

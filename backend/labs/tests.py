@@ -628,7 +628,8 @@ class ResearchExportTests(BaseTestCase):
         self.run_code(SOLUTION)  # to'g'ri
         second = LabAttempt.objects.filter(student=self.student_a1).order_by("id")[1]
         second.ai_advice = "maslahat"
-        second.save(update_fields=["ai_advice"])
+        second.ai_hint_level = 2
+        second.save(update_fields=["ai_advice", "ai_hint_level"])
         self.client.credentials()
 
     def export(self, user, **params):
@@ -683,6 +684,7 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(rows[0]["xato_turlari"], "sintaksis")
         self.assertEqual(rows[1]["xato_turlari"], "natija_ustunlari_soni")
         self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
+        self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
 
     def test_summary_includes_students_who_did_not_start(self):
@@ -695,6 +697,8 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(solved["baza_xatolari"], "1")
         self.assertEqual(solved["natija_farqlari"], "1")
         self.assertEqual(solved["ai_maslahatlar"], "1")
+        self.assertEqual(solved["maslahat_darajalari_jami"], "2")
+        self.assertEqual(solved["eng_yuqori_maslahat_darajasi"], "2")
         self.assertEqual(solved["maslahatdan_keyin_yechdi"], "1")
         idle = summary["0"]
         self.assertEqual((idle["yechildi"], idle["maslahatdan_keyin_yechdi"]), ("0", ""))
