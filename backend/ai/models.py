@@ -93,6 +93,12 @@ class AIUsage(models.Model):
     model_name = models.CharField("AI modeli", max_length=100, blank=True)
     input_tokens = models.PositiveIntegerField("kirish tokenlari", default=0)
     output_tokens = models.PositiveIntegerField("chiqish tokenlari", default=0)
+    # Prompt caching: keshdan o'qilgan (arzon) va keshga yozilgan tokenlar; input_tokens — qolgan qismi
+    cache_read_tokens = models.PositiveIntegerField("keshdan o'qilgan tokenlar", default=0)
+    cache_write_tokens = models.PositiveIntegerField("keshga yozilgan tokenlar", default=0)
+    # So'rov paytidagi narx bo'yicha hisoblangan xarajat (AQSh dollari). Eski yozuvlarda bo'sh — hisobotda
+    # tokenlar joriy narx bo'yicha hisoblanadi
+    cost = models.FloatField("narxi ($)", null=True, blank=True)
     ok = models.BooleanField("muvaffaqiyatli", default=True)
     error = models.CharField("xato", max_length=200, blank=True)
     created_at = models.DateTimeField("vaqti", default=timezone.now, db_index=True)

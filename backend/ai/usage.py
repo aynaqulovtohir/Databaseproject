@@ -11,8 +11,14 @@ from .models import AIUsage
 TOTALS = {
     "requests": Count("id"),
     "failed": Count("id", filter=Q(ok=False)),
-    "input_tokens": Sum("input_tokens"),
-    "output_tokens": Sum("output_tokens"),
+    # Nomlar maydon nomlaridan farq qiladi: annotate'da bir xil nom keyingi Sum'larni buzadi
+    "sum_input": Sum("input_tokens"),
+    "sum_output": Sum("output_tokens"),
+    "sum_cache_read": Sum("cache_read_tokens"),
+    # Narxi saqlangan yozuvlar xarajati va narxi saqlanmagan (eski) yozuvlar tokenlari
+    "stored_cost": Sum("cost"),
+    "unpriced_input": Sum("input_tokens", filter=Q(cost__isnull=True)),
+    "unpriced_output": Sum("output_tokens", filter=Q(cost__isnull=True)),
 }
 
 
@@ -27,10 +33,13 @@ def _row(values):
     row = {
         "requests": values["requests"] or 0,
         "failed": values["failed"] or 0,
-        "input_tokens": values["input_tokens"] or 0,
-        "output_tokens": values["output_tokens"] or 0,
+        "input_tokens": values["sum_input"] or 0,
+        "output_tokens": values["sum_output"] or 0,
+        "cache_read_tokens": values["sum_cache_read"] or 0,
     }
-    row["cost"] = cost(row["input_tokens"], row["output_tokens"])
+    row["cost"] = round(
+        (values["stored_cost"] or 0) + cost(values["unpriced_input"] or 0, values["unpriced_output"] or 0), 4
+    )
     return row
 
 
@@ -56,6 +65,8 @@ def usage_report(days=30):
         "price": {
             "input_per_mtok": settings.AI_PRICE_INPUT_PER_MTOK,
             "output_per_mtok": settings.AI_PRICE_OUTPUT_PER_MTOK,
+            "fast_input_per_mtok": settings.AI_FAST_PRICE_INPUT_PER_MTOK,
+            "fast_output_per_mtok": settings.AI_FAST_PRICE_OUTPUT_PER_MTOK,
             "configured": bool(settings.AI_PRICE_INPUT_PER_MTOK or settings.AI_PRICE_OUTPUT_PER_MTOK),
         },
         "today": _row(usage.filter(created_at__gte=_start_of(today)).aggregate(**TOTALS)),

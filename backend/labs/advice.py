@@ -106,6 +106,7 @@ def generate_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
         return generate_er_advice(attempt, level, previous)
     response = create_message(
         purpose="lab_advice",
+        fast=True,
         max_tokens=ADVICE_MAX_TOKENS,
         system=SYSTEM_PROMPT + LEVEL_RULE,
         messages=[
@@ -297,6 +298,7 @@ def generate_er_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
     check_result = "Diagramma namunadan farq qiladi:\n" + "\n".join(f"- {item}" for item in differences)
     response = create_message(
         purpose="er_advice",
+        fast=True,
         max_tokens=ADVICE_MAX_TOKENS,
         system=ER_ADVICE_SYSTEM_PROMPT + LEVEL_RULE,
         messages=[{"role": "user", "content": _er_message(attempt, check_result) + level_block(level, previous)}],

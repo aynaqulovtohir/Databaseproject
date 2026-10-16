@@ -606,13 +606,21 @@ export interface AIUsageTotals {
   failed: number
   input_tokens: number
   output_tokens: number
+  /** Prompt caching: keshdan arzon narxda o'qilgan kirish tokenlari (input_tokens ga kirmaydi) */
+  cache_read_tokens: number
   /** AQSh dollari (narx sozlanmagan bo'lsa 0) */
   cost: number
 }
 
 export interface AIUsageReport {
   days: number
-  price: { input_per_mtok: number; output_per_mtok: number; configured: boolean }
+  price: {
+    input_per_mtok: number
+    output_per_mtok: number
+    fast_input_per_mtok: number
+    fast_output_per_mtok: number
+    configured: boolean
+  }
   today: AIUsageTotals
   month: AIUsageTotals
   previous_month: AIUsageTotals

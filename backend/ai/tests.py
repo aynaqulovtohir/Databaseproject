@@ -597,8 +597,60 @@ class AIUsageTests(DataMixin, APITestCase):
             self.assertEqual(self.client.get("/api/ai/usage/", {"days": bad}).status_code, 400)
         data = self.client.get("/api/ai/usage/", {"days": 7}).data
         self.assertEqual(len(data["daily"]), 7)
-        self.assertEqual(data["period"], {"requests": 2, "failed": 1, "input_tokens": 500_000, "output_tokens": 250_000, "cost": 1.5})
+        self.assertEqual(
+            data["period"],
+            {"requests": 2, "failed": 1, "input_tokens": 500_000, "output_tokens": 250_000, "cache_read_tokens": 0, "cost": 1.5},
+        )
         self.assertEqual(data["today"]["requests"], 2)
         self.assertEqual(data["by_purpose"][0]["label"], "SQL maslahati")
         self.assertTrue(data["price"]["configured"])
         self.assertEqual(data["daily"][-1]["requests"], 2)
+
+
+@override_settings(
+    AI_PROVIDER="anthropic",
+    ANTHROPIC_API_KEY="test-key",
+    AI_MODEL="asosiy-model",
+    AI_FAST_MODEL="tez-model",
+    AI_PRICE_INPUT_PER_MTOK=2.0,
+    AI_PRICE_OUTPUT_PER_MTOK=10.0,
+    AI_FAST_PRICE_INPUT_PER_MTOK=0.1,
+    AI_FAST_PRICE_OUTPUT_PER_MTOK=0.5,
+)
+class CachingAndFastModelTests(DataMixin, TestCase):
+    """Tizim ko'rsatmasi keshlanadi; maslahatlar arzon modelda; xarajat kesh va model narxi bo'yicha hisoblanadi."""
+
+    def test_system_prompt_is_cached_and_main_model_used(self):
+        client = fake_client("javob")
+        with patch("ai.client.get_client", return_value=client):
+            chat_reply(self.assignment, [], "NOYOB-SAVOL-42")
+        kwargs = client.messages.create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "asosiy-model")
+        self.assertEqual(kwargs["system"][-1]["cache_control"], {"type": "ephemeral"})
+        # O'zgaruvchan savol keshlanadigan qismdan keyin keladi
+        self.assertNotIn("NOYOB-SAVOL-42", json.dumps(kwargs["system"], ensure_ascii=False))
+
+    def test_fast_model_and_cost_with_cache(self):
+        from .client import create_message
+        from .models import AIUsage
+
+        client = fake_client("javob")
+        client.messages.create.return_value.usage = SimpleNamespace(
+            input_tokens=1_000_000, output_tokens=1_000_000, cache_read_input_tokens=1_000_000, cache_creation_input_tokens=0
+        )
+        with patch("ai.client.get_client", return_value=client):
+            create_message(purpose="lab_advice", fast=True, max_tokens=10, system="s", messages=[])
+        self.assertEqual(client.messages.create.call_args.kwargs["model"], "tez-model")
+        usage = AIUsage.objects.get()
+        self.assertEqual((usage.model_name, usage.cache_read_tokens), ("tez-model", 1_000_000))
+        # 0.1 (kirish) + 0.01 (kesh: 0.1 narxning 10%) + 0.5 (chiqish)
+        self.assertAlmostEqual(usage.cost, 0.61)
+
+    @override_settings(AI_FAST_MODEL="")
+    def test_empty_fast_model_falls_back_to_main(self):
+        from .client import create_message
+
+        client = fake_client("javob")
+        with patch("ai.client.get_client", return_value=client):
+            create_message(purpose="lab_advice", fast=True, max_tokens=10, system="s", messages=[])
+        self.assertEqual(client.messages.create.call_args.kwargs["model"], "asosiy-model")
