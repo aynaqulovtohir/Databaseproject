@@ -103,10 +103,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if user.is_student:
             # Ro'yxatda har bir topshiriq bo'yicha talabaning o'z holati ko'rinishi uchun
             own_attempts = (
-                Submission.objects.filter(student=user).select_related("grade").order_by("-attempt_number")
+                Submission.objects.filter(student=user)
+                .select_related("grade")
+                .order_by("-submitted_at", "-id")
             )
-            return queryset.prefetch_related(Prefetch("submissions", queryset=own_attempts, to_attr="my_attempts"))
-        return queryset.prefetch_related("groups")
+            return queryset.prefetch_related(
+                "stages", Prefetch("submissions", queryset=own_attempts, to_attr="my_attempts")
+            )
+        return queryset.prefetch_related("groups", "stages")
 
     def get_serializer_class(self):
         if self.request.user.is_student:

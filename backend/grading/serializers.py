@@ -18,7 +18,7 @@ class StudentGradeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Grade
-        fields = ["score", "comment", "graded_at", "updated_at"]
+        fields = ["score", "max_score", "rubric_scores", "comment", "graded_at", "updated_at"]
         read_only_fields = fields
 
 
@@ -27,12 +27,29 @@ class StaffGradeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Grade
-        fields = ["score", "comment", "ai_suggested_score", "graded_by", "graded_at", "updated_at"]
+        fields = [
+            "score",
+            "max_score",
+            "rubric_scores",
+            "comment",
+            "ai_suggested_score",
+            "graded_by",
+            "graded_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
 
 class GradeInputSerializer(serializers.Serializer):
+    """Rubrikasiz topshiriqda — score (0–100); rubrika bo'lsa — rubric_scores (har bir mezon uchun ball)."""
+
+    rubric_scores = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, error_messages={"min_value": "Ball manfiy bo'lmasin."}),
+        required=False,
+        max_length=50,
+    )
     score = serializers.IntegerField(
+        required=False,
         min_value=0,
         max_value=MAX_SCORE,
         error_messages={

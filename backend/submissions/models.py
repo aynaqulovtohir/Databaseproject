@@ -25,6 +25,15 @@ class Submission(models.Model):
         on_delete=models.CASCADE,
         related_name="submissions",
     )
+    # Bosqichli loyihada: qaysi bosqich uchun (bosqichsiz topshiriqda bo'sh)
+    stage = models.ForeignKey(
+        "learning.AssignmentStage",
+        verbose_name="bosqich",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="submissions",
+    )
     sql_code = models.TextField("SQL kod", max_length=MAX_SQL_CODE_LENGTH)
     attempt_number = models.PositiveIntegerField("urinish raqami")
     is_late = models.BooleanField("kechikkan", default=False)
@@ -40,9 +49,11 @@ class Submission(models.Model):
         verbose_name_plural = "yechimlar"
         ordering = ["-submitted_at", "-id"]
         constraints = [
+            # Urinishlar har bir bosqich uchun alohida raqamlanadi; bosqichsiz topshiriqda stage = NULL
             models.UniqueConstraint(
-                fields=["assignment", "student", "attempt_number"],
-                name="unique_attempt_per_student_assignment",
+                fields=["assignment", "stage", "student", "attempt_number"],
+                name="unique_attempt_per_student_stage",
+                nulls_distinct=False,
             )
         ]
 

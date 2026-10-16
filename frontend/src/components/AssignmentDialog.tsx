@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { CheckList } from '@/components/CheckList'
 import { FormField } from '@/components/FormField'
+import { ProjectPlanEditor } from '@/components/ProjectPlanEditor'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -13,9 +14,10 @@ import { api } from '@/lib/api'
 import { applyFormError } from '@/lib/forms'
 import { toLocalInputValue } from '@/lib/format'
 import { useGroupOptions } from '@/lib/groups'
+import { RUBRIC_TOTAL, rubricTotal, type CriterionDraft, type StageDraft } from '@/lib/rubric'
 import type { Assignment } from '@/lib/types'
 
-const ASSIGNMENT_FIELDS = ['title', 'description', 'grading_criteria', 'groups', 'deadline'] as const
+const ASSIGNMENT_FIELDS = ['title', 'description', 'grading_criteria', 'groups', 'deadline', 'rubric', 'stages'] as const
 
 interface AssignmentDialogProps {
   /** Berilmasa — yangi topshiriq yaratiladi */
@@ -33,6 +35,16 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
   const [criteria, setCriteria] = useState(assignment?.grading_criteria ?? '')
   const [groupIds, setGroupIds] = useState<number[]>(assignment?.groups ?? [])
   const [deadline, setDeadline] = useState(initialDeadline)
+  const initialStages: StageDraft[] = (assignment?.stages ?? []).map((stage) => ({
+    title: stage.title,
+    description: stage.description,
+    deadline: toLocalInputValue(stage.deadline),
+  }))
+  const [stages, setStages] = useState<StageDraft[]>(initialStages)
+  const [rubric, setRubric] = useState<CriterionDraft[]>(
+    (assignment?.rubric ?? []).map((item) => ({ ...item, points: String(item.points) })),
+  )
+  const locked = Boolean(assignment?.has_submissions)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
@@ -43,9 +55,25 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
         grading_criteria: criteria,
         groups: groupIds,
       }
+      body.rubric = rubric.map((item) => ({
+        name: item.name.trim(),
+        points: Number.parseInt(item.points, 10) || 0,
+        description: item.description.trim(),
+        stage: stages.length ? item.stage : null,
+      }))
+      body.stages = stages.map((stage, index) => ({
+        title: stage.title.trim(),
+        description: stage.description,
+        // O'zgartirilmagan muddat asl qiymatida yuboriladi (o'tib ketgan bo'lsa ham qabul qilinadi)
+        deadline:
+          index < initialStages.length && stage.deadline === initialStages[index].deadline
+            ? assignment!.stages[index].deadline
+            : new Date(stage.deadline).toISOString(),
+      }))
       // Muddat o'zgartirilmagan bo'lsa yuborilmaydi: o'tib ketgan muddatli
-      // topshiriqning boshqa maydonlarini tahrirlash mumkin bo'lishi kerak
-      if (deadline !== initialDeadline) body.deadline = new Date(deadline).toISOString()
+      // topshiriqning boshqa maydonlarini tahrirlash mumkin bo'lishi kerak.
+      // Bosqichli loyihada muddat oxirgi bosqichdan olinadi
+      if (!stages.length && deadline !== initialDeadline) body.deadline = new Date(deadline).toISOString()
       return assignment
         ? api<Assignment>(`/assignments/${assignment.id}/`, { method: 'PATCH', body })
         : api<Assignment>('/assignments/', { method: 'POST', body })
@@ -63,7 +91,11 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
     event.preventDefault()
     const problems: Record<string, string> = {}
     if (!groupIds.length) problems.groups = 'Kamida bitta guruh tanlang.'
-    if (!deadline || Number.isNaN(new Date(deadline).getTime())) problems.deadline = 'Muddatni kiriting.'
+    if (!stages.length && (!deadline || Number.isNaN(new Date(deadline).getTime()))) problems.deadline = 'Muddatni kiriting.'
+    if (stages.some((stage) => !stage.title.trim() || Number.isNaN(new Date(stage.deadline).getTime())))
+      problems.stages = "Har bir bosqichning sarlavhasi va muddatini kiriting."
+    if (rubric.length && rubricTotal(rubric) !== RUBRIC_TOTAL)
+      problems.rubric = `Mezonlar ballari yig'indisi ${RUBRIC_TOTAL} bo'lishi kerak.`
     setErrors(problems)
     if (!Object.keys(problems).length) mutation.mutate()
   }
@@ -96,9 +128,9 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
           </FormField>
           <FormField
             id="assignment_criteria"
-            label="Baholash mezonlari"
+            label="Yashirin baholash izohlari"
             error={errors.grading_criteria}
-            hint="Ixtiyoriy. Talabaga ko'rinmaydi; AI tahlilida va ball taklif qilishda ishlatiladi."
+            hint="Ixtiyoriy. Talabaga ko'rinmaydi; AI tahlilida va ball taklif qilishda ishlatiladi. Talabaga ko'rinadigan mezonlar uchun pastdagi rubrikadan foydalaning."
           >
             <Textarea
               id="assignment_criteria"
@@ -118,21 +150,32 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
               invalid={Boolean(errors.groups)}
             />
           </FormField>
-          <FormField
-            id="assignment_deadline"
-            label="Muddat"
-            error={errors.deadline}
-            hint="Muddatdan keyin topshirilgan yechim «kechikkan» deb belgilanadi."
-          >
-            <Input
+          <ProjectPlanEditor
+            stages={stages}
+            onStagesChange={setStages}
+            rubric={rubric}
+            onRubricChange={setRubric}
+            locked={locked}
+            stagesError={errors.stages}
+            rubricError={errors.rubric}
+          />
+          {!stages.length ? (
+            <FormField
               id="assignment_deadline"
-              type="datetime-local"
-              className="h-10 w-full sm:w-64"
-              aria-invalid={Boolean(errors.deadline)}
-              value={deadline}
-              onChange={(event) => setDeadline(event.target.value)}
-            />
-          </FormField>
+              label="Muddat"
+              error={errors.deadline}
+              hint="Muddatdan keyin topshirilgan yechim «kechikkan» deb belgilanadi."
+            >
+              <Input
+                id="assignment_deadline"
+                type="datetime-local"
+                className="h-10 w-full sm:w-64"
+                aria-invalid={Boolean(errors.deadline)}
+                value={deadline}
+                onChange={(event) => setDeadline(event.target.value)}
+              />
+            </FormField>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
               Bekor qilish

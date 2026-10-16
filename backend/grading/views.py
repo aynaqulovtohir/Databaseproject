@@ -7,12 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ai.models import AIAnalysis
+from learning.rubric import criteria_for
 from notifications.services import notify_returned
 from submissions.access import visible_submissions
 from submissions.models import Submission
 from submissions.serializers import SubmissionSerializer
 
-from .models import Grade
+from .models import MAX_SCORE, Grade
 from .serializers import GradeInputSerializer, ReturnInputSerializer
 
 
@@ -36,7 +37,11 @@ class ReviewBaseView(APIView):
         submission = get_object_or_404(visible_submissions(self.request.user), pk=submission_pk)
         attempts = list(
             Submission.objects.select_for_update()
-            .filter(assignment_id=submission.assignment_id, student_id=submission.student_id)
+            .filter(
+                assignment_id=submission.assignment_id,
+                student_id=submission.student_id,
+                stage_id=submission.stage_id,
+            )
             .order_by("-attempt_number")
         )
         if attempts[0].pk != submission.pk:
@@ -57,21 +62,24 @@ class SubmissionGradeView(ReviewBaseView):
 
         with transaction.atomic():
             submission = self.get_locked_latest_submission(submission_pk)
+            score, max_score, rubric_scores = self.score_from(submission, serializer.validated_data)
             grade, created = Grade.objects.get_or_create(
                 submission=submission,
                 defaults={
-                    "score": serializer.validated_data["score"],
+                    "score": score,
+                    "max_score": max_score,
+                    "rubric_scores": rubric_scores,
                     "comment": serializer.validated_data["comment"],
                     "graded_by": request.user,
-                    "ai_suggested_score": self.get_ai_suggested_score(submission),
+                    "ai_suggested_score": self.get_ai_suggested_score(submission, max_score),
                 },
             )
             if not created:
-                grade.score = serializer.validated_data["score"]
+                grade.score, grade.max_score, grade.rubric_scores = score, max_score, rubric_scores
                 grade.comment = serializer.validated_data["comment"]
                 grade.graded_by = request.user
                 if grade.ai_suggested_score is None:
-                    grade.ai_suggested_score = self.get_ai_suggested_score(submission)
+                    grade.ai_suggested_score = self.get_ai_suggested_score(submission, max_score)
                 grade.save()
 
             submission.status = Submission.Status.GRADED
@@ -80,9 +88,31 @@ class SubmissionGradeView(ReviewBaseView):
         return self.respond(submission)
 
     @staticmethod
-    def get_ai_suggested_score(submission):
+    def score_from(submission, data):
+        """Qaytaradi: (ball, eng yuqori ball, mezonlar bo'yicha ballar yoki None)."""
+        criteria = criteria_for(submission.assignment, submission.stage)
+        if not criteria:
+            if data.get("score") is None:
+                raise ValidationError({"score": "Ball kiritilishi shart."})
+            return data["score"], MAX_SCORE, None
+        scores = data.get("rubric_scores")
+        if scores is None or len(scores) != len(criteria):
+            raise ValidationError({"rubric_scores": f"Har bir mezon ({len(criteria)} ta) uchun ball qo'ying."})
+        for item, value in zip(criteria, scores):
+            if value > item["points"]:
+                raise ValidationError({"rubric_scores": f"«{item['name']}» uchun ball {item['points']} dan oshmasin."})
+        rubric_scores = [
+            {"name": item["name"], "points": item["points"], "score": value} for item, value in zip(criteria, scores)
+        ]
+        return sum(scores), sum(item["points"] for item in criteria), rubric_scores
+
+    @staticmethod
+    def get_ai_suggested_score(submission, max_score=MAX_SCORE):
+        """AI 0–100 shkalada baholaydi; bosqichda ball shu bosqichning eng yuqori baliga moslanadi."""
         analysis = AIAnalysis.objects.filter(submission=submission, status=AIAnalysis.Status.DONE).first()
-        return analysis.suggested_score if analysis else None
+        if not analysis or analysis.suggested_score is None:
+            return None
+        return round(analysis.suggested_score * max_score / MAX_SCORE)
 
 
 class SubmissionReturnView(ReviewBaseView):

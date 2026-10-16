@@ -3,7 +3,7 @@ from .models import Submission
 
 
 def visible_submissions(user):
-    queryset = Submission.objects.select_related("student", "assignment", "grade")
+    queryset = Submission.objects.select_related("student", "assignment", "grade", "stage")
     if user.is_admin:
         return queryset
     if user.is_teacher:

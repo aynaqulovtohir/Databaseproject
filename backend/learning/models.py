@@ -77,6 +77,9 @@ class Assignment(models.Model):
         "users.StudentGroup", verbose_name="guruhlar", related_name="assignments"
     )
     deadline = models.DateTimeField("muddat")
+    # Baholash rubrikasi (talabaga ko'rinadi): [{"name", "points", "description", "stage"}], ballar yig'indisi 100.
+    # "stage" — bosqich tartib raqami (bosqichlar bo'lsa, har bir mezon bitta bosqichga tegishli), aks holda null
+    rubric = models.JSONField("baholash rubrikasi", default=list, blank=True)
     created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
 
     class Meta:
@@ -86,3 +89,25 @@ class Assignment(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class AssignmentStage(models.Model):
+    """Bosqichli loyiha: har bir bosqich alohida topshiriladi va o'z rubrika mezonlari bo'yicha baholanadi."""
+
+    assignment = models.ForeignKey(
+        Assignment, verbose_name="topshiriq", on_delete=models.CASCADE, related_name="stages"
+    )
+    # 0 dan boshlab, ketma-ket
+    order = models.PositiveSmallIntegerField("tartib raqami")
+    title = models.CharField("sarlavha", max_length=200)
+    description = models.TextField("bosqich sharti", blank=True)
+    deadline = models.DateTimeField("muddat")
+
+    class Meta:
+        verbose_name = "bosqich"
+        verbose_name_plural = "bosqichlar"
+        ordering = ["assignment", "order"]
+        constraints = [models.UniqueConstraint(fields=["assignment", "order"], name="unique_stage_order")]
+
+    def __str__(self):
+        return f"{self.assignment}: {self.order + 1}. {self.title}"

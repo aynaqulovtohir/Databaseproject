@@ -82,19 +82,52 @@ export interface Material {
   created_at: string
 }
 
+/** Baholash rubrikasi mezoni; stage — bosqich tartib raqami (bosqichsiz topshiriqda null) */
+export interface RubricCriterion {
+  name: string
+  points: number
+  description: string
+  stage: number | null
+}
+
+export interface AssignmentStage {
+  id: number
+  /** 0 dan boshlab */
+  order: number
+  title: string
+  description: string
+  deadline: string
+}
+
+export interface MyStageProgress {
+  stage: number
+  status: SubmissionStatus | null
+  is_late: boolean
+  score: number | null
+  max_score: number | null
+}
+
 export interface Assignment {
   id: number
   title: string
   description: string
   /** Talabaga yuborilmaydi */
   grading_criteria?: string
+  /** Baholash rubrikasi (talabaga ham ko'rinadi); bo'sh bo'lsa — oddiy 0–100 baho */
+  rubric: RubricCriterion[]
+  /** Bosqichli loyiha; bo'sh bo'lsa — bitta topshirish */
+  stages: AssignmentStage[]
   author: PersonShort
   /** Talabaga yuborilmaydi */
   groups?: number[]
   deadline: string
+  /** Faqat admin va o'qituvchiga: yechimlar kelganmi (rubrika tuzilishi qulflanadi) */
+  has_submissions?: boolean
   created_at: string
   /** Faqat talabaga keladi: o'zining oxirgi urinishi (topshirmagan bo'lsa null) */
   my_submission?: MySubmission | null
+  /** Faqat talabaga, bosqichli loyihada: har bir bosqich holati va jami ball */
+  my_stages?: { items: MyStageProgress[]; total_score: number | null } | null
 }
 
 export type SubmissionStatus = 'submitted' | 'graded' | 'returned'
@@ -113,8 +146,18 @@ export interface MissingStudent extends PersonShort {
   group: string
 }
 
+export interface RubricScore {
+  name: string
+  points: number
+  score: number
+}
+
 export interface Grade {
   score: number
+  /** Bosqich bahosida — bosqich mezonlari yig'indisi; aks holda 100 */
+  max_score: number
+  /** Rubrika bo'yicha baholanganda mezonlar ballari */
+  rubric_scores: RubricScore[] | null
   comment: string
   graded_at: string
   updated_at: string
@@ -127,6 +170,8 @@ export interface Submission {
   id: number
   assignment: number
   student: PersonShort
+  /** Bosqichli loyihada bosqich id'si */
+  stage: number | null
   sql_code: string
   attempt_number: number
   is_late: boolean
