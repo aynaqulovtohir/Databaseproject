@@ -8,6 +8,8 @@ Shuning uchun shartda nomlar va turlar aniq beriladi, loyihalash qarorlari esa
 Laboratoriyalarni bazaga qo'shish: python manage.py seed_design_labs --author <login> --group <guruh>
 """
 
+from .theory import THEORY
+
 FK_NOTE = "Tashqi kalitlarga ON DELETE / ON UPDATE amallarini qo'shmang."
 NO_SELECT_NOTE = "Kod oxirida SELECT yozish shart emas: tekshiruv yaratilgan jadvallarni solishtiradi."
 
@@ -470,3 +472,5 @@ O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning 
 
 # Seed buyrug'i shu tartibda qo'shadi: avval konseptual (ER), keyin fizik (SQL) loyihalash
 ALL_LABS = ER_LABS + DESIGN_LABS
+for _lab in ALL_LABS:
+    _lab["theory"] = THEORY.get(_lab["title"], "")

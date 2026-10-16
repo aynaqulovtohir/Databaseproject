@@ -38,6 +38,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "kind",
             "title",
             "description",
+            "theory",
             "setup_sql",
             "solution_sql",
             "reference_diagram",
@@ -108,7 +109,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ["id", "kind", "title", "description", "setup_sql", "author", "created_at", "my_progress"]
+        fields = ["id", "kind", "title", "description", "theory", "setup_sql", "author", "created_at", "my_progress"]
         read_only_fields = fields
 
     def get_my_progress(self, lab):

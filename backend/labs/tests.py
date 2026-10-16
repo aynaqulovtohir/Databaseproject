@@ -1130,6 +1130,8 @@ class LearningCurveTests(BaseTestCase):
 
 class DuplicateLabTests(BaseTestCase):
     def test_teacher_duplicates_own_lab(self):
+        Lab.objects.filter(pk=self.lab.pk).update(theory="Nazariya matni")
+        self.lab.refresh_from_db()
         LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="x", is_correct=False)
         self.auth_as(self.teacher_a)
         response = self.client.post(f"/api/labs/{self.lab.pk}/duplicate/")
@@ -1137,6 +1139,7 @@ class DuplicateLabTests(BaseTestCase):
         copy = Lab.objects.get(pk=response.data["id"])
         self.assertEqual(copy.title, "Qimmat kitoblar (nusxa)")
         self.assertEqual((copy.setup_sql, copy.solution_sql), (self.lab.setup_sql, self.lab.solution_sql))
+        self.assertEqual(copy.theory, "Nazariya matni")
         self.assertEqual(list(copy.groups.all()), [self.group_a])
         self.assertEqual(copy.attempts.count(), 0)
 
@@ -1363,3 +1366,76 @@ class SimilarityTests(BaseTestCase):
         self.assertEqual(self.get(self.student_a1).status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.get(self.teacher_b).status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.get(self.admin).status_code, status.HTTP_200_OK)
+
+
+class TheoryTests(BaseTestCase):
+    """Nazariya va namuna: talabaga ko'rinadi, yechimni bermaydi."""
+
+    def test_student_sees_theory_but_not_solution(self):
+        Lab.objects.filter(pk=self.lab.pk).update(theory="WHERE qatorlarni filtrlaydi")
+        self.auth_as(self.student_a1)
+        data = self.client.get(self.url).data
+        self.assertEqual(data["theory"], "WHERE qatorlarni filtrlaydi")
+        self.assertNotIn("solution_sql", data)
+
+    def test_teacher_edits_theory_with_length_limit(self):
+        self.auth_as(self.teacher_a)
+        response = self.client.patch(self.url, {"theory": "Yangi nazariya"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.lab.refresh_from_db()
+        self.assertEqual(self.lab.theory, "Yangi nazariya")
+        response = self.client.patch(self.url, {"theory": "x" * 20_001}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.patch(self.url, {"theory": "x"}, format="json").status_code, 403)
+
+    def test_every_ready_lab_has_theory(self):
+        from .design_labs import ALL_LABS
+
+        for lab_data in ALL_LABS:
+            self.assertTrue(lab_data["theory"].strip(), lab_data["title"])
+
+    def test_examples_do_not_reveal_solutions(self):
+        """Namunada laboratoriya yechimidagi jadvallar yaratilmaydi: misol boshqa mavzuda bo'lishi kerak."""
+        import re
+
+        from .design_labs import DESIGN_LABS
+
+        for lab_data in DESIGN_LABS:
+            solution_tables = set(re.findall(r"CREATE TABLE (\w+)", lab_data["solution_sql"], re.IGNORECASE))
+            example_tables = set(re.findall(r"CREATE TABLE (\w+)", lab_data["theory"], re.IGNORECASE))
+            self.assertFalse(solution_tables & example_tables, lab_data["title"])
+            self.assertNotIn(lab_data["solution_sql"].strip(), lab_data["theory"])
+
+    def test_examples_run_in_sandbox(self):
+        import re
+
+        from .design_labs import DESIGN_LABS
+
+        helpers = (
+            "CREATE TABLE film (id INT PRIMARY KEY); CREATE TABLE aktyor (id INT PRIMARY KEY);"
+            "INSERT INTO film VALUES (1), (2); INSERT INTO aktyor VALUES (2), (3);"
+            "CREATE TABLE seans (id INT PRIMARY KEY); CREATE TABLE xona (id INT PRIMARY KEY);"
+            "CREATE TABLE mehmon (id INT PRIMARY KEY);"
+            "CREATE TABLE dars (talaba_id INT, fan_kodi VARCHAR(10), fan_nomi VARCHAR(100), baho INT);"
+            "INSERT INTO dars VALUES (1, 'F1', 'Fizika', 5), (2, 'F1', 'Fizika', 4);"
+        )
+        for lab_data in DESIGN_LABS:
+            for code in re.findall(r"```sql\n(.*?)```", lab_data["theory"], re.DOTALL):
+                self.assertIsNone(run_sql(code, helpers).error, lab_data["title"])
+
+    def test_migration_fills_only_empty_theory(self):
+        import importlib
+
+        from django.apps import apps
+
+        from .theory import THEORY
+
+        title = next(iter(THEORY))
+        empty = Lab.objects.create(title=title, description="d", author=self.teacher_a)
+        custom = Lab.objects.create(title=title, description="d", theory="O'qituvchi matni", author=self.teacher_a)
+        importlib.import_module("labs.migrations.0008_tayyor_nazariya").fill_theory(apps, None)
+        empty.refresh_from_db()
+        custom.refresh_from_db()
+        self.assertEqual(empty.theory, THEORY[title])
+        self.assertEqual(custom.theory, "O'qituvchi matni")

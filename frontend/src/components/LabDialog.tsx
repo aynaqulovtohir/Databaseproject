@@ -17,7 +17,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'setup_sql', 'solution_sql', 'reference_diagram', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'reference_diagram', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -39,6 +39,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [referenceDiagram, setReferenceDiagram] = useState<ErDiagram>(lab?.reference_diagram ?? EMPTY_DIAGRAM)
   const [title, setTitle] = useState(lab?.title ?? '')
   const [description, setDescription] = useState(lab?.description ?? '')
+  const [theory, setTheory] = useState(lab?.theory ?? '')
   const [setupSql, setSetupSql] = useState(lab?.setup_sql ?? '')
   const [solutionSql, setSolutionSql] = useState(lab?.solution_sql ?? '')
   const [groupIds, setGroupIds] = useState<number[]>(lab?.groups ?? [])
@@ -46,7 +47,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const common = { title: title.trim(), description, groups: groupIds }
+      const common = { title: title.trim(), description, theory, groups: groupIds }
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
@@ -133,6 +134,21 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               aria-invalid={Boolean(errors.description)}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
+            />
+          </FormField>
+          <FormField
+            id="lab_theory"
+            label="Nazariya va namuna (ixtiyoriy)"
+            error={errors.theory}
+            hint="Talabaga shart ostida ko'rinadi. Kodni ``` qatorlari orasiga yozing. Namunani boshqa mavzuda bering, yechimni yozmang."
+          >
+            <Textarea
+              id="lab_theory"
+              className="max-h-64 min-h-24"
+              maxLength={20000}
+              aria-invalid={Boolean(errors.theory)}
+              value={theory}
+              onChange={(event) => setTheory(event.target.value)}
             />
           </FormField>
           {kind === 'er' ? (

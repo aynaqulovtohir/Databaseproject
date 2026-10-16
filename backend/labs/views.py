@@ -378,6 +378,7 @@ class LabViewSet(viewsets.ModelViewSet):
             kind=lab.kind,
             title=f"{lab.title} (nusxa)"[: Lab._meta.get_field("title").max_length],
             description=lab.description,
+            theory=lab.theory,
             setup_sql=lab.setup_sql,
             solution_sql=lab.solution_sql,
             reference_diagram=lab.reference_diagram,

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Copy, Pencil, ShieldCheck, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, Copy, Pencil, ShieldCheck, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -46,6 +46,24 @@ function BackLink() {
   )
 }
 
+/** Nazariya matni: ``` bilan ajratilgan qismlar kod sifatida, qolgani oddiy matn (HTML ishlatilmaydi). */
+function TheoryText({ text }: { text: string }) {
+  const parts = text.split(/```[a-z]*\n?/)
+  return (
+    <div className="grid gap-3">
+      {parts.map((part, index) =>
+        !part.trim() ? null : index % 2 === 1 ? (
+          <SqlCode key={index} code={part.trimEnd()} />
+        ) : (
+          <p key={index} className="text-sm whitespace-pre-wrap">
+            {part.trim()}
+          </p>
+        ),
+      )}
+    </div>
+  )
+}
+
 function ConditionCard({ lab }: { lab: Lab }) {
   return (
     <Card>
@@ -54,6 +72,17 @@ function ConditionCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
+        {lab.theory.trim() ? (
+          <details open className="group rounded-lg border bg-muted/30 p-3">
+            <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium select-none">
+              <BookOpen className="size-4 shrink-0" aria-hidden="true" />
+              Nazariya va namuna
+            </summary>
+            <div className="mt-3">
+              <TheoryText text={lab.theory} />
+            </div>
+          </details>
+        ) : null}
         {lab.kind === 'er' ? null : lab.setup_sql.trim() ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Tayyor jadvallar</h3>

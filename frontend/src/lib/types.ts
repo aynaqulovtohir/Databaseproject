@@ -212,6 +212,8 @@ export interface Lab {
   kind: LabKind
   title: string
   description: string
+  /** Nazariya va namuna: oddiy matn, kod ``` bilan ajratiladi */
+  theory: string
   /** Har bir ishga tushirishdan oldin bajariladigan tayyor jadvallar */
   setup_sql: string
   /** Talabaga yuborilmaydi */

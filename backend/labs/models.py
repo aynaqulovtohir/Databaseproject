@@ -13,6 +13,8 @@ class Lab(models.Model):
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.SQL)
     title = models.CharField("sarlavha", max_length=200)
     description = models.TextField("laboratoriya sharti")
+    # Talabaga shart yonida ko'rinadi: qisqa nazariya va boshqa mavzudagi ishlangan namuna. Kod ``` bilan ajratiladi
+    theory = models.TextField("nazariya va namuna", blank=True, max_length=20_000)
     # Har bir ishga tushirishdan oldin bajariladi: tayyor jadvallar va ma'lumotlar
     setup_sql = models.TextField("boshlang'ich jadvallar (SQL)", blank=True, max_length=MAX_SQL_LENGTH)
     # Talabaga ko'rinmaydi; talaba natijasi shu yechim natijasi bilan solishtiriladi
