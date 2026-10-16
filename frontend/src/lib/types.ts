@@ -504,11 +504,31 @@ export interface AiEffectBucket {
   rate: number | null
 }
 
+export interface LearningCurveSegment {
+  students: number
+  solved: number
+  /** Yechganlarning birinchi to'g'ri urinishgacha o'rtacha urinishlari */
+  attempts_to_solve: number | null
+  /** Birinchi urinishda yechganlar ulushi (%) */
+  first_try_rate: number | null
+}
+
+export interface LearningCurvePoint {
+  id: number
+  position: number
+  title: string
+  kind: LabKind
+  ai: LearningCurveSegment
+  control: LearningCurveSegment
+}
+
 export interface Statistics {
   groups_available: GroupShort[]
   overview: { students: number; labs: number; attempts: number; solved_rate: number | null; average_grade: number | null }
   top_errors: { category: string; label: string; count: number }[]
   labs: StatisticsLab[]
+  /** Laboratoriyalar talabalar bajargan tartibda */
+  learning_curve: LearningCurvePoint[]
   ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
   groups: StatisticsGroup[]
 }

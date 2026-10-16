@@ -1013,6 +1013,57 @@ class StatisticsTests(BaseTestCase):
         self.assertEqual(len(self.client.get(self.stats_url).data["groups_available"]), 2)
 
 
+class LearningCurveTests(BaseTestCase):
+    stats_url = "/api/statistics/"
+
+    def test_labs_follow_learning_order_and_split_by_ai(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        # Seed buyrug'idagidek: 1-laboratoriya oxirida yaratiladi
+        second = self.lab
+        first = Lab.objects.create(title="Birinchi", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        unstarted_old = Lab.objects.create(title="Boshlanmagan eski", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        unstarted_new = Lab.objects.create(title="Boshlanmagan yangi", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        for lab in (first, unstarted_old, unstarted_new):
+            lab.groups.add(self.group_a)
+        Lab.objects.filter(pk=unstarted_new.pk).update(created_at=timezone.now() + timedelta(minutes=1))
+        control = StudentGroup.objects.create(name="Nazorat", ai_enabled=False)
+        control.teachers.add(self.teacher_a)
+        for lab in (first, second):
+            lab.groups.add(control)
+        control_student = User.objects.create_user("control1", password=PASSWORD, role=User.Role.STUDENT, group=control)
+
+        start = timezone.now() - timedelta(days=7)
+
+        def attempt(lab, student, correct, days):
+            item = LabAttempt.objects.create(lab=lab, student=student, is_correct=correct)
+            LabAttempt.objects.filter(pk=item.pk).update(created_at=start + timedelta(days=days))
+
+        attempt(first, self.student_a1, False, 0)
+        attempt(first, self.student_a1, True, 0.1)  # AI guruhi: 2 urinishda
+        attempt(first, control_student, True, 0.2)  # nazorat: 1 urinishda
+        attempt(second, self.student_a1, True, 2)
+        attempt(second, control_student, False, 2)
+        attempt(second, control_student, False, 2.1)
+        attempt(second, control_student, True, 2.2)  # nazorat: 3 urinishda
+
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.stats_url).data
+        self.assertEqual(
+            [lab["title"] for lab in data["labs"]],
+            ["Birinchi", second.title, "Boshlanmagan yangi", "Boshlanmagan eski"],
+        )
+        curve = data["learning_curve"]
+        self.assertEqual([point["position"] for point in curve], [1, 2, 3, 4])
+        self.assertEqual(curve[0]["ai"], {"students": 2, "solved": 1, "attempts_to_solve": 2.0, "first_try_rate": 0.0})
+        self.assertEqual(curve[0]["control"]["attempts_to_solve"], 1.0)
+        self.assertEqual(curve[1]["control"]["attempts_to_solve"], 3.0)
+        self.assertEqual(curve[1]["ai"]["first_try_rate"], 50.0)
+        self.assertIsNone(curve[3]["ai"]["attempts_to_solve"])
+
+
 class DuplicateLabTests(BaseTestCase):
     def test_teacher_duplicates_own_lab(self):
         LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="x", is_correct=False)
