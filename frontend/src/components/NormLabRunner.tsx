@@ -3,12 +3,14 @@ import { CircleCheck, CircleX, Loader2, Search, Send } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { FormField } from '@/components/FormField'
 import { AiAdvice, GradeCard } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
+import { useConfidence } from '@/lib/confidence'
 import type { LabRunResult, NormAnswer, NormalForm, NormTask } from '@/lib/types'
 
 const FORMS: NormalForm[] = ['1NF', '2NF', '3NF', 'BCNF']
@@ -58,18 +60,25 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
   const [form, setForm] = useState<NormalForm | ''>(initialAnswer?.normal_form ?? '')
   const [decomposition, setDecomposition] = useState(lines(initialAnswer?.decomposition))
   const [error, setError] = useState<string | null>(null)
+  const confidence = useConfidence()
 
   function summary(next: { keys?: string; form?: string; decomposition?: string }) {
     return `Kalitlar:\n${next.keys ?? keys}\nNormal forma: ${next.form ?? form}\nDekompozitsiya:\n${next.decomposition ?? decomposition}`
   }
 
   const mutation = useMutation({
-    mutationFn: (mode: 'run' | 'submit') =>
+    mutationFn: ({ mode, level }: { mode: 'run' | 'submit'; level: number | null }) =>
       api<LabRunResult>(`/labs/${labId}/${mode}/`, {
         method: 'POST',
-        body: { answer: { keys: splitLines(keys), normal_form: form, decomposition: splitLines(decomposition) } },
+        body: {
+          answer: { keys: splitLines(keys), normal_form: form, decomposition: splitLines(decomposition) },
+          ...confidence.body(level),
+        },
       }),
-    onSuccess: (result) => onResult?.(result, summary({})),
+    onSuccess: (result, { level }) => {
+      if (gradable) confidence.record(level, result.is_correct)
+      onResult?.(result, summary({}))
+    },
     onError: (failure) => {
       const message = fieldErrors(failure).answer
       if (message) setError(message)
@@ -79,7 +88,8 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
 
   const canRun = !mutation.isPending && Boolean(keys.trim() && form && decomposition.trim())
   const result = mutation.data
-  const submitting = mutation.isPending && mutation.variables === 'submit'
+  const submitting = mutation.isPending && mutation.variables?.mode === 'submit'
+  const run = (mode: 'run' | 'submit') => mutation.mutate({ mode, level: gradable ? confidence.value : null })
 
   return (
     <div className="grid gap-4">
@@ -138,13 +148,14 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
           {error}
         </p>
       ) : null}
+      {gradable ? <ConfidencePicker value={confidence.value} onChange={confidence.setValue} note={confidence.note} /> : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => mutation.mutate('run')}>
+        <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => run('run')}>
           {mutation.isPending && !submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}
           Tekshirish
         </Button>
         {gradable ? (
-          <Button size="lg" disabled={!canRun} onClick={() => mutation.mutate('submit')}>
+          <Button size="lg" disabled={!canRun} onClick={() => run('submit')}>
             {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
             Baholashga topshirish
           </Button>

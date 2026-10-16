@@ -10,6 +10,7 @@ import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
 import { BlindReviewPage } from '@/pages/BlindReviewPage'
+import { CompetencePage } from '@/pages/CompetencePage'
 import { HomePage } from '@/pages/HomePage'
 import { LabDetailPage } from '@/pages/LabDetailPage'
 import { LabsPage } from '@/pages/LabsPage'
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
         element: <RequireRole roles={['admin', 'teacher']} />,
         children: [
           { path: '/statistics', element: <StatisticsPage /> },
+          { path: '/competence', element: <CompetencePage /> },
           { path: '/blind-review', element: <BlindReviewPage /> },
         ],
       },

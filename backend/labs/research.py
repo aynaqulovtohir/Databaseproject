@@ -23,7 +23,7 @@ from users.models import User
 from .checker import ERROR_TIPS
 from .models import BlindReview, LabAttempt, LabGrade
 
-QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy", "survey": "sorovnoma"}
+QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "delayed": "kechiktirilgan", "practice": "oddiy", "survey": "sorovnoma"}
 QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
 QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_started": "boshlamagan"}
 
@@ -158,6 +158,7 @@ ATTEMPT_COLUMNS = [
     "maslahat_darajasi",
     "kod_qatorlari",
     "kod_belgilari",
+    "ishonch",
 ]
 
 SUMMARY_COLUMNS = [
@@ -222,6 +223,7 @@ maslahat_darajasi           olingan eng batafsil maslahat darajasi: 0 — olinma
                             savol, 2 — tushuncha nomi, 3 — aniq ko'rsatma (darajalar joriy etilishidan
                             oldingi maslahatlar 3 deb yoziladi, chunki ular darhol batafsil berilgan)
 kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
+ishonch                     talaba tekshirishdan oldin belgilagan ishonch (1-5); bo'sh — belgilamagan
 
 xulosa.csv — har bir talaba va laboratoriya
 --------------------------------------------
@@ -246,7 +248,7 @@ testlar.csv — har bir talaba va test (kirish/chiqish testlari)
 -------------------------------------------------------------
 Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
 test_id, test
-test_turi                   kirish | chiqish | oddiy | sorovnoma
+test_turi                   kirish | chiqish | kechiktirilgan | oddiy | sorovnoma
 holat                       topshirgan | boshlagan | boshlamagan
 ball, maksimal_ball, foiz   topshirmagan bo'lsa va so'rovnomada bo'sh
 boshlangan, topshirilgan
@@ -273,6 +275,15 @@ tizim_manbasi               ai (sun'iy intellekt) yoki auto (avtomatik tekshiruv
 oqituvchi_ball              o'qituvchi bahosi (0-100)
 farq                        tizim_ball − oqituvchi_ball (musbat — tizim yumshoqroq)
 tizim_baho, oqituvchi_baho  5 ballik shkalada: 86+ → 5, 71-85 → 4, 55-70 → 3, 0-54 → 2
+
+kompetentlik.csv — har bir talaba, kesim va kompetentlik komponenti
+---------------------------------------------------------------------
+talaba, guruh, ai_yoqilgan
+kesim                       boshida (tajriba boshida), oxirida (tajriba oxirida) yoki keyin (kechiktirilgan test)
+komponent                   komponent nomi yoki "Umumiy" (o'lchangan komponentlar o'rtachasi)
+ball                        0-100; bo'sh — bu kesimda o'lchanmagan (masalan, test topshirilmagan)
+daraja                      past / orta / yuqori (chegaralar admin panelda, komponent sozlamalarida)
+Ballar platformadagi kompetentlik modeli bo'yicha eksport paytida hisoblanadi.
 
 Xato toifalari
 --------------
@@ -489,8 +500,45 @@ def _quiz_rows(quizzes):
     return quiz_rows, answer_rows
 
 
-def build_export(labs, quizzes=None):
-    """Berilgan laboratoriyalar va testlar bo'yicha ZIP arxiv (bytes) qaytaradi."""
+COMPETENCE_COLUMNS = ["talaba", "guruh", "ai_yoqilgan", "kesim", "komponent", "ball", "daraja"]
+COMPETENCE_STAGES = {"initial": "boshida", "final": "oxirida", "delayed": "keyin"}
+COMPETENCE_LEVELS = {"low": "past", "medium": "orta", "high": "yuqori"}
+
+
+def _competence_rows(groups):
+    """Kompetentlik modeli bo'yicha har bir talaba, kesim va komponent (hamda umumiy) bali va darajasi."""
+    from competence.services import Data, group_students, load_model, student_profile
+
+    components = load_model()
+    if not components:
+        return []
+    rows = []
+    for group in groups:
+        students = group_students(group)
+        for stage, stage_label in COMPETENCE_STAGES.items():
+            data = Data(components, students, stage)
+            for student in students:
+                scores, overall = student_profile(components, student, data)
+                items = [(component.name, scores[component.pk]) for component in components] + [("Umumiy", overall)]
+                for name, item in items:
+                    rows.append(
+                        [
+                            pseudonym(student.pk),
+                            group.name,
+                            _flag(group.ai_enabled),
+                            stage_label,
+                            name,
+                            "" if item["score"] is None else item["score"],
+                            COMPETENCE_LEVELS.get(item["level"], ""),
+                        ]
+                    )
+    stage_order = list(COMPETENCE_STAGES.values())
+    rows.sort(key=lambda row: (row[0], stage_order.index(row[3])))
+    return rows
+
+
+def build_export(labs, quizzes=None, groups=None):
+    """Berilgan laboratoriyalar, testlar va guruhlar (kompetentlik) bo'yicha ZIP arxiv (bytes) qaytaradi."""
     labs = list(labs.prefetch_related("groups"))
     attempts = (
         LabAttempt.objects.filter(lab__in=labs)
@@ -542,6 +590,7 @@ def build_export(labs, quizzes=None):
                         hint_level(attempt),
                         len(attempt.sql_code.splitlines()),
                         len(attempt.sql_code),
+                        "" if attempt.confidence is None else attempt.confidence,
                     ]
                 )
             summary_rows.append(
@@ -567,5 +616,7 @@ def build_export(labs, quizzes=None):
             quiz_rows, answer_rows = _quiz_rows(quizzes)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))
             zip_file.writestr("test_javoblari.csv", _csv(ANSWER_COLUMNS, answer_rows))
+        if groups is not None:
+            zip_file.writestr("kompetentlik.csv", _csv(COMPETENCE_COLUMNS, _competence_rows(groups)))
         zip_file.writestr("README.txt", readme)
     return archive.getvalue()

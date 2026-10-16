@@ -43,6 +43,11 @@ class Lab(models.Model):
     # SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL): talaba shu model bo'yicha jadvallarni yaratadi.
     # Talabaga ko'rinadi; tekshiruv o'zgarmaydi — jadvallar namunaviy yechim bilan solishtiriladi
     given_diagram = models.JSONField("berilgan ER-model", null=True, blank=True)
+    # Talablarni aniqlash (faqat ER laboratoriyasi; labs/interview.py): ro'yxat bo'sh bo'lmasa, shartda faqat vaziyat
+    # beriladi, to'liq talablarni talaba AI-buyurtmachidan so'rab aniqlaydi. [{"id", "text", "kind"}].
+    # AI yoqilgan guruh talabasiga ko'rsatilmaydi (nazorat guruhiga esa an'anaviy shart sifatida to'liq beriladi)
+    requirements = models.JSONField("buyurtmachi talablari", default=list, blank=True)
+    client_persona = models.TextField("buyurtmachi roli", blank=True, max_length=2000)
     # Indeks laboratoriyasi: talaba kodidan keyin shu so'rovning rejasi (EXPLAIN) olinadi va unda taqiqlangan
     # tugunlar (masalan, Seq Scan) bo'lmasligi kerak. So'rovning o'zi bajarilmaydi. Talabaga ko'rinadi
     plan_query = models.TextField("rejasi tekshiriladigan so'rov", blank=True, max_length=5000)
@@ -69,6 +74,22 @@ class Lab(models.Model):
 
     def __str__(self):
         return self.title
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        from .interview import RequirementsError, validate_requirements
+
+        try:
+            self.requirements = validate_requirements(self.requirements)
+        except RequirementsError as exc:
+            raise ValidationError({"requirements": str(exc)})
+        if self.requirements and self.kind != self.Kind.ER:
+            raise ValidationError({"requirements": "Talablarni aniqlash faqat ER-diagramma laboratoriyasida bo'ladi."})
+
+    @property
+    def is_interview(self):
+        return self.kind == self.Kind.ER and bool(self.requirements)
 
     @property
     def effective_topic(self):
@@ -123,6 +144,9 @@ class LabAttempt(models.Model):
     is_submission = models.BooleanField("baholashga topshirilgan", default=False)
     # Urinish vaqtida talabaning guruhida AI yoqilganmi (tajriba tahlili uchun saqlanadi)
     ai_enabled = models.BooleanField("AI yoqilgan edi", default=True)
+    # Talaba tekshirishdan oldin o'z javobiga qanchalik ishonganini belgilaydi (1-5; ixtiyoriy). Natija bilan
+    # solishtirib, o'z bilimini baholash aniqligi (kalibrlash) hisoblanadi — labs/calibration.py
+    confidence = models.PositiveSmallIntegerField("ishonch (1-5)", null=True, blank=True)
     # To'g'ri yechimdan keyin talaba o'z so'zlari bilan tushuntiradi (self-explanation); AI mosligini baholaydi.
     # Bahoga ta'sir qilmaydi: o'qituvchi tasodifan yoki ko'chirib topilgan javoblarni ko'rishi uchun
     self_explanation = models.TextField("talabaning tushuntirishi", blank=True, max_length=3000)
@@ -227,6 +251,30 @@ class AIAction(models.Model):
         verbose_name = "AI so'rovi (talaba)"
         verbose_name_plural = "AI so'rovlari (talabalar)"
         ordering = ["-id"]
+
+
+class InterviewMessage(models.Model):
+    """Talabaning AI-buyurtmachi bilan suhbati (talablarni aniqlash). Faqat talabaning o'zi ko'radi."""
+
+    class Role(models.TextChoices):
+        USER = "user", "Talaba"
+        ASSISTANT = "assistant", "Buyurtmachi"
+
+    lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="interview_messages")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="interview_messages"
+    )
+    role = models.CharField("kim yozgan", max_length=10, choices=Role.choices)
+    content = models.TextField("matn")
+    # Buyurtmachi shu javobda aytgan talablar (Lab.requirements id'lari)
+    revealed = models.JSONField("aytilgan talablar", default=list, blank=True)
+    created_at = models.DateTimeField("vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "buyurtmachi bilan suhbat xabari"
+        verbose_name_plural = "buyurtmachi bilan suhbat xabarlari"
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["lab", "student"])]
 
 
 class LabChatMessage(models.Model):

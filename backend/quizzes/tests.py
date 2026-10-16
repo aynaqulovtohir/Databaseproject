@@ -134,6 +134,37 @@ class QuizManagementTests(QuizTestCase):
         self.assertEqual(self.client.delete(f"/api/quizzes/{quiz.pk}/").status_code, 400)
 
 
+class QuizDuplicateTests(QuizTestCase):
+    def test_post_test_becomes_delayed_test_with_same_questions(self):
+        quiz = self.create_quiz(kind="post", title="Chiqish testi")
+        self.auth_as(self.student)
+        self.client.post(f"/api/quizzes/{quiz.pk}/start/")
+        self.auth_as(self.teacher)
+        response = self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/", {"kind": "delayed"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        copy = Quiz.objects.get(pk=response.data["id"])
+        self.assertEqual(copy.kind, Quiz.Kind.DELAYED)
+        self.assertEqual(copy.title, "Chiqish testi — kechiktirilgan test")
+        self.assertEqual(copy.author, self.teacher)
+        self.assertEqual(list(copy.groups.all()), [self.group])
+        original = [(q.text, [(c.text, c.is_correct) for c in q.choices.all()]) for q in quiz.questions.all()]
+        copied = [(q.text, [(c.text, c.is_correct) for c in q.choices.all()]) for q in copy.questions.all()]
+        self.assertEqual(copied, original)
+        self.assertFalse(copy.attempts.exists())  # topshirishlar ko'chirilmaydi
+        self.assertEqual(quiz.questions.count(), 2)  # asl test o'zgarmaydi
+
+    def test_duplicate_rules(self):
+        quiz = self.create_quiz()
+        self.auth_as(self.teacher)
+        self.assertEqual(self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/", {"kind": "survey"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/", {"kind": "x"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/").data["title"], "Kirish testi (nusxa)")
+        self.auth_as(self.student)
+        self.assertEqual(self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/").status_code, 403)
+        self.auth_as(self.other_teacher)
+        self.assertEqual(self.client.post(f"/api/quizzes/{quiz.pk}/duplicate/").status_code, 404)
+
+
 class QuizTakingTests(QuizTestCase):
     def test_answers_are_hidden_from_student(self):
         quiz = self.create_quiz()

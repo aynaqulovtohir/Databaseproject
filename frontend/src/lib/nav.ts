@@ -6,6 +6,7 @@ import {
   Coins,
   EyeOff,
   FlaskConical,
+  Gauge,
   Home,
   UserRound,
   Users,
@@ -32,6 +33,7 @@ const LEARNING_ITEMS: NavItem[] = [
 ]
 const STAFF_ITEMS: NavItem[] = [
   { to: '/statistics', label: 'Statistika', icon: BarChart3 },
+  { to: '/competence', label: 'Kompetentlik', icon: Gauge },
   { to: '/blind-review', label: "Ko'r baholash", icon: EyeOff },
 ]
 const COMMON_ITEMS: NavItem[] = [{ to: '/profile', label: 'Profil', icon: UserRound }]

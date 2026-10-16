@@ -65,6 +65,42 @@ class QuizViewSet(viewsets.ModelViewSet):
             )
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        """Test nusxasi: savollar va variantlar ko'chiriladi, topshirishlar emas. {"kind"} bilan turi o'zgartiriladi —
+        masalan, chiqish testidan o'sha savollar bilan kechiktirilgan test. O'qituvchining nusxasiga faqat
+        o'zi o'qitadigan guruhlar o'tadi; ochilish/yopilish vaqtlari ko'chirilmaydi (yangidan belgilanadi)."""
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        quiz = self.get_object()
+        kind = request.data.get("kind", quiz.kind)
+        if kind not in Quiz.Kind.values:
+            raise ValidationError({"kind": "Noma'lum test turi."})
+        if (kind == Quiz.Kind.SURVEY) != (quiz.kind == Quiz.Kind.SURVEY):
+            raise ValidationError({"kind": "So'rovnomani oddiy testga (yoki aksincha) aylantirib bo'lmaydi."})
+        groups = quiz.groups.all()
+        if request.user.is_teacher:
+            groups = groups.filter(teachers=request.user)
+        suffix = f" — {Quiz.Kind(kind).label.lower()}" if kind != quiz.kind else " (nusxa)"
+        copy = Quiz.objects.create(
+            kind=kind,
+            title=f"{quiz.title}{suffix}"[: Quiz._meta.get_field("title").max_length],
+            description=quiz.description,
+            author=request.user,
+            time_limit_minutes=quiz.time_limit_minutes,
+            show_answers=quiz.show_answers,
+        )
+        copy.groups.set(groups)
+        for question in quiz.questions.all():
+            choices = list(question.choices.all())
+            question.pk = None
+            question.quiz = copy
+            question.save()
+            Choice.objects.bulk_create(
+                Choice(question=question, order=choice.order, text=choice.text, is_correct=choice.is_correct) for choice in choices
+            )
+        return Response(QuizSerializer(self.get_queryset().get(pk=copy.pk), context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
     # ---------- Talaba ----------
 
     def student_attempt(self, request):

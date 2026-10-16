@@ -85,6 +85,10 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 # loyihalash laboratoriyalarini (3 ta ER-model va 7 ta SQL) o'qituvchi va guruhga qo'shing:
 docker compose -f docker-compose.prod.yml exec backend \
     python manage.py seed_design_labs --author <o'qituvchi_logini> --group "<guruh nomi>"
+
+# Namunaviy kompetentlik modeli (4 komponent). Kirish/chiqish testlari va so'rovnomadan keyin
+# ishga tushiring: testlar turiga qarab avtomatik bog'lanadi. Keyin admin panelda metodikaga moslang.
+docker compose -f docker-compose.prod.yml exec backend python manage.py seed_competence_model
 ```
 
 ## 7. Yangilash (yangi versiyani o'rnatish)

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CircleCheck, CircleX, Clock, Loader2, Pencil, Play, Send, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CircleCheck, CircleX, Clock, Copy, History, Loader2, Pencil, Play, Send, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -560,6 +560,21 @@ function StaffView({ quiz }: { quiz: Quiz }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const survey = quiz.kind === 'survey'
 
+  // Nusxa: chiqish testidan o'sha savollar bilan kechiktirilgan test yaratiladi (ochilish vaqti keyin belgilanadi)
+  const duplicate = useMutation({
+    mutationFn: (kind: Quiz['kind']) => api<Quiz>(`/quizzes/${quiz.id}/duplicate/`, { method: 'POST', body: { kind } }),
+    onSuccess: (copy) => {
+      toast.success(
+        copy.kind === 'delayed'
+          ? "Kechiktirilgan test yaratildi. Uning ochilish vaqtini kurs tugagandan 4–6 hafta keyinga qo'ying."
+          : 'Nusxa yaratildi',
+      )
+      void queryClient.invalidateQueries({ queryKey: ['quizzes'] })
+      void navigate(`/quizzes/${copy.id}`)
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
   const remove = useMutation({
     mutationFn: () => api(`/quizzes/${quiz.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -584,6 +599,16 @@ function StaffView({ quiz }: { quiz: Quiz }) {
             <Button variant="outline" size="lg" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
               Tahrirlash
+            </Button>
+            {quiz.kind === 'post' ? (
+              <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate('delayed')}>
+                <History aria-hidden="true" />
+                Kechiktirilgan test yaratish
+              </Button>
+            ) : null}
+            <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate(quiz.kind)}>
+              <Copy aria-hidden="true" />
+              Nusxa olish
             </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />
