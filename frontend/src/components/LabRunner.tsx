@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Award, CircleCheck, CircleX, Lightbulb, Loader2, Play, Send, Sparkles } from 'lucide-react'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
@@ -50,18 +50,35 @@ function ResultTable({ table }: { table: LabRunTable }) {
   )
 }
 
-/** Xato urinish uchun AI maslahati: natija kelishi bilan o'zi so'raladi. */
+interface AdviceResponse {
+  advice: string
+  hints: string[]
+  level: number
+  max_level: number
+}
+
+const HINT_TITLES = ['Yo\'naltiruvchi savol', 'Tushuncha', 'Aniq ko\'rsatma']
+
+/** Bosqichma-bosqich AI maslahati: 1-daraja o'zi so'raladi, keyingisini talaba tugma bilan oladi. */
 export function AiAdvice({ attemptId }: { attemptId: number }) {
+  const queryClient = useQueryClient()
+  const key = ['lab-advice', attemptId]
   const advice = useQuery({
-    queryKey: ['lab-advice', attemptId],
-    queryFn: () => api<{ advice: string }>(`/labs/attempts/${attemptId}/advice/`, { method: 'POST' }),
+    queryKey: key,
+    queryFn: () => api<AdviceResponse>(`/labs/attempts/${attemptId}/advice/`, { method: 'POST' }),
     staleTime: Infinity,
     retry: false,
   })
+  const more = useMutation({
+    mutationFn: (level: number) =>
+      api<AdviceResponse>(`/labs/attempts/${attemptId}/advice/`, { method: 'POST', body: { level } }),
+    onSuccess: (data) => queryClient.setQueryData(key, data),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
 
   return (
-    <div className="rounded-lg border bg-background p-3">
-      <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-foreground">
+    <div className="grid gap-2 rounded-lg border bg-background p-3">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
         <Sparkles className="size-4" aria-hidden="true" />
         AI maslahati
       </div>
@@ -73,7 +90,28 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
       ) : advice.isError ? (
         <p className="text-sm text-muted-foreground">{errorMessage(advice.error)}</p>
       ) : (
-        <p className="text-sm whitespace-pre-wrap text-foreground">{advice.data.advice}</p>
+        <>
+          {advice.data.hints.map((hint, index) => (
+            <div key={index} className="text-sm text-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
+                {index + 1}-daraja: {HINT_TITLES[index] ?? ''}
+              </span>
+              <p className="whitespace-pre-wrap">{hint}</p>
+            </div>
+          ))}
+          {advice.data.level < advice.data.max_level ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="justify-self-start"
+              disabled={more.isPending}
+              onClick={() => more.mutate(advice.data.level + 1)}
+            >
+              {more.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Lightbulb aria-hidden="true" />}
+              Ko'proq yordam ({advice.data.level + 1}/{advice.data.max_level})
+            </Button>
+          ) : null}
+        </>
       )}
     </div>
   )

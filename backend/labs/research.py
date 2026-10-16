@@ -21,9 +21,10 @@ from django.utils import timezone
 from users.models import User
 
 from .checker import ERROR_TIPS
-from .models import LabAttempt, LabGrade
+from .models import BlindReview, LabAttempt, LabGrade
 
-QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy"}
+QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy", "survey": "sorovnoma"}
+QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
 QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_started": "boshlamagan"}
 
 QUIZ_COLUMNS = [
@@ -52,6 +53,24 @@ ANSWER_COLUMNS = [
     "ball",
     "maksimal_ball",
     "togri",
+    "javob",
+]
+
+REVIEW_COLUMNS = [
+    "talaba",
+    "guruh",
+    "ai_yoqilgan",
+    "laboratoriya_id",
+    "laboratoriya",
+    "laboratoriya_turi",
+    "baholovchi",
+    "tizim_ball",
+    "tizim_manbasi",
+    "oqituvchi_ball",
+    "farq",
+    "tizim_baho",
+    "oqituvchi_baho",
+    "baholangan",
 ]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
@@ -136,6 +155,7 @@ ATTEMPT_COLUMNS = [
     "togri",
     "xato_turlari",
     "ai_maslahat",
+    "maslahat_darajasi",
     "kod_qatorlari",
     "kod_belgilari",
 ]
@@ -154,6 +174,8 @@ SUMMARY_COLUMNS = [
     "baza_xatolari",
     "natija_farqlari",
     "ai_maslahatlar",
+    "maslahat_darajalari_jami",
+    "eng_yuqori_maslahat_darajasi",
     "maslahatdan_keyin_yechdi",
     "topshirishlar",
     "eng_yuqori_baho",
@@ -196,6 +218,9 @@ natija                      togri | baza_xatosi (kod xato berdi) | natija_farqli
 togri                       1 / 0
 xato_turlari                xato toifalari, vergul bilan (pastdagi ro'yxatga qarang)
 ai_maslahat                 talaba shu urinish uchun AI maslahatini olganmi: 1 / 0
+maslahat_darajasi           olingan eng batafsil maslahat darajasi: 0 — olinmagan, 1 — yo'naltiruvchi
+                            savol, 2 — tushuncha nomi, 3 — aniq ko'rsatma (darajalar joriy etilishidan
+                            oldingi maslahatlar 3 deb yoziladi, chunki ular darhol batafsil berilgan)
 kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
 
 xulosa.csv — har bir talaba va laboratoriya
@@ -207,7 +232,9 @@ togri_gacha_urinishlar      birinchi to'g'ri urinishgacha (u ham kiradi) urinish
 yechish_vaqti_daqiqa        birinchi urinishdan birinchi to'g'ri urinishgacha
 baza_xatolari               kod xato bergan urinishlar soni
 natija_farqlari             kod ishlagan, lekin natija farq qilgan urinishlar soni
-ai_maslahatlar              olingan AI maslahatlari soni
+ai_maslahatlar              olingan AI maslahatlari soni (maslahat olingan urinishlar)
+maslahat_darajalari_jami    barcha urinishlardagi maslahat darajalari yig'indisi (jami so'ralgan yordam)
+eng_yuqori_maslahat_darajasi  urinishlardagi eng yuqori maslahat darajasi (0 — maslahat olinmagan)
 maslahatdan_keyin_yechdi    AI maslahatidan keyingi urinishlardan biri to'g'ri bo'lganmi: 1 / 0
                             (maslahat olinmagan bo'lsa bo'sh)
 topshirishlar               baholashga topshirishlar soni
@@ -219,9 +246,9 @@ testlar.csv — har bir talaba va test (kirish/chiqish testlari)
 -------------------------------------------------------------
 Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
 test_id, test
-test_turi                   kirish | chiqish | oddiy
+test_turi                   kirish | chiqish | oddiy | sorovnoma
 holat                       topshirgan | boshlagan | boshlamagan
-ball, maksimal_ball, foiz   topshirmagan bo'lsa bo'sh
+ball, maksimal_ball, foiz   topshirmagan bo'lsa va so'rovnomada bo'sh
 boshlangan, topshirilgan
 davomiylik_daqiqa           boshlangandan topshirilgangacha
 
@@ -229,9 +256,23 @@ test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar t
 ------------------------------------------------------------------------------------------
 test_id, test_turi
 savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
-savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob)
-ball, maksimal_ball         savol bo'yicha
-togri                       to'liq ball olganmi: 1 / 0
+savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob) |
+                            likert (so'rovnoma fikri, ball qo'yilmaydi)
+ball, maksimal_ball         savol bo'yicha (likert savolida bo'sh)
+togri                       to'liq ball olganmi: 1 / 0 (likert savolida bo'sh)
+javob                       faqat likert savolida: 1 — mutlaqo qo'shilmayman, 2 — qo'shilmayman,
+                            3 — betarafman, 4 — qo'shilaman, 5 — to'liq qo'shilaman
+                            (javob berilmagan bo'lsa bo'sh)
+
+baholash_mosligi.csv — ko'r baholash: tizim va o'qituvchi bahosi juftliklari
+--------------------------------------------------------------------------
+O'qituvchi ishni talaba ismi va tizim bahosini ko'rmasdan baholagan.
+baholovchi                  baholovchi taxallusi (O-...)
+tizim_ball                  o'qituvchi baholagan paytdagi tizim bahosi (0-100)
+tizim_manbasi               ai (sun'iy intellekt) yoki auto (avtomatik tekshiruv)
+oqituvchi_ball              o'qituvchi bahosi (0-100)
+farq                        tizim_ball − oqituvchi_ball (musbat — tizim yumshoqroq)
+tizim_baho, oqituvchi_baho  5 ballik shkalada: 86+ → 5, 71-85 → 4, 55-70 → 3, 0-54 → 2
 
 Xato toifalari
 --------------
@@ -248,6 +289,44 @@ Namunadan farqlar (kod ishladi, natija boshqacha):
 def pseudonym(user_id):
     digest = hmac.new(settings.SECRET_KEY.encode(), f"lab-research:{user_id}".encode(), hashlib.sha256)
     return "T-" + digest.hexdigest()[:8].upper()
+
+
+def reviewer_pseudonym(user_id):
+    digest = hmac.new(settings.SECRET_KEY.encode(), f"lab-reviewer:{user_id}".encode(), hashlib.sha256)
+    return "O-" + digest.hexdigest()[:6].upper()
+
+
+def _review_rows(labs):
+    from .blind_review import band
+
+    rows = []
+    reviews = (
+        BlindReview.objects.filter(attempt__lab__in=labs)
+        .select_related("attempt__lab", "attempt__student__group")
+        .order_by("attempt__lab_id", "id")
+    )
+    for review in reviews:
+        attempt = review.attempt
+        student = attempt.student
+        rows.append(
+            [
+                pseudonym(student.pk),
+                student.group.name if student.group else "",
+                _flag(attempt.ai_enabled),
+                attempt.lab_id,
+                attempt.lab.title,
+                attempt.lab.kind,
+                reviewer_pseudonym(review.reviewer_id),
+                review.ai_score,
+                review.ai_source,
+                review.score,
+                review.ai_score - review.score,
+                band(review.ai_score),
+                band(review.score),
+                _local(review.created_at),
+            ]
+        )
+    return rows
 
 
 def error_category(error):
@@ -276,6 +355,13 @@ def attempt_outcome(attempt):
     if attempt.is_correct:
         return "togri"
     return "baza_xatosi" if attempt.feedback.get("error") else "natija_farqli"
+
+
+def hint_level(attempt):
+    """Olingan maslahat darajasi (0-3). Darajalargacha bo'lgan maslahat to'liq (3) hisoblanadi."""
+    if attempt.ai_hint_level:
+        return attempt.ai_hint_level
+    return 3 if attempt.ai_advice else 0
 
 
 def _local(moment):
@@ -318,6 +404,8 @@ def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
         "baza_xatolari": sum(1 for attempt in attempts if attempt.feedback.get("error")),
         "natija_farqlari": sum(1 for attempt in attempts if attempt_outcome(attempt) == "natija_farqli"),
         "ai_maslahatlar": sum(1 for attempt in attempts if attempt.ai_advice),
+        "maslahat_darajalari_jami": sum(hint_level(attempt) for attempt in attempts),
+        "eng_yuqori_maslahat_darajasi": max((hint_level(attempt) for attempt in attempts), default=0),
         "maslahatdan_keyin_yechdi": "",
         "topshirishlar": sum(1 for attempt in attempts if attempt.is_submission),
         "eng_yuqori_baho": grade.score if grade else "",
@@ -339,10 +427,10 @@ def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
 def _quiz_rows(quizzes):
     """testlar.csv va test_javoblari.csv qatorlari."""
     from quizzes.models import QuizAttempt
-    from quizzes.services import attempt_status, finalize_if_expired, percent
+    from quizzes.services import attempt_status, finalize_if_expired, likert_value, percent
 
     quiz_rows, answer_rows = [], []
-    for quiz in sorted(quizzes.prefetch_related("groups", "questions"), key=lambda item: item.pk):
+    for quiz in sorted(quizzes.prefetch_related("groups", "questions__choices"), key=lambda item: item.pk):
         attempts = {
             attempt.student_id: finalize_if_expired(attempt)
             for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
@@ -360,6 +448,7 @@ def _quiz_rows(quizzes):
         for student_id in sorted(students, key=pseudonym):
             attempt = attempts.get(student_id)
             submitted = bool(attempt and attempt.submitted_at)
+            scored = submitted and quiz.kind != "survey"
             quiz_rows.append(
                 [
                     pseudonym(student_id),
@@ -369,9 +458,9 @@ def _quiz_rows(quizzes):
                     quiz.title,
                     kind,
                     QUIZ_STATUSES[attempt_status(attempt)],
-                    attempt.score if submitted else "",
-                    attempt.max_score if submitted else "",
-                    percent(attempt) if submitted else "",
+                    attempt.score if scored else "",
+                    attempt.max_score if scored else "",
+                    percent(attempt) if scored else "",
                     _local(attempt.started_at) if attempt else "",
                     _local(attempt.submitted_at) if submitted else "",
                     _minutes(attempt.started_at, attempt.submitted_at) if submitted else "",
@@ -381,6 +470,8 @@ def _quiz_rows(quizzes):
                 continue
             for question in questions:
                 earned = attempt.results.get(str(question.pk), 0)
+                likert = question.kind == "likert"
+                answer = likert_value(question, attempt.answers.get(str(question.pk), [])) if likert else None
                 answer_rows.append(
                     [
                         pseudonym(student_id),
@@ -388,10 +479,11 @@ def _quiz_rows(quizzes):
                         quiz.pk,
                         kind,
                         question.order,
-                        "bitta" if question.kind == "single" else "kop",
-                        earned,
-                        question.points,
-                        _flag(earned >= question.points),
+                        QUESTION_KINDS.get(question.kind, question.kind),
+                        "" if likert else earned,
+                        "" if likert else question.points,
+                        "" if likert else _flag(earned >= question.points),
+                        "" if answer is None else answer,
                     ]
                 )
     return quiz_rows, answer_rows
@@ -447,6 +539,7 @@ def build_export(labs, quizzes=None):
                         _flag(attempt.is_correct),
                         ",".join(attempt_categories(attempt)),
                         _flag(attempt.ai_advice),
+                        hint_level(attempt),
                         len(attempt.sql_code.splitlines()),
                         len(attempt.sql_code),
                     ]
@@ -469,6 +562,7 @@ def build_export(labs, quizzes=None):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
+        zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs)))
         if quizzes is not None:
             quiz_rows, answer_rows = _quiz_rows(quizzes)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))

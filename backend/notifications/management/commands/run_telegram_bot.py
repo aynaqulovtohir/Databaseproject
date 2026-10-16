@@ -1,7 +1,8 @@
 """Fon jarayoni: Telegram bot.
 
-Uch ish qiladi: /start va /stop buyruqlarini qabul qiladi, navbatdagi
-bildirishnomalarni yuboradi, muddat eslatmalarini yaratadi.
+To'rt ish qiladi: /start va /stop buyruqlarini qabul qiladi, navbatdagi
+bildirishnomalarni yuboradi, muddat eslatmalarini yaratadi va backend hamda
+bazalar ishlamay qolsa, adminlarga xabar beradi (monitoring).
 
 Ishga tushirish: python manage.py run_telegram_bot
 """
@@ -9,8 +10,9 @@ import logging
 import time
 
 from django.core.management.base import BaseCommand
+from django.db import close_old_connections
 
-from notifications import bot, services, telegram
+from notifications import bot, monitor, services, telegram
 
 NOT_CONFIGURED_SLEEP_SECONDS = 30
 ERROR_SLEEP_SECONDS = 10
@@ -28,6 +30,8 @@ class Command(BaseCommand):
         warned_not_configured = False
         offset = None
         last_reminder_check = 0.0
+        health_monitor = monitor.Monitor()
+        last_health_check = 0.0
 
         while True:
             if not telegram.is_configured():
@@ -38,6 +42,14 @@ class Command(BaseCommand):
                     warned_not_configured = True
                 time.sleep(NOT_CONFIGURED_SLEEP_SECONDS)
                 continue
+
+            # Alohida: baza ishlamay qolganda ham monitoring ishlashi kerak
+            if monitor.is_enabled() and time.monotonic() - last_health_check >= monitor.CHECK_INTERVAL_SECONDS:
+                last_health_check = time.monotonic()
+                try:
+                    health_monitor.check()
+                except Exception:  # noqa: BLE001
+                    logger.exception("Monitoring xatosi")
 
             try:
                 for update in telegram.get_updates(offset=offset):
@@ -54,4 +66,6 @@ class Command(BaseCommand):
                 time.sleep(ERROR_SLEEP_SECONDS)
             except Exception:  # masalan, baza vaqtincha uzilgan
                 logger.exception("Bot xatosi")
+                # Uzilgan ulanish yopiladi, baza tiklanganda keyingi so'rov yangisini ochadi
+                close_old_connections()
                 time.sleep(ERROR_SLEEP_SECONDS)

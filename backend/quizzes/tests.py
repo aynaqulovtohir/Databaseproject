@@ -301,3 +301,162 @@ class EntryTestCommandTests(QuizTestCase):
         call_command("seed_entry_test", markdown=True, stdout=output)
         self.assertIn("## Javoblar kaliti", output.getvalue())
         self.assertEqual(Quiz.objects.count(), 0)
+
+
+SURVEY_QUESTIONS = [
+    {"text": "Laboratoriya foydali bo'ldi.", "kind": "likert"},
+    # Yuborilgan variantlar, to'g'ri belgisi va ball e'tiborga olinmaydi
+    {"text": "AI maslahati tushunarli edi.", "kind": "likert", "points": 50,
+     "choices": [{"text": "x", "is_correct": True}, {"text": "y", "is_correct": False}]},
+]
+
+
+class SurveyTests(QuizTestCase):
+    """So'rovnoma (Likert shkalasi): ball qo'yilmaydi, o'qituvchi faqat umumlashgan natijani ko'radi."""
+
+    def auth_as(self, user):
+        # Bu testlarda login ko'p: login cheklovi (throttle) xalaqit bermasin
+        cache.clear()
+        super().auth_as(user)
+
+    def create_survey(self):
+        return self.create_quiz(kind="survey", title="So'rovnoma", questions=SURVEY_QUESTIONS)
+
+    def answer(self, user, quiz, values):
+        """values: har bir savol uchun shkaladagi qiymat (1-5) yoki None."""
+        self.auth_as(user)
+        taking = self.client.post(f"/api/quizzes/{quiz.pk}/start/").data
+        answers = {
+            str(question["id"]): [question["choices"][value - 1]["id"]]
+            for question, value in zip(taking["questions"], values)
+            if value is not None
+        }
+        response = self.client.post(f"/api/quizzes/{quiz.pk}/submit/", {"answers": answers}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return taking, response.data
+
+    def test_likert_questions_get_standard_scale_and_no_points(self):
+        from .models import LIKERT_SCALE
+
+        quiz = self.create_survey()
+        for question in quiz.questions.all():
+            self.assertEqual(question.points, 0)
+            self.assertEqual([choice.text for choice in question.choices.all()], LIKERT_SCALE)
+            self.assertFalse(question.choices.filter(is_correct=True).exists())
+
+    def test_survey_and_test_questions_are_not_mixed(self):
+        self.auth_as(self.teacher)
+        mixed = {"kind": "survey", "title": "S", "groups": [self.group.pk], "questions": SURVEY_QUESTIONS + QUESTIONS[:1]}
+        self.assertEqual(self.client.post("/api/quizzes/", mixed, format="json").status_code, 400)
+        likert_in_test = {"kind": "pre", "title": "T", "groups": [self.group.pk], "questions": SURVEY_QUESTIONS}
+        self.assertEqual(self.client.post("/api/quizzes/", likert_in_test, format="json").status_code, 400)
+        # Bor testning turini savollarni o'zgartirmasdan so'rovnomaga almashtirib bo'lmaydi
+        quiz = self.create_quiz()
+        self.auth_as(self.teacher)
+        self.assertEqual(self.client.patch(f"/api/quizzes/{quiz.pk}/", {"kind": "survey"}).status_code, 400)
+
+    def test_scale_is_not_shuffled_and_single_answer_only(self):
+        quiz = self.create_survey()
+        self.auth_as(self.student)
+        taking = self.client.post(f"/api/quizzes/{quiz.pk}/start/").data
+        question = taking["questions"][0]
+        self.assertEqual(question["choices"][0]["text"], "Mutlaqo qo'shilmayman")
+        self.assertEqual(question["choices"][-1]["text"], "To'liq qo'shilaman")
+        two = [question["choices"][0]["id"], question["choices"][1]["id"]]
+        response = self.client.put(f"/api/quizzes/{quiz.pk}/answers/", {"answers": {str(question["id"]): two}}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Boshqa savolning varianti qabul qilinmaydi
+        other = taking["questions"][1]["choices"][0]["id"]
+        response = self.client.put(f"/api/quizzes/{quiz.pk}/answers/", {"answers": {str(question["id"]): [other]}}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_summary_by_group_without_individual_answers(self):
+        quiz = self.create_survey()
+        control = StudentGroup.objects.create(name="Nazorat", ai_enabled=False)
+        control.teachers.add(self.teacher)
+        quiz.groups.add(control)
+        control_student = User.objects.create_user("q_control", password=PASSWORD, role=User.Role.STUDENT, group=control)
+        self.group.ai_enabled = True
+        self.group.save()
+
+        _, result = self.answer(self.student, quiz, [5, 4])
+        self.assertEqual((result["score"], result["max_score"]), (0, 0))
+        self.auth_as(self.teacher)
+        # Bitta javob: natija yashiriladi (aks holda talabaning javobi ochilib qoladi)
+        first = self.client.get(f"/api/quizzes/{quiz.pk}/survey/").data["questions"][0]
+        self.assertEqual(first["all"], {"count": 1, "mean": None, "distribution": None, "hidden": True})
+
+        more = [
+            User.objects.create_user(f"q_extra{index}", password=PASSWORD, role=User.Role.STUDENT, group=group)
+            for index, group in enumerate([self.group, control, control])
+        ]
+        self.answer(self.student2, quiz, [3, None])
+        self.answer(control_student, quiz, [1, 2])
+        self.answer(more[1], quiz, [1, 2])
+
+        # 4 ta javob (AI: 2, nazorat: 2): umumiy natija ko'rinadi, qismlar esa yashirin
+        self.auth_as(self.teacher)
+        first, second = self.client.get(f"/api/quizzes/{quiz.pk}/survey/").data["questions"]
+        self.assertEqual(first["all"], {"count": 4, "mean": 2.5, "distribution": [2, 0, 1, 0, 1], "hidden": False})
+        self.assertTrue(first["ai"]["hidden"] and first["control"]["hidden"])
+        self.assertIsNone(first["ai"]["mean"])
+        # 2-savolga 3 kishi javob bergan: AI qismida 1 ta — ikkala qism ham yashirin
+        self.assertEqual(second["all"]["count"], 3)
+        self.assertTrue(second["ai"]["hidden"] and second["control"]["hidden"])
+
+        self.answer(more[0], quiz, [2, 4])
+        self.answer(more[2], quiz, [3, 3])
+        self.auth_as(self.teacher)
+        summary = self.client.get(f"/api/quizzes/{quiz.pk}/survey/").data
+        self.assertEqual(summary["respondents"], 6)
+        first = summary["questions"][0]
+        self.assertEqual(first["ai"], {"count": 3, "mean": 3.33, "distribution": [0, 1, 1, 0, 1], "hidden": False})
+        self.assertEqual(first["control"]["mean"], 1.67)
+        # Javoblar ism bilan bog'lanmaydi
+        self.assertNotIn("Maxfiyism", str(summary))
+        self.assertNotIn("q_student", str(summary))
+
+    def test_summary_access(self):
+        quiz = self.create_survey()
+        self.auth_as(self.student)
+        self.assertEqual(self.client.get(f"/api/quizzes/{quiz.pk}/survey/").status_code, 403)
+        self.auth_as(self.other_teacher)
+        self.assertEqual(self.client.get(f"/api/quizzes/{quiz.pk}/survey/").status_code, 404)
+        regular = self.create_quiz()
+        self.auth_as(self.teacher)
+        self.assertEqual(self.client.get(f"/api/quizzes/{regular.pk}/survey/").status_code, 400)
+
+    def test_survey_answers_in_export(self):
+        import csv
+        import io
+        import zipfile
+
+        quiz = self.create_survey()
+        self.answer(self.student, quiz, [5, None])
+        self.auth_as(self.teacher)
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+        read = lambda name: list(  # noqa: E731
+            csv.DictReader(io.StringIO(archive.read(name).decode("utf-8-sig")), delimiter=";")
+        )
+        quizzes = [row for row in read("testlar.csv") if row["holat"] == "topshirgan"]
+        self.assertEqual([(row["test_turi"], row["ball"], row["foiz"]) for row in quizzes], [("sorovnoma", "", "")])
+        answers = read("test_javoblari.csv")
+        self.assertEqual([(row["savol_turi"], row["javob"], row["togri"]) for row in answers], [("likert", "5", ""), ("likert", "", "")])
+
+    def test_seed_survey(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from .survey_bank import STATEMENTS
+
+        control = StudentGroup.objects.create(name="Nazorat", ai_enabled=False)
+        call_command("seed_survey", author="q_teacher", group=["Q-guruh", "Nazorat"], stdout=StringIO())
+        call_command("seed_survey", author="q_teacher", group=["Q-guruh", "Nazorat"], stdout=StringIO())
+        surveys = Quiz.objects.filter(kind="survey")
+        self.assertEqual(surveys.count(), 2)
+        full = surveys.get(groups=self.group)
+        short = surveys.get(groups=control)
+        self.assertEqual(full.questions.count(), len(STATEMENTS))
+        self.assertEqual(short.questions.count(), sum(1 for item in STATEMENTS if not item["ai"]))
+        self.assertFalse(short.questions.filter(text__icontains="AI").exists())

@@ -273,6 +273,31 @@ export interface LabStudentProgress extends PersonShort {
   grade: LabGrade | null
 }
 
+export interface SimilarWork extends PersonShort {
+  group: string
+  solved: boolean
+  code: string
+  diagram: ErDiagram | null
+}
+
+/** Yechimlari shubhali darajada o'xshash ikki talaba */
+export interface SimilarPair {
+  students: [SimilarWork, SimilarWork]
+  /** Talabalarning o'z tanlovlari (namunada yo'q bo'laklar) bo'yicha o'xshashlik, 0-1 */
+  score: number
+  shared: number
+  /** Ikkalasida bir xil bo'lgan noodatiy xato urinishlar soni */
+  shared_wrong: number
+  /** Birinchi to'g'ri yechimlari orasidagi vaqt (daqiqa) */
+  gap_minutes: number | null
+}
+
+export interface SimilarityReport {
+  compared: number
+  threshold: number
+  pairs: SimilarPair[]
+}
+
 export type AnalysisStatus = 'pending' | 'processing' | 'done' | 'failed'
 
 export interface AnalysisIssue {
@@ -318,15 +343,17 @@ export const MAX_SCORE = 100
 
 // ---------- Testlar ----------
 
-export type QuizKind = 'pre' | 'post' | 'practice'
+export type QuizKind = 'pre' | 'post' | 'practice' | 'survey'
 
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
   pre: 'Kirish testi',
   post: 'Chiqish testi',
   practice: 'Oddiy test',
+  survey: "So'rovnoma",
 }
 
-export type QuestionKind = 'single' | 'multiple'
+/** likert — so'rovnoma fikri: 1-5 shkala, ball qo'yilmaydi, variantlar serverda qo'shiladi */
+export type QuestionKind = 'single' | 'multiple' | 'likert'
 
 export interface QuizChoice {
   id?: number
@@ -403,6 +430,22 @@ export interface QuizResult {
     | null
 }
 
+export interface SurveySegment {
+  count: number
+  mean: number | null
+  /** 1 dan 5 gacha har bir qiymatni tanlaganlar soni (yashirilgan bo'lsa null) */
+  distribution: number[] | null
+  /** Javoblar kam: alohida talabaning javobi ochilib qolmasligi uchun natija yashirilgan */
+  hidden: boolean
+}
+
+export interface SurveySummary {
+  respondents: number
+  min_responses: number
+  scale: string[]
+  questions: { id: number; order: number; text: string; all: SurveySegment; ai: SurveySegment; control: SurveySegment }[]
+}
+
 export interface QuizStudentResult extends PersonShort {
   group: string
   status: QuizAttemptStatus
@@ -411,6 +454,68 @@ export interface QuizStudentResult extends PersonShort {
   percent: number | null
   started_at: string | null
   submitted_at: string | null
+}
+
+// ---------- Ko'r baholash ----------
+
+/** O'qituvchiga talaba ismi va tizim bahosisiz ko'rsatiladigan ish */
+export interface BlindReviewItem {
+  attempt_id: number
+  lab: Pick<Lab, 'id' | 'title' | 'kind' | 'description' | 'setup_sql' | 'solution_sql' | 'reference_diagram'>
+  code: string
+  diagram: ErDiagram | null
+  is_correct: boolean
+  check: { error: { message: string; tip?: string } | null; differences: string[] }
+}
+
+export interface BlindReviewQueue {
+  item: BlindReviewItem | null
+  remaining: number
+  reviewed: number
+}
+
+export interface AgreementStats {
+  count: number
+  pearson_r?: number | null
+  mean_abs_diff?: number
+  /** Tizim − o'qituvchi: musbat bo'lsa tizim yumshoqroq */
+  mean_diff?: number
+  limits_of_agreement?: [number, number] | null
+  within_10?: number
+  band_agreement?: number
+  weighted_kappa?: number | null
+  system_mean?: number
+  teacher_mean?: number
+}
+
+export interface Agreement {
+  overall: AgreementStats
+  by_source: Record<LabGrade['source'], AgreementStats>
+  pairs: { lab_id: number; lab_kind: LabKind; system: number; teacher: number; source: LabGrade['source'] }[]
+  bands: { min: number; mark: number }[]
+}
+
+// ---------- AI xarajati ----------
+
+export interface AIUsageTotals {
+  requests: number
+  failed: number
+  input_tokens: number
+  output_tokens: number
+  /** AQSh dollari (narx sozlanmagan bo'lsa 0) */
+  cost: number
+}
+
+export interface AIUsageReport {
+  days: number
+  price: { input_per_mtok: number; output_per_mtok: number; configured: boolean }
+  today: AIUsageTotals
+  month: AIUsageTotals
+  previous_month: AIUsageTotals
+  period: AIUsageTotals
+  daily: (AIUsageTotals & { date: string })[]
+  by_purpose: (AIUsageTotals & { purpose: string; label: string })[]
+  by_model: (AIUsageTotals & { model: string })[]
 }
 
 // ---------- Statistika ----------
@@ -447,11 +552,31 @@ export interface AiEffectBucket {
   rate: number | null
 }
 
+export interface LearningCurveSegment {
+  students: number
+  solved: number
+  /** Yechganlarning birinchi to'g'ri urinishgacha o'rtacha urinishlari */
+  attempts_to_solve: number | null
+  /** Birinchi urinishda yechganlar ulushi (%) */
+  first_try_rate: number | null
+}
+
+export interface LearningCurvePoint {
+  id: number
+  position: number
+  title: string
+  kind: LabKind
+  ai: LearningCurveSegment
+  control: LearningCurveSegment
+}
+
 export interface Statistics {
   groups_available: GroupShort[]
   overview: { students: number; labs: number; attempts: number; solved_rate: number | null; average_grade: number | null }
   top_errors: { category: string; label: string; count: number }[]
   labs: StatisticsLab[]
+  /** Laboratoriyalar talabalar bajargan tartibda */
+  learning_curve: LearningCurvePoint[]
   ai_effect: { with_advice: AiEffectBucket; without_advice: AiEffectBucket }
   groups: StatisticsGroup[]
 }

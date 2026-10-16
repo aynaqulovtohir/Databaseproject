@@ -122,6 +122,12 @@ def _connect(dbname, **overrides):
         raise SandboxUnavailable(str(exc)) from exc
 
 
+def ping():
+    """Laboratoriya bazasi serveri javob beryaptimi (monitoring uchun). Ishlamasa SandboxUnavailable."""
+    with _connect(settings.LAB_DB["MAINTENANCE_DB"]) as connection:
+        connection.execute("SELECT 1")
+
+
 def _ensure_database():
     """Qum quti bazasini birinchi murojaatda yaratadi."""
     global _database_ready

@@ -6,14 +6,14 @@ import json
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from ai.client import AITransientError
 from users.models import StudentGroup, User
 
-from .models import Lab, LabAttempt, LabGrade
+from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .sandbox import run_sql
 
 PASSWORD = "Kuchli-Parol-2026"
@@ -377,9 +377,32 @@ class AdviceTests(BaseTestCase):
 
     @patch("labs.views.generate_advice", return_value="FROM so'zini tekshiring.")
     def test_advice_is_saved_and_not_requested_twice(self, generate):
-        self.assertEqual(self.client.post(self.advice_url).data, {"advice": "FROM so'zini tekshiring."})
-        self.assertEqual(self.client.post(self.advice_url).data, {"advice": "FROM so'zini tekshiring."})
+        self.assertEqual(self.client.post(self.advice_url).data["hints"], ["FROM so'zini tekshiring."])
+        self.assertEqual(self.client.post(self.advice_url).data["advice"], "FROM so'zini tekshiring.")
         generate.assert_called_once()
+
+    @patch("labs.views.generate_advice", side_effect=["savol", "tushuncha", "ko'rsatma"])
+    def test_hint_levels_are_sequential(self, generate):
+        first = self.client.post(self.advice_url).data
+        self.assertEqual((first["level"], first["max_level"], first["hints"]), (1, 3, ["savol"]))
+        self.assertEqual(self.client.post(self.advice_url, {"level": 3}, format="json").status_code, 400)
+        second = self.client.post(self.advice_url, {"level": 2}, format="json").data
+        self.assertEqual(second["hints"], ["savol", "tushuncha"])
+        # 2-daraja uchun AI'ga avvalgi maslahat ham berildi
+        self.assertEqual(generate.call_args.args[1:], (2, ["savol"]))
+        third = self.client.post(self.advice_url, {"level": 3}, format="json").data
+        self.assertEqual(third["advice"], "ko'rsatma")
+        self.assertEqual(self.client.post(self.advice_url, {"level": 4}, format="json").status_code, 400)
+        attempt = LabAttempt.objects.get(pk=self.advice_url.split("/")[-3])
+        self.assertEqual((attempt.ai_hint_level, attempt.ai_advice), (3, "ko'rsatma"))
+
+    @patch("labs.advice.create_message")
+    def test_level_instruction_is_sent(self, create_message):
+        create_message.return_value.content = [type("Block", (), {"type": "text", "text": "savol"})()]
+        self.client.post(self.advice_url)
+        message = create_message.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("1-daraja", message)
+        self.assertNotIn("<oldingi_maslahatlar>", message)
 
     @patch("labs.advice.create_message")
     def test_solution_and_student_identity_are_not_sent_to_ai(self, create_message):
@@ -397,10 +420,12 @@ class AdviceTests(BaseTestCase):
         self.assertEqual(self.client.post(self.advice_url).status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertIsNone(LabAttempt.objects.get().ai_requested_at)
 
-    @override_settings(LAB_AI_DAILY_LIMIT=1)
+    @override_settings(LAB_AI_DAILY_LIMIT=2)
     @patch("labs.views.generate_advice", return_value="Maslahat")
     def test_daily_limit(self, generate):
+        # Har bir daraja limitdan alohida yechiladi
         self.assertEqual(self.client.post(self.advice_url).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.post(self.advice_url, {"level": 2}, format="json").status_code, 200)
         second = self.run_code("SELECT nomi FORM kitob;")
         self.assertFalse(second.data["ai_available"])
         response = self.client.post(f"/api/labs/attempts/{second.data['attempt_id']}/advice/")
@@ -603,7 +628,8 @@ class ResearchExportTests(BaseTestCase):
         self.run_code(SOLUTION)  # to'g'ri
         second = LabAttempt.objects.filter(student=self.student_a1).order_by("id")[1]
         second.ai_advice = "maslahat"
-        second.save(update_fields=["ai_advice"])
+        second.ai_hint_level = 2
+        second.save(update_fields=["ai_advice", "ai_hint_level"])
         self.client.credentials()
 
     def export(self, user, **params):
@@ -638,7 +664,8 @@ class ResearchExportTests(BaseTestCase):
         response, (files, tables) = self.export(self.admin)
         self.assertIn("attachment;", response["Content-Disposition"])
         self.assertEqual(
-            set(files), {"urinishlar.csv", "xulosa.csv", "testlar.csv", "test_javoblari.csv", "README.txt"}
+            set(files),
+            {"urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv", "README.txt"},
         )
         everything = "".join(files.values())
         for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):
@@ -658,6 +685,7 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(rows[0]["xato_turlari"], "sintaksis")
         self.assertEqual(rows[1]["xato_turlari"], "natija_ustunlari_soni")
         self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
+        self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
 
     def test_summary_includes_students_who_did_not_start(self):
@@ -670,6 +698,8 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(solved["baza_xatolari"], "1")
         self.assertEqual(solved["natija_farqlari"], "1")
         self.assertEqual(solved["ai_maslahatlar"], "1")
+        self.assertEqual(solved["maslahat_darajalari_jami"], "2")
+        self.assertEqual(solved["eng_yuqori_maslahat_darajasi"], "2")
         self.assertEqual(solved["maslahatdan_keyin_yechdi"], "1")
         idle = summary["0"]
         self.assertEqual((idle["yechildi"], idle["maslahatdan_keyin_yechdi"]), ("0", ""))
@@ -981,3 +1011,291 @@ class StatisticsTests(BaseTestCase):
         self.assertEqual(self.client.get(self.stats_url).data["overview"]["labs"], 0)
         self.auth_as(self.admin)
         self.assertEqual(len(self.client.get(self.stats_url).data["groups_available"]), 2)
+
+
+class LearningCurveTests(BaseTestCase):
+    stats_url = "/api/statistics/"
+
+    def test_labs_follow_learning_order_and_split_by_ai(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        # Seed buyrug'idagidek: 1-laboratoriya oxirida yaratiladi
+        second = self.lab
+        first = Lab.objects.create(title="Birinchi", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        unstarted_old = Lab.objects.create(title="Boshlanmagan eski", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        unstarted_new = Lab.objects.create(title="Boshlanmagan yangi", setup_sql=SETUP, solution_sql=SOLUTION, author=self.teacher_a)
+        for lab in (first, unstarted_old, unstarted_new):
+            lab.groups.add(self.group_a)
+        Lab.objects.filter(pk=unstarted_new.pk).update(created_at=timezone.now() + timedelta(minutes=1))
+        control = StudentGroup.objects.create(name="Nazorat", ai_enabled=False)
+        control.teachers.add(self.teacher_a)
+        for lab in (first, second):
+            lab.groups.add(control)
+        control_student = User.objects.create_user("control1", password=PASSWORD, role=User.Role.STUDENT, group=control)
+
+        start = timezone.now() - timedelta(days=7)
+
+        def attempt(lab, student, correct, days):
+            item = LabAttempt.objects.create(lab=lab, student=student, is_correct=correct)
+            LabAttempt.objects.filter(pk=item.pk).update(created_at=start + timedelta(days=days))
+
+        attempt(first, self.student_a1, False, 0)
+        attempt(first, self.student_a1, True, 0.1)  # AI guruhi: 2 urinishda
+        attempt(first, control_student, True, 0.2)  # nazorat: 1 urinishda
+        attempt(second, self.student_a1, True, 2)
+        attempt(second, control_student, False, 2)
+        attempt(second, control_student, False, 2.1)
+        attempt(second, control_student, True, 2.2)  # nazorat: 3 urinishda
+
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.stats_url).data
+        self.assertEqual(
+            [lab["title"] for lab in data["labs"]],
+            ["Birinchi", second.title, "Boshlanmagan yangi", "Boshlanmagan eski"],
+        )
+        curve = data["learning_curve"]
+        self.assertEqual([point["position"] for point in curve], [1, 2, 3, 4])
+        self.assertEqual(curve[0]["ai"], {"students": 2, "solved": 1, "attempts_to_solve": 2.0, "first_try_rate": 0.0})
+        self.assertEqual(curve[0]["control"]["attempts_to_solve"], 1.0)
+        self.assertEqual(curve[1]["control"]["attempts_to_solve"], 3.0)
+        self.assertEqual(curve[1]["ai"]["first_try_rate"], 50.0)
+        self.assertIsNone(curve[3]["ai"]["attempts_to_solve"])
+
+
+class DuplicateLabTests(BaseTestCase):
+    def test_teacher_duplicates_own_lab(self):
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="x", is_correct=False)
+        self.auth_as(self.teacher_a)
+        response = self.client.post(f"/api/labs/{self.lab.pk}/duplicate/")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        copy = Lab.objects.get(pk=response.data["id"])
+        self.assertEqual(copy.title, "Qimmat kitoblar (nusxa)")
+        self.assertEqual((copy.setup_sql, copy.solution_sql), (self.lab.setup_sql, self.lab.solution_sql))
+        self.assertEqual(list(copy.groups.all()), [self.group_a])
+        self.assertEqual(copy.attempts.count(), 0)
+
+    def test_others_cannot_duplicate(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 403)
+        self.auth_as(self.teacher_b)
+        self.assertEqual(self.client.post(f"/api/labs/{self.lab.pk}/duplicate/").status_code, 404)
+
+
+class BlindReviewTests(BaseTestCase):
+    """Ko'r baholash: ish ism va AI bahosisiz beriladi, baho bir marta qo'yiladi, moslik to'g'ri hisoblanadi."""
+
+    review_url = "/api/labs/blind-review/"
+
+    def setUp(self):
+        super().setUp()
+        self.grades = []
+        for student, score, source in ((self.student_a1, 90, "ai"), (self.student_a2, 40, "auto")):
+            attempt = LabAttempt.objects.create(
+                lab=self.lab, student=student, sql_code=f"SELECT {score};", is_correct=score > 50,
+                feedback={"differences": ["Natijadagi qatorlar soni farq qiladi"]}, is_submission=True,
+            )
+            self.grades.append(
+                LabGrade.objects.create(
+                    lab=self.lab, student=student, attempt=attempt, score=score, source=source,
+                    comment="MAXFIY-AI-IZOH",
+                )
+            )
+
+    def auth_as(self, user):
+        cache.clear()  # login cheklovi xalaqit bermasin
+        super().auth_as(user)
+
+    def review(self, attempt_id, score):
+        return self.client.post(self.review_url, {"attempt": attempt_id, "score": score}, format="json")
+
+    def test_student_cannot_review(self):
+        self.auth_as(self.student_a1)
+        self.assertEqual(self.client.get(self.review_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.review(self.grades[0].attempt_id, 100).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.get(self.review_url + "agreement/").status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_item_hides_student_and_system_grade(self):
+        self.auth_as(self.teacher_a)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["remaining"], data["reviewed"]), (2, 0))
+        text = str(data)
+        for secret in ("MAXFIY-AI-IZOH", "Zuhriddin", "student_a", "'score'", "source", str(self.student_a1.pk) + ","):
+            self.assertNotIn(secret, text)
+        self.assertIn(data["item"]["code"], {"SELECT 90;", "SELECT 40;"})
+        self.assertEqual(data["item"]["check"]["differences"], ["Natijadagi qatorlar soni farq qiladi"])
+
+    def test_review_is_saved_once_with_snapshot(self):
+        self.auth_as(self.teacher_a)
+        attempt_id = self.grades[0].attempt_id
+        self.assertEqual(self.review(attempt_id, 70).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.review(attempt_id, 95).status_code, status.HTTP_409_CONFLICT)
+        review = BlindReview.objects.get()
+        self.assertEqual((review.score, review.ai_score, review.ai_source), (70, 90, "ai"))
+        # Talaba keyin qayta topshirib, bahosi o'zgarsa ham juftlik o'zgarmaydi
+        LabGrade.objects.filter(pk=self.grades[0].pk).update(score=100)
+        review.refresh_from_db()
+        self.assertEqual(review.ai_score, 90)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["remaining"], data["reviewed"]), (1, 1))
+        self.assertEqual(data["item"]["attempt_id"], self.grades[1].attempt_id)
+
+    def test_invalid_input(self):
+        self.auth_as(self.teacher_a)
+        attempt_id = self.grades[0].attempt_id
+        for score in (101, -1, "80", True, 7.5, None):
+            self.assertEqual(self.review(attempt_id, score).status_code, status.HTTP_400_BAD_REQUEST, score)
+        self.assertEqual(self.review(str(attempt_id), 50).status_code, status.HTTP_400_BAD_REQUEST)
+        # Baholanmagan (navbatda yo'q) urinish
+        other = LabAttempt.objects.create(lab=self.lab, student=self.student_a1, is_correct=False)
+        self.assertEqual(self.review(other.pk, 50).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.review_url, {"lab": "1 OR 1=1"}).status_code, 400)
+        self.assertFalse(BlindReview.objects.exists())
+
+    def test_other_teacher_cannot_see_or_review(self):
+        self.auth_as(self.teacher_b)
+        data = self.client.get(self.review_url).data
+        self.assertEqual((data["item"], data["remaining"]), (None, 0))
+        self.assertEqual(self.review(self.grades[0].attempt_id, 50).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(BlindReview.objects.exists())
+
+    def test_agreement_visibility_and_export(self):
+        import csv
+        import io
+        import zipfile
+
+        self.auth_as(self.teacher_a)
+        self.review(self.grades[0].attempt_id, 80)
+        self.auth_as(self.admin)
+        self.review(self.grades[1].attempt_id, 45)
+
+        # O'qituvchi faqat o'zi baholagan ishlar juftligini ko'radi, admin — hammasini
+        self.auth_as(self.teacher_a)
+        mine = self.client.get(self.review_url + "agreement/").data
+        self.assertEqual(mine["overall"]["count"], 1)
+        self.assertEqual(mine["pairs"], [{"lab_id": self.lab.pk, "lab_kind": "sql", "system": 90, "teacher": 80, "source": "ai"}])
+        self.auth_as(self.admin)
+        everything = self.client.get(self.review_url + "agreement/").data
+        self.assertEqual(everything["overall"]["count"], 2)
+        self.assertEqual(everything["overall"]["mean_diff"], 2.5)  # (10 + -5) / 2
+        self.assertEqual(everything["by_source"]["auto"]["count"], 1)
+
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+        rows = list(csv.DictReader(io.StringIO(archive.read("baholash_mosligi.csv").decode("utf-8-sig")), delimiter=";"))
+        self.assertEqual([(row["tizim_ball"], row["oqituvchi_ball"], row["farq"]) for row in rows], [("90", "80", "10"), ("40", "45", "-5")])
+        self.assertEqual([(row["tizim_baho"], row["oqituvchi_baho"]) for row in rows], [("5", "4"), ("2", "2")])
+        self.assertTrue(all(row["baholovchi"].startswith("O-") for row in rows))
+        self.assertNotIn("teacher_a", archive.read("baholash_mosligi.csv").decode("utf-8-sig"))
+
+
+class AgreementMathTests(TestCase):
+    def test_statistics(self):
+        from .blind_review import agreement_stats, band, pearson, weighted_kappa
+
+        self.assertEqual([band(score) for score in (100, 86, 85, 71, 70, 55, 54, 0)], [5, 5, 4, 4, 3, 3, 2, 2])
+        self.assertAlmostEqual(pearson([1, 2, 3], [2, 4, 6]), 1.0)
+        self.assertIsNone(pearson([5, 5], [1, 2]))
+        self.assertEqual(weighted_kappa([2, 3, 4, 5], [2, 3, 4, 5]), 1.0)
+        # Qarama-qarshi baholar — manfiy kappa
+        self.assertLess(weighted_kappa([2, 2, 5, 5], [5, 5, 2, 2]), 0)
+
+        class Review:
+            def __init__(self, ai_score, score):
+                self.ai_score, self.score = ai_score, score
+
+        stats = agreement_stats([Review(90, 80), Review(60, 60), Review(30, 50)])
+        self.assertEqual(stats["count"], 3)
+        self.assertEqual(stats["mean_abs_diff"], 10.0)
+        self.assertEqual(stats["mean_diff"], -3.3)
+        self.assertEqual(stats["band_agreement"], 0.667)
+        self.assertEqual(stats["within_10"], 0.667)
+        self.assertEqual(agreement_stats([]), {"count": 0})
+
+
+COPIED_SQL = """-- kitoblarni narx bo'yicha saralaymiz
+SELECT nomi AS kitob_nomi, narx AS bahosi
+FROM kitob k
+WHERE k.narx >= 20
+ORDER BY bahosi DESC;"""
+OWN_SQL = """select nomi, narx from kitob where narx between 20 and 1000000 order by 2 desc"""
+
+
+class SimilarityTests(BaseTestCase):
+    """Ko'chirishni aniqlash: talabaning o'z tanlovlari solishtiriladi, namunaga mos qismlar emas."""
+
+    def setUp(self):
+        super().setUp()
+        self.student_a3 = User.objects.create_user(
+            "student_a3", password=PASSWORD, role=User.Role.STUDENT, group=self.group_a
+        )
+        self.url = f"/api/labs/{self.lab.pk}/similarity/"
+
+    def attempt(self, student, code, correct=True, diagram=None, lab=None):
+        return LabAttempt.objects.create(
+            lab=lab or self.lab, student=student, sql_code=code, diagram=diagram, is_correct=correct
+        )
+
+    def get(self, user=None):
+        self.auth_as(user or self.teacher_a)
+        return self.client.get(self.url)
+
+    def test_copied_solution_is_flagged_but_independent_ones_are_not(self):
+        self.attempt(self.student_a1, COPIED_SQL)
+        self.attempt(self.student_a2, COPIED_SQL.replace("DESC;", "DESC ;"))  # bo'sh joy farqi
+        self.attempt(self.student_a3, OWN_SQL)
+        data = self.get().data
+        self.assertEqual(len(data["pairs"]), 1)
+        pair = data["pairs"][0]
+        self.assertEqual({student["id"] for student in pair["students"]}, {self.student_a1.pk, self.student_a2.pk})
+        self.assertEqual(pair["score"], 1.0)
+        self.assertIsNotNone(pair["gap_minutes"])
+
+    def test_solutions_equal_to_reference_are_not_flagged(self):
+        for student in (self.student_a1, self.student_a2):
+            self.attempt(student, SOLUTION)
+        self.assertEqual(self.get().data["pairs"], [])
+
+    def test_shared_unusual_wrong_attempt_is_flagged(self):
+        wrong = "SELECT nomi, narx, muallif FROM kitob WHERE narx > 20 AND nomi LIKE '%a%' ORDER BY nomi;"
+        self.attempt(self.student_a1, wrong, correct=False)
+        self.attempt(self.student_a2, wrong, correct=False)
+        self.attempt(self.student_a1, SOLUTION)
+        self.attempt(self.student_a2, OWN_SQL)
+        pairs = self.get().data["pairs"]
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0]["shared_wrong"], 1)
+
+    def test_er_names_are_compared(self):
+        reference = {
+            "entities": [{"id": "e1", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
+            "relationships": [],
+        }
+        lab = Lab.objects.create(kind="er", title="ER", reference_diagram=reference, author=self.teacher_a)
+        lab.groups.add(self.group_a)
+
+        def diagram(*names):
+            return {
+                "entities": [
+                    {"id": "e1", "name": "Talaba", "x": 0, "y": 0,
+                     "attributes": [{"name": "id", "key": "pk"}] + [{"name": name, "key": ""} for name in names]},
+                    {"id": "e2", "name": "Yotoqxona xonasi", "x": 0, "y": 0, "attributes": [{"name": "qavat", "key": ""}]},
+                ],
+                "relationships": [],
+            }
+
+        unusual = ("tugilgan_joyi", "sevimli_fan", "oyoq_kiyim_olchami", "telefon_2")
+        self.attempt(self.student_a1, "", False, diagram(*unusual), lab)
+        self.attempt(self.student_a2, "", False, diagram(*[name.upper() for name in unusual]), lab)
+        self.attempt(self.student_a3, "", False, diagram("ism", "familiya", "manzil", "telefon"), lab)
+        self.url = f"/api/labs/{lab.pk}/similarity/"
+        pairs = self.get().data["pairs"]
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual({student["id"] for student in pairs[0]["students"]}, {self.student_a1.pk, self.student_a2.pk})
+
+    def test_access(self):
+        self.attempt(self.student_a1, COPIED_SQL)
+        self.attempt(self.student_a2, COPIED_SQL)
+        self.assertEqual(self.get(self.student_a1).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.get(self.teacher_b).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.get(self.admin).status_code, status.HTTP_200_OK)

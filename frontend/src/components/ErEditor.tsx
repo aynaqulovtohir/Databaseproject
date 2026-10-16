@@ -76,7 +76,9 @@ function AttributeRow({ attribute }: { attribute: ErAttribute }) {
   )
 }
 
-const HANDLE_CLASS = '!size-2.5 !border-2 !border-background !bg-primary opacity-0 transition-opacity group-hover:opacity-100'
+// Sichqonchali qurilmada nuqtalar obyekt ustiga kelinganda chiqadi; sensorli ekranda (telefon) doim ko'rinadi va kattaroq
+const HANDLE_CLASS =
+  '!size-2.5 !border-2 !border-background !bg-primary opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:!size-4 [@media(hover:none)]:opacity-100'
 
 function EntityNodeView({ data, selected }: NodeProps<EntityNode>) {
   const { entity } = data
@@ -517,6 +519,10 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
 
   return (
     <div className="grid gap-3">
+      <p className="rounded-lg border bg-muted/40 p-2 text-xs text-muted-foreground sm:hidden">
+        Kichik ekranda chizish noqulay bo'lishi mumkin: imkon bo'lsa, kompyuterdan foydalaning. Kattalashtirish — ikki
+        barmoq bilan.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" disabled={value.entities.length >= MAX_ENTITIES} onClick={addEntity}>
           <Plus aria-hidden="true" />
@@ -560,7 +566,10 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
               <ol className="list-decimal space-y-1 pl-4">
                 <li>«Obyekt qo'shish» bilan obyekt yarating va uni bosib nomi va atributlarini yozing.</li>
                 <li>Asosiy kalit atributiga PK belgisini qo'ying.</li>
-                <li>Obyekt ustiga kursorni olib boring: chetida nuqtalar chiqadi. Nuqtani boshqa obyektga sudrang.</li>
+                <li>
+                  Obyekt ustiga kursorni olib boring (telefonda nuqtalar doim ko'rinadi): chetidagi nuqtani boshqa
+                  obyektga sudrang.
+                </li>
                 <li>Chiziqni bosib, bog'lanish nomi va ikki tomondagi kardinallikni (1 yoki N) tanlang.</li>
               </ol>
               <p>{value.entities.length} ta obyekt, {value.relationships.length} ta bog'lanish.</p>

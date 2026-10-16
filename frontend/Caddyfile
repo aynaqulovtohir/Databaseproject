@@ -17,6 +17,11 @@
 		max_size 25MB
 	}
 
+	# Holat tekshiruvi faqat ichki tarmoq uchun (Telegram bot monitoringi)
+	handle /api/health* {
+		respond 404
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8000
 	}

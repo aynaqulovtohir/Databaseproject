@@ -56,7 +56,11 @@ class LabAttempt(models.Model):
     is_correct = models.BooleanField("to'g'ri")
     # Baza xatosi va namunadan farqlar (AI maslahati uchun saqlanadi)
     feedback = models.JSONField("tekshiruv natijasi", default=dict)
+    # Oxirgi (eng batafsil) olingan maslahat; bo'sh bo'lmasa — talaba AI maslahatidan foydalangan
     ai_advice = models.TextField("AI maslahati", blank=True)
+    # Bosqichma-bosqich maslahatlar: 1 — yo'naltiruvchi savol, 2 — tushuncha, 3 — aniq ko'rsatma
+    ai_hints = models.JSONField("AI maslahatlari (darajalar bo'yicha)", default=list, blank=True)
+    ai_hint_level = models.PositiveSmallIntegerField("olingan maslahat darajasi", default=0)
     # AI maslahati so'ralgan vaqt (kunlik limitni hisoblash uchun)
     ai_requested_at = models.DateTimeField("AI maslahati so'ralgan vaqti", null=True, blank=True)
     # True - talaba bu urinishni baholashga topshirgan (oddiy ishga tushirish emas)
@@ -103,3 +107,32 @@ class LabGrade(models.Model):
 
     def __str__(self):
         return f"{self.lab} / {self.student}: {self.score}"
+
+
+class BlindReview(models.Model):
+    """Ko'r baholash: o'qituvchi topshirilgan ishni AI bahosini va talaba ismini ko'rmasdan baholaydi.
+
+    Keyin ikki baho o'rtasidagi moslik hisoblanadi (blind_review.py). Baho qo'yilgan paytdagi AI bahosi
+    shu yerda saqlanadi: talaba keyin qayta topshirsa ham solishtiriladigan juftlik o'zgarmaydi.
+    Baho bir marta qo'yiladi va o'zgartirilmaydi (keyin AI bahosini ko'rib "tuzatish" natijani buzadi).
+    """
+
+    attempt = models.ForeignKey(
+        LabAttempt, verbose_name="urinish", on_delete=models.CASCADE, related_name="blind_reviews"
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="baholovchi", on_delete=models.CASCADE, related_name="blind_reviews"
+    )
+    score = models.PositiveSmallIntegerField("o'qituvchi bahosi")
+    ai_score = models.PositiveSmallIntegerField("tizim bahosi")
+    ai_source = models.CharField("tizim bahosi manbasi", max_length=10, choices=LabGrade.Source.choices)
+    created_at = models.DateTimeField("baholangan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ko'r baholash"
+        verbose_name_plural = "ko'r baholashlar"
+        ordering = ["id"]
+        constraints = [models.UniqueConstraint(fields=["attempt", "reviewer"], name="unique_blind_review")]
+
+    def __str__(self):
+        return f"{self.attempt} / {self.reviewer}: {self.score} (tizim: {self.ai_score})"

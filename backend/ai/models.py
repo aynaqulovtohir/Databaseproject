@@ -1,6 +1,7 @@
 """AI tahlili va chat-yordamchi modellari."""
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class AIAnalysis(models.Model):
@@ -71,3 +72,35 @@ class ChatMessage(models.Model):
         verbose_name = "chat xabari"
         verbose_name_plural = "chat xabarlari"
         ordering = ["created_at", "id"]
+
+
+class AIUsage(models.Model):
+    """Har bir AI so'rovining hisobi: xarajat va nosozliklarni kuzatish uchun.
+
+    Kim so'raganligi va matn saqlanmaydi — faqat maqsad, model va token soni.
+    """
+
+    class Purpose(models.TextChoices):
+        ANALYSIS = "analysis", "Topshiriq tahlili"
+        CHAT = "chat", "Chat-yordamchi"
+        LAB_ADVICE = "lab_advice", "SQL maslahati"
+        LAB_GRADE = "lab_grade", "SQL baholash"
+        ER_ADVICE = "er_advice", "ER maslahati"
+        ER_GRADE = "er_grade", "ER baholash"
+        OTHER = "other", "Boshqa"
+
+    purpose = models.CharField("maqsad", max_length=20, choices=Purpose.choices, default=Purpose.OTHER)
+    model_name = models.CharField("AI modeli", max_length=100, blank=True)
+    input_tokens = models.PositiveIntegerField("kirish tokenlari", default=0)
+    output_tokens = models.PositiveIntegerField("chiqish tokenlari", default=0)
+    ok = models.BooleanField("muvaffaqiyatli", default=True)
+    error = models.CharField("xato", max_length=200, blank=True)
+    created_at = models.DateTimeField("vaqti", default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "AI so'rovi"
+        verbose_name_plural = "AI so'rovlari"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_purpose_display()} / {self.model_name}: {self.input_tokens}+{self.output_tokens}"

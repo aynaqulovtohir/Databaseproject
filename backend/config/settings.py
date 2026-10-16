@@ -121,6 +121,7 @@ REST_FRAMEWORK = {
         "lab_run": "30/min",
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
+        "blind_review": "60/min",
         # Testda javoblarni oraliq saqlash
         "quiz_save": "120/min",
     },
@@ -150,6 +151,8 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 # HTTPS majburiyligi: sayt faqat HTTPS orqali ishlashi aniq bo'lgandan keyin .env da yoqiladi
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+# Monitoring ichki tarmoqdan oddiy http orqali keladi (tashqaridan Caddy bu manzilni yopadi)
+SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
 
 # Kesh: urinishlar cheklovlari (login, kod ishga tushirish) shu yerda hisoblanadi. Ishchi serverda gunicorn
@@ -180,6 +183,10 @@ GEMINI_FALLBACK_MODELS = env.list("GEMINI_FALLBACK_MODELS", default=["gemini-3.5
 # AI kerak bo'lgan testlar kalitni override_settings bilan o'zi beradi va javobni mock qiladi.
 if len(sys.argv) > 1 and sys.argv[1] == "test":
     ANTHROPIC_API_KEY = GEMINI_API_KEY = ""
+# Xarajat hisoboti uchun narx: 1 million token uchun AQSh dollarida (tarif sahifasidan olinadi).
+# 0 bo'lsa (masalan, bepul tarifda), hisobotda faqat tokenlar ko'rsatiladi.
+AI_PRICE_INPUT_PER_MTOK = env.float("AI_PRICE_INPUT_PER_MTOK", default=0.0)
+AI_PRICE_OUTPUT_PER_MTOK = env.float("AI_PRICE_OUTPUT_PER_MTOK", default=0.0)
 # Bitta talaba kuniga yubora oladigan chat xabarlari soni
 AI_CHAT_DAILY_LIMIT = env.int("AI_CHAT_DAILY_LIMIT", default=30)
 
@@ -200,6 +207,10 @@ LAB_DB = {
 LAB_AI_DAILY_LIMIT = env.int("LAB_AI_DAILY_LIMIT", default=40)
 # Bitta talabaning kuniga AI baholaydigan topshirishlari soni (undan keyin avtomatik baho qo'yiladi)
 LAB_AI_GRADES_DAILY_LIMIT = env.int("LAB_AI_GRADES_DAILY_LIMIT", default=20)
+
+# Monitoring: Telegram bot shu manzil orqali backend, asosiy va laboratoriya bazalarini tekshiradi
+# va nosozlik bo'lsa Telegram'ni bog'lagan adminlarga xabar yuboradi. Bo'sh bo'lsa, HTTP tekshiruv o'chiq.
+MONITOR_HEALTH_URL = env("MONITOR_HEALTH_URL", default="http://backend:8000/api/health/")
 
 # Telegram bildirishnomalari. Ikkalasi ham bo'sh bo'lmasa, bot ishlaydi.
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")

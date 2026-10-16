@@ -1,10 +1,11 @@
 """Virtual laboratoriya API'lari."""
 import logging
+from collections import defaultdict
 from datetime import datetime, time
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -21,10 +22,10 @@ from learning.permissions import IsStaffRoleOrReadOnly
 from users.models import User
 
 from .access import visible_labs
-from .advice import ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
+from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code
 from .er import build_fixed, compare
-from .models import Lab, LabAttempt, LabGrade
+from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -40,10 +41,12 @@ logger = logging.getLogger(__name__)
 
 
 def ai_advice_left(student):
-    """Talaba bugun yana nechta AI maslahati olishi mumkin."""
+    """Talaba bugun yana nechta AI maslahati olishi mumkin (har bir daraja alohida sanaladi)."""
     today_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
-    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).count()
-    return max(0, settings.LAB_AI_DAILY_LIMIT - used)
+    used = LabAttempt.objects.filter(student=student, ai_requested_at__gte=today_start).aggregate(
+        total=Sum("ai_hint_level")
+    )["total"]
+    return max(0, settings.LAB_AI_DAILY_LIMIT - (used or 0))
 
 
 def ai_grades_left(student):
@@ -269,6 +272,97 @@ class LabViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
+    def staff_labs(self, request):
+        """Admin — barcha, o'qituvchi — o'z laboratoriyalari; ?lab=<id> bilan bittasi."""
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        labs = visible_labs(request.user)
+        lab_id = request.query_params.get("lab")
+        if lab_id:
+            if not lab_id.isdigit():
+                raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+            labs = labs.filter(pk=lab_id)
+        return labs
+
+    @action(
+        detail=False,
+        methods=["get", "post"],
+        url_path="blind-review",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="blind_review",
+    )
+    def blind_review(self, request):
+        """Ko'r baholash. GET — navbatdagi ish (talaba ismi va AI bahosisiz), POST {attempt, score} — baho.
+
+        Baho bir marta qo'yiladi va o'zgartirilmaydi.
+        """
+        from .blind_review import item_payload, queue
+
+        labs = self.staff_labs(request)
+        if request.method == "GET":
+            pending = queue(labs, request.user)
+            reviewed = BlindReview.objects.filter(reviewer=request.user, attempt__lab__in=labs).count()
+            return Response(
+                {
+                    "item": item_payload(pending[0]) if pending else None,
+                    "remaining": len(pending),
+                    "reviewed": reviewed,
+                }
+            )
+
+        attempt_id, score = request.data.get("attempt"), request.data.get("score")
+        if not isinstance(attempt_id, int) or isinstance(attempt_id, bool):
+            raise ValidationError({"attempt": "Urinish raqami butun son bo'lishi kerak."})
+        if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 100:
+            raise ValidationError({"score": "Ball 0 dan 100 gacha butun son bo'lsin."})
+        # Faqat navbatdagi ishlar: o'z laboratoriyasidagi, hozir baho sifatida turgan urinish
+        grade = LabGrade.objects.filter(lab__in=labs, attempt_id=attempt_id).first()
+        if grade is None:
+            raise ValidationError({"attempt": "Bu ish ko'r baholash navbatida yo'q."})
+        review, created = BlindReview.objects.get_or_create(
+            attempt_id=attempt_id,
+            reviewer=request.user,
+            defaults={"score": score, "ai_score": grade.score, "ai_source": grade.source},
+        )
+        if not created:
+            return Response(
+                {"detail": "Bu ishni allaqachon baholagansiz: ko'r baholash natijasi o'zgartirilmaydi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response({"saved": True}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="blind-review/agreement")
+    def blind_review_agreement(self, request):
+        """AI va o'qituvchi baholari mosligi. O'qituvchi — o'zi baholagan ishlar, admin — hamma baholovchilar."""
+        from .blind_review import agreement
+
+        labs = self.staff_labs(request)
+        return Response(agreement(labs, None if request.user.is_admin else request.user))
+
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        """Laboratoriyaning nusxasi: shart, SQL va namunaviy diagramma ko'chiriladi, urinishlar emas.
+
+        O'qituvchining nusxasiga faqat o'zi o'qitadigan guruhlar o'tadi.
+        """
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        groups = lab.groups.all()
+        if request.user.is_teacher:
+            groups = groups.filter(teachers=request.user)
+        copy = Lab.objects.create(
+            kind=lab.kind,
+            title=f"{lab.title} (nusxa)"[: Lab._meta.get_field("title").max_length],
+            description=lab.description,
+            setup_sql=lab.setup_sql,
+            solution_sql=lab.solution_sql,
+            reference_diagram=lab.reference_diagram,
+            author=request.user,
+        )
+        copy.groups.set(groups)
+        return Response(LabSerializer(copy, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         """O'qituvchi uchun: laboratoriya berilgan guruhlardagi har bir talabaning holati."""
@@ -310,8 +404,58 @@ class LabViewSet(viewsets.ModelViewSet):
         return Response(rows)
 
 
+    @action(detail=True, methods=["get"])
+    def similarity(self, request, pk=None):
+        """O'qituvchi uchun: yechimlari shubhali darajada o'xshash talabalar juftliklari (ko'chirish belgisi)."""
+        from .similarity import THRESHOLD, find_similar
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        students = {
+            student.pk: student
+            for student in User.objects.filter(
+                role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all()
+            ).select_related("group")
+        }
+        attempts_by_student = defaultdict(list)
+        for attempt in LabAttempt.objects.filter(lab=lab, student_id__in=students).order_by("created_at", "id"):
+            attempts_by_student[attempt.student_id].append(attempt)
+        pairs, compared = find_similar(lab, attempts_by_student)
+
+        def work(student_id):
+            attempts = attempts_by_student[student_id]
+            final = ([attempt for attempt in attempts if attempt.is_correct] or attempts)[-1]
+            student = students[student_id]
+            return {
+                "id": student.pk,
+                "first_name": student.first_name,
+                "last_name": student.last_name,
+                "group": student.group.name,
+                "solved": any(attempt.is_correct for attempt in attempts),
+                "code": final.sql_code,
+                "diagram": final.diagram,
+            }
+
+        return Response(
+            {
+                "compared": compared,
+                "threshold": THRESHOLD,
+                "pairs": [
+                    {**{key: value for key, value in pair.items() if key != "students"},
+                     "students": [work(student_id) for student_id in pair["students"]]}
+                    for pair in pairs
+                ],
+            }
+        )
+
+
 class LabAttemptAdviceView(APIView):
-    """Xato urinish uchun AI maslahati. Faqat urinish egasi (talaba) so'ray oladi."""
+    """Xato urinish uchun bosqichma-bosqich AI maslahati. Faqat urinish egasi (talaba) so'ray oladi.
+
+    {"level": n} bilan n-darajali maslahat so'raladi (darajalar ketma-ket olinadi); level berilmasa,
+    olingan maslahatlar qaytariladi (hali bo'lmasa — 1-daraja).
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -321,8 +465,15 @@ class LabAttemptAdviceView(APIView):
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
         if not request.user.ai_allowed:
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
-        if attempt.ai_advice:
-            return Response({"advice": attempt.ai_advice})
+        # Darajalar joriy etilishidan oldingi urinishlarda bitta maslahat saqlangan
+        hints = list(attempt.ai_hints) or ([attempt.ai_advice] if attempt.ai_advice else [])
+        level = request.data.get("level", max(1, len(hints)))
+        if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= MAX_HINT_LEVEL:
+            raise ValidationError({"level": f"Daraja 1 dan {MAX_HINT_LEVEL} gacha bo'lishi kerak."})
+        if level <= len(hints):
+            return Response(self.payload(hints))
+        if level > len(hints) + 1:
+            raise ValidationError({"level": "Avval oldingi darajadagi maslahatni oling."})
         if not is_configured():
             return Response(
                 {"detail": "AI maslahatchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE
@@ -334,7 +485,7 @@ class LabAttemptAdviceView(APIView):
             )
 
         try:
-            advice = generate_advice(attempt)
+            advice = generate_advice(attempt, level, list(hints))
         except AITransientError:
             return Response(
                 {"detail": "AI maslahatchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
@@ -347,10 +498,17 @@ class LabAttemptAdviceView(APIView):
             )
 
         # Faqat muvaffaqiyatli maslahat kunlik limitdan yechiladi
+        hints.append(advice)
+        attempt.ai_hints = hints
+        attempt.ai_hint_level = len(hints)
         attempt.ai_advice = advice
         attempt.ai_requested_at = timezone.now()
-        attempt.save(update_fields=["ai_advice", "ai_requested_at"])
-        return Response({"advice": advice})
+        attempt.save(update_fields=["ai_hints", "ai_hint_level", "ai_advice", "ai_requested_at"])
+        return Response(self.payload(hints))
+
+    @staticmethod
+    def payload(hints):
+        return {"advice": hints[-1], "hints": hints, "level": len(hints), "max_level": MAX_HINT_LEVEL}
 
 
 class StatisticsView(APIView):

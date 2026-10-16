@@ -4,6 +4,7 @@ Hisoblar shaxsiy ma'lumotsiz (faqat sonlar), o'qituvchi faqat o'z laboratoriyala
 va o'zi o'qitadigan guruhlar bo'yicha ko'radi; admin — hammasini.
 """
 from collections import Counter, defaultdict
+from statistics import median
 
 from quizzes.models import Quiz, QuizAttempt
 from quizzes.services import finalize_if_expired, percent
@@ -87,6 +88,20 @@ def _mean(values):
     return _round(sum(values) / len(values)) if values else None
 
 
+def learning_order(labs, by_pair):
+    """Laboratoriyalar talabalar ularni bajargan tartibda: har bir talabaning birinchi urinishi vaqtining
+    medianasi bo'yicha. Hali boshlanmaganlari oxirida, talabalar ro'yxatda ko'radigan tartibda
+    (yangisi yuqorida — seed_design_labs 1-laboratoriyani eng oxirida yaratadi)."""
+    starts = defaultdict(list)
+    for (lab_id, _), attempts in by_pair.items():
+        starts[lab_id].append(attempts[0].created_at.timestamp())
+    started = sorted((lab for lab in labs if starts[lab.pk]), key=lambda lab: (median(starts[lab.pk]), lab.pk))
+    waiting = sorted(
+        (lab for lab in labs if not starts[lab.pk]), key=lambda lab: (lab.created_at, lab.pk), reverse=True
+    )
+    return started + waiting
+
+
 def allowed_groups(user):
     """Statistika ko'rish mumkin bo'lgan guruhlar: admin — hammasi, o'qituvchi — o'zi o'qitadiganlari."""
     groups = StudentGroup.objects.all() if user.is_admin else user.teaching_groups.all()
@@ -102,9 +117,10 @@ def build_statistics(user, group=None):
         User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups).select_related("group")
     )
     student_ids = {student.pk for student in students}
+    students_by_id = {student.pk: student for student in students}
     group_of = {student.pk: student.group_id for student in students}
 
-    labs = list(labs_qs.filter(groups__in=groups).distinct().prefetch_related("groups").order_by("created_at", "id"))
+    labs = list(labs_qs.filter(groups__in=groups).distinct().prefetch_related("groups"))
     # Har bir laboratoriya qaysi talabalarga berilgan (laboratoriya guruhlari ∩ tanlangan guruhlar)
     assigned = {
         lab.pk: {sid for sid in student_ids if group_of[sid] in {item.pk for item in lab.groups.all()}} for lab in labs
@@ -119,6 +135,8 @@ def build_statistics(user, group=None):
         (grade.lab_id, grade.student_id): grade.score
         for grade in LabGrade.objects.filter(lab__in=labs, student_id__in=student_ids)
     }
+
+    labs = learning_order(labs, by_pair)
 
     def solved(lab_id, student_id):
         return any(attempt.is_correct for attempt in by_pair.get((lab_id, student_id), []))
@@ -144,16 +162,21 @@ def build_statistics(user, group=None):
         for category, count in errors.most_common(TOP_ERRORS)
     ]
 
+    def attempts_to_solve(lab_id, ids):
+        """Yechgan talabalarning birinchi to'g'ri urinishgacha bo'lgan urinishlari soni."""
+        result = []
+        for sid in ids:
+            pair = by_pair.get((lab_id, sid), [])
+            first = next((index for index, attempt in enumerate(pair) if attempt.is_correct), None)
+            if first is not None:
+                result.append(first + 1)
+        return result
+
     # ---- Laboratoriyalar qiyinligi ----
     lab_rows = []
     for lab in labs:
         ids = assigned[lab.pk]
-        to_solve = []
-        for sid in ids:
-            pair = by_pair.get((lab.pk, sid), [])
-            first = next((index for index, attempt in enumerate(pair) if attempt.is_correct), None)
-            if first is not None:
-                to_solve.append(first + 1)
+        to_solve = attempts_to_solve(lab.pk, ids)
         started = sum(1 for sid in ids if by_pair.get((lab.pk, sid)))
         lab_rows.append(
             {
@@ -168,6 +191,23 @@ def build_statistics(user, group=None):
                 "average_grade": _mean([grades.get((lab.pk, sid)) for sid in ids]),
             }
         )
+
+    # ---- O'rganish egri chizig'i: laboratoriyadan laboratoriyaga yechish osonlashib boradimi ----
+    ai_students = {sid for sid in student_ids if students_by_id[sid].group.ai_enabled}
+    segments = {"ai": ai_students, "control": student_ids - ai_students}
+    learning_curve = []
+    for position, lab in enumerate(labs, start=1):
+        point = {"id": lab.pk, "position": position, "title": lab.title, "kind": lab.kind}
+        for name, members in segments.items():
+            ids = assigned[lab.pk] & members
+            to_solve = attempts_to_solve(lab.pk, ids)
+            point[name] = {
+                "students": len(ids),
+                "solved": len(to_solve),
+                "attempts_to_solve": _mean(to_solve),
+                "first_try_rate": _rate(sum(1 for value in to_solve if value == 1), len(ids)),
+            }
+        learning_curve.append(point)
 
     # ---- AI maslahatining ta'siri: kamida bir marta xato qilgan (talaba, laboratoriya) juftliklari ----
     with_advice = {"pairs": 0, "solved": 0}
@@ -224,6 +264,7 @@ def build_statistics(user, group=None):
         "overview": overview,
         "top_errors": top_errors,
         "labs": lab_rows,
+        "learning_curve": learning_curve,
         "ai_effect": ai_effect,
         "groups": group_rows,
     }

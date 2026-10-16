@@ -4,7 +4,7 @@ from rest_framework import serializers
 from learning.serializers import AuthorSerializer, GroupsValidationMixin
 from users.models import StudentGroup
 
-from .models import Choice, Question, Quiz
+from .models import LIKERT_SCALE, Choice, Question, Quiz
 from .services import attempt_status, percent
 
 MAX_QUESTIONS = 100
@@ -24,19 +24,25 @@ class ChoiceSerializer(serializers.ModelSerializer):
 class QuestionSerializer(serializers.ModelSerializer):
     text = serializers.CharField(max_length=2000)
     points = serializers.IntegerField(min_value=1, max_value=100, default=1)
-    choices = ChoiceSerializer(many=True)
+    # Likert savolida variantlar yuborilmaydi: ular standart shkaladan olinadi
+    choices = ChoiceSerializer(many=True, required=False)
 
     class Meta:
         model = Question
         fields = ["id", "text", "kind", "points", "choices"]
         read_only_fields = ["id"]
 
-    def validate_choices(self, choices):
-        if not MIN_CHOICES <= len(choices) <= MAX_CHOICES:
-            raise serializers.ValidationError(f"Javob variantlari {MIN_CHOICES} tadan {MAX_CHOICES} tagacha bo'lsin.")
-        return choices
-
     def validate(self, attrs):
+        if attrs.get("kind") == Question.Kind.LIKERT:
+            # Ball qo'yilmaydi; foydalanuvchi yuborgan variantlar hisobga olinmaydi
+            attrs["points"] = 0
+            attrs["choices"] = [{"text": text, "is_correct": False} for text in LIKERT_SCALE]
+            return attrs
+        choices = attrs.get("choices", [])
+        if not MIN_CHOICES <= len(choices) <= MAX_CHOICES:
+            raise serializers.ValidationError(
+                {"choices": f"Javob variantlari {MIN_CHOICES} tadan {MAX_CHOICES} tagacha bo'lsin."}
+            )
         correct = sum(1 for choice in attrs["choices"] if choice.get("is_correct"))
         if attrs.get("kind", Question.Kind.SINGLE) == Question.Kind.SINGLE and correct != 1:
             raise serializers.ValidationError({"choices": "Bitta to'g'ri javobli savolda aynan bitta to'g'ri variant belgilang."})
@@ -96,6 +102,18 @@ class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             )
         opens_at = attrs.get("opens_at", current.opens_at if current else None)
         closes_at = attrs.get("closes_at", current.closes_at if current else None)
+        kind = attrs.get("kind", current.kind if current else Quiz.Kind.PRACTICE)
+        if "questions" in attrs:
+            kinds = {question.get("kind", Question.Kind.SINGLE) for question in attrs["questions"]}
+        elif current is not None:
+            kinds = set(current.questions.values_list("kind", flat=True))
+        else:
+            kinds = set()
+        # So'rovnomada faqat Likert savollari, testda esa faqat ball qo'yiladigan savollar bo'ladi
+        if kind == Quiz.Kind.SURVEY and kinds - {Question.Kind.LIKERT}:
+            raise serializers.ValidationError({"questions": "So'rovnomada faqat Likert shkalali savollar bo'ladi."})
+        if kind != Quiz.Kind.SURVEY and Question.Kind.LIKERT in kinds:
+            raise serializers.ValidationError({"questions": "Likert shkalali savollar faqat so'rovnomada bo'ladi."})
         if opens_at and closes_at and closes_at <= opens_at:
             raise serializers.ValidationError({"closes_at": "Yopilish vaqti ochilish vaqtidan keyin bo'lsin."})
         return attrs

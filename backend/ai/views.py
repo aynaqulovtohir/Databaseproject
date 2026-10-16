@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from learning.access import visible_assignments
+from users.permissions import IsAdmin
 from submissions.access import visible_submissions
 
 from .client import AIError, AINotConfigured, AITransientError
@@ -154,3 +155,17 @@ class AssignmentChatView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class AIUsageView(APIView):
+    """Admin uchun AI xarajati hisoboti: ?days=7..365 (sukut bo'yicha 30)."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from .usage import usage_report
+
+        days = request.query_params.get("days", "30")
+        if not days.isdigit() or not 1 <= int(days) <= 365:
+            raise ValidationError({"days": "Kunlar soni 1 dan 365 gacha butun son bo'lsin."})
+        return Response(usage_report(int(days)))

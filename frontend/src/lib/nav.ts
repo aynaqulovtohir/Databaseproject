@@ -1,4 +1,17 @@
-import { BarChart3, BookOpen, ClipboardCheck, ClipboardList, FlaskConical, Home, UserRound, Users, UsersRound, type LucideIcon } from 'lucide-react'
+import {
+  BarChart3,
+  BookOpen,
+  ClipboardCheck,
+  ClipboardList,
+  Coins,
+  EyeOff,
+  FlaskConical,
+  Home,
+  UserRound,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
 
 import type { Role } from '@/lib/types'
 
@@ -17,6 +30,10 @@ const LEARNING_ITEMS: NavItem[] = [
   { to: '/labs', label: 'Virtual laboratoriya', icon: FlaskConical },
   { to: '/quizzes', label: 'Testlar', icon: ClipboardCheck },
 ]
+const STAFF_ITEMS: NavItem[] = [
+  { to: '/statistics', label: 'Statistika', icon: BarChart3 },
+  { to: '/blind-review', label: "Ko'r baholash", icon: EyeOff },
+]
 const COMMON_ITEMS: NavItem[] = [{ to: '/profile', label: 'Profil', icon: UserRound }]
 
 const ROLE_ITEMS: Record<Role, NavItem[]> = {
@@ -25,9 +42,10 @@ const ROLE_ITEMS: Record<Role, NavItem[]> = {
     { to: '/users', label: 'Foydalanuvchilar', icon: Users },
     { to: '/groups', label: 'Guruhlar', icon: UsersRound },
     ...LEARNING_ITEMS,
-    { to: '/statistics', label: 'Statistika', icon: BarChart3 },
+    ...STAFF_ITEMS,
+    { to: '/ai-usage', label: 'AI xarajati', icon: Coins },
   ],
-  teacher: [HOME, ...LEARNING_ITEMS, { to: '/statistics', label: 'Statistika', icon: BarChart3 }],
+  teacher: [HOME, ...LEARNING_ITEMS, ...STAFF_ITEMS],
   student: [HOME, ...LEARNING_ITEMS],
 }
 

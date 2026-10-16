@@ -8,7 +8,7 @@ Platforma bitta serverda Docker konteynerlarida ishlaydi:
 | `backend` | Django + gunicorn (API va admin) |
 | `db` | Asosiy PostgreSQL bazasi |
 | `lab_db` | Talabalar SQL kodi bajariladigan alohida, resurslari cheklangan PostgreSQL |
-| `ai_worker`, `telegram_bot` | Fon jarayonlari: AI tahlili va Telegram bildirishnomalari |
+| `ai_worker`, `telegram_bot` | Fon jarayonlari: AI tahlili va Telegram bildirishnomalari; bot har daqiqada backend va bazalarni tekshiradi va nosozlik bo'lsa Telegram'ni bog'lagan adminlarga yozadi |
 | `backup` | Har kuni baza va yuklangan fayllarning zaxira nusxasi (`./backups`) |
 
 Tashqariga faqat 80 va 443 portlar ochiladi. Baza va backend ichki tarmoqda.

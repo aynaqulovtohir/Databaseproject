@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, Copy, Pencil, ShieldCheck, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -27,6 +27,9 @@ import {
   type Lab,
   type LabRunResult,
   type LabStudentProgress,
+  type SimilarityReport,
+  type SimilarPair,
+  type SimilarWork,
 } from '@/lib/types'
 import { LabProgressBadge } from '@/pages/LabsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -174,12 +177,136 @@ function ProgressCard({ lab }: { lab: Lab }) {
   )
 }
 
+function formatGap(minutes: number | null) {
+  if (minutes === null) return '—'
+  if (minutes < 60) return `${Math.round(minutes)} daqiqa`
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} soat`
+  return `${Math.round(minutes / 60 / 24)} kun`
+}
+
+function SimilarWorkView({ work, kind }: { work: SimilarWork; kind: Lab['kind'] }) {
+  return (
+    <div className="grid min-w-0 content-start gap-2">
+      <div className="text-sm">
+        <span className="font-medium">{fullName(work)}</span>{' '}
+        <span className="text-muted-foreground">
+          · {work.group} · {work.solved ? 'bajargan' : 'bajarmagan'}
+        </span>
+      </div>
+      {kind === 'er' && work.diagram ? <ErEditor value={work.diagram} /> : <SqlCode code={work.code} />}
+    </div>
+  )
+}
+
+function SimilarityCard({ lab }: { lab: Lab }) {
+  const [viewing, setViewing] = useState<SimilarPair | null>(null)
+  const report = useQuery({
+    queryKey: ['lab-similarity', lab.id],
+    queryFn: () => api<SimilarityReport>(`/labs/${lab.id}/similarity/`),
+  })
+
+  let content
+  if (report.isPending) content = <ListSkeleton rows={2} />
+  else if (report.isError) content = <ErrorState error={report.error} onRetry={() => void report.refetch()} />
+  else if (!report.data.pairs.length)
+    content = (
+      <EmptyState
+        icon={ShieldCheck}
+        title="Shubhali o'xshash yechim topilmadi"
+        description={`${report.data.compared} ta talaba yechimi solishtirildi.`}
+      />
+    )
+  else
+    content = (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Talabalar</TableHead>
+            <TableHead className="text-right">O'xshashlik</TableHead>
+            {lab.kind === 'sql' ? <TableHead className="text-right">Bir xil xato</TableHead> : null}
+            <TableHead className="text-right">Yechimlar orasidagi vaqt</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {report.data.pairs.map((pair) => (
+            <TableRow key={pair.students.map((student) => student.id).join('-')}>
+              <TableCell>
+                {pair.students.map((student) => (
+                  <div key={student.id}>
+                    <span className="font-medium">{fullName(student)}</span>{' '}
+                    <span className="text-xs text-muted-foreground">{student.group}</span>
+                  </div>
+                ))}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {Math.round(pair.score * 100)}%
+                <span className="block text-xs text-muted-foreground">{pair.shared} ta umumiy bo'lak</span>
+              </TableCell>
+              {lab.kind === 'sql' ? <TableCell className="text-right tabular-nums">{pair.shared_wrong || '—'}</TableCell> : null}
+              <TableCell className="text-right tabular-nums">{formatGap(pair.gap_minutes)}</TableCell>
+              <TableCell className="text-right">
+                <Button variant="outline" size="lg" onClick={() => setViewing(pair)}>
+                  Solishtirish
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>O'xshash yechimlar{report.data?.pairs.length ? ` (${report.data.pairs.length})` : ''}</CardTitle>
+        <CardDescription>
+          Ko'chirish belgisi: namunaviy yechimda yo'q, talabaning o'zi tanlagan qismlar (nomlar, yozilish uslubi, izohlar)
+          {lab.kind === 'sql' ? ' va bir xil noodatiy xato urinishlar' : ''} solishtiriladi. Bu dalil emas — ishlarni
+          ko'rib, talabalar bilan gaplashib aniqlang.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+      <Dialog open={Boolean(viewing)} onOpenChange={(open) => (!open ? setViewing(null) : undefined)}>
+        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Yechimlarni solishtirish</DialogTitle>
+            <DialogDescription>
+              {viewing
+                ? `O'xshashlik ${Math.round(viewing.score * 100)}%${viewing.shared_wrong ? `, ${viewing.shared_wrong} ta bir xil xato urinish` : ''}.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {viewing ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {viewing.students.map((student) => (
+                <SimilarWorkView key={student.id} work={student} kind={lab.kind} />
+              ))}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
 function StaffView({ lab }: { lab: Lab }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { groups } = useGroupOptions()
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const duplicate = useMutation({
+    mutationFn: () => api<Lab>(`/labs/${lab.id}/duplicate/`, { method: 'POST' }),
+    onSuccess: (copy) => {
+      toast.success('Nusxa yaratildi: endi uni tahrirlang')
+      queryClient.setQueryData(['lab', copy.id], copy)
+      void queryClient.invalidateQueries({ queryKey: ['labs'] })
+      void navigate(`/labs/${copy.id}`)
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
 
   const remove = useMutation({
     mutationFn: () => api(`/labs/${lab.id}/`, { method: 'DELETE' }),
@@ -206,6 +333,10 @@ function StaffView({ lab }: { lab: Lab }) {
               <Pencil aria-hidden="true" />
               Tahrirlash
             </Button>
+            <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>
+              <Copy aria-hidden="true" />
+              Nusxa olish
+            </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />
               O'chirish
@@ -217,6 +348,7 @@ function StaffView({ lab }: { lab: Lab }) {
         <ConditionCard lab={lab} />
         {lab.kind === 'er' ? <ErStaffCards lab={lab} /> : <SqlStaffCards lab={lab} />}
         <ProgressCard lab={lab} />
+        <SimilarityCard lab={lab} />
       </div>
 
       {editing ? <LabDialog lab={lab} onClose={() => setEditing(false)} /> : null}

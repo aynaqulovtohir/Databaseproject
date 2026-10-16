@@ -22,6 +22,7 @@ from .services import (
     finalize_if_expired,
     percent,
     result_payload,
+    survey_summary,
     taking_payload,
 )
 
@@ -135,6 +136,16 @@ class QuizViewSet(viewsets.ModelViewSet):
             raise ValidationError({"answers": str(exc)})
 
     # ---------- O'qituvchi ----------
+
+    @action(detail=True, methods=["get"])
+    def survey(self, request, pk=None):
+        """So'rovnoma bo'yicha umumlashgan natija (alohida talabalar javobisiz)."""
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        quiz = self.get_object()
+        if quiz.kind != Quiz.Kind.SURVEY:
+            raise ValidationError({"detail": "Bu test so'rovnoma emas."})
+        return Response(survey_summary(quiz))
 
     @action(detail=True, methods=["get"])
     def results(self, request, pk=None):

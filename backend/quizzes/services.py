@@ -4,7 +4,11 @@ import random
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Question, QuizAttempt
+from .models import LIKERT_SCALE, Question, QuizAttempt
+
+# So'rovnoma natijasi bundan kam javob bo'lsa ko'rsatilmaydi: aks holda o'qituvchi kim topshirganini
+# bilgani uchun alohida talabaning javobini aniqlay oladi
+MIN_SURVEY_RESPONSES = 3
 
 
 class AnswersError(ValueError):
@@ -27,7 +31,7 @@ def clean_answers(quiz, raw):
         selected = sorted(set(selected))
         if any(item not in allowed for item in selected):
             raise AnswersError("Savolda bunday javob varianti yo'q.")
-        if question.kind == Question.Kind.SINGLE and len(selected) > 1:
+        if question.kind in (Question.Kind.SINGLE, Question.Kind.LIKERT) and len(selected) > 1:
             raise AnswersError("Bu savolda faqat bitta javob tanlanadi.")
         cleaned[str(question.pk)] = selected
     return cleaned
@@ -36,6 +40,8 @@ def clean_answers(quiz, raw):
 def score_question(question, selected):
     """Bitta to'g'ri javobli: to'liq ball yoki 0. Bir nechta to'g'ri javobli: (to'g'ri − noto'g'ri tanlanganlar) /
     to'g'ri variantlar soni ulushida ball (manfiy bo'lmaydi), shunda hammasini belgilab qo'yish foyda bermaydi."""
+    if question.kind == Question.Kind.LIKERT:
+        return 0.0
     correct = {choice.pk for choice in question.choices.all() if choice.is_correct}
     chosen = set(selected)
     if question.kind == Question.Kind.SINGLE:
@@ -91,7 +97,9 @@ def taking_payload(attempt):
     questions = []
     for question in attempt.quiz.questions.prefetch_related("choices"):
         choices = [{"id": choice.pk, "text": choice.text} for choice in question.choices.all()]
-        random.Random(attempt.pk * 100_003 + question.pk).shuffle(choices)
+        # Likert shkalasi tartibi o'zgarmaydi (1 dan 5 gacha)
+        if question.kind != Question.Kind.LIKERT:
+            random.Random(attempt.pk * 100_003 + question.pk).shuffle(choices)
         questions.append(
             {"id": question.pk, "text": question.text, "kind": question.kind, "points": question.points, "choices": choices}
         )
@@ -101,6 +109,61 @@ def taking_payload(attempt):
         "started_at": attempt.started_at,
         "deadline": attempt.deadline,
         "server_now": timezone.now(),
+    }
+
+
+def likert_value(question, selected):
+    """Likert savoliga javob: shkaladagi qiymat (1-5) yoki None."""
+    if not selected:
+        return None
+    order = {choice.pk: choice.order for choice in question.choices.all()}
+    return order.get(selected[0])
+
+
+def survey_summary(quiz):
+    """So'rovnoma natijasi: har bir savol bo'yicha javoblar taqsimoti va o'rtacha qiymat —
+    hamma topshirganlar, tajriba (AI yoqilgan) va nazorat guruhlari bo'yicha alohida.
+    Alohida talabaning javobi ko'rsatilmaydi: talabalar ochiq javob berishlari uchun. Javoblari
+    MIN_SURVEY_RESPONSES tadan kam bo'lgan qism yashiriladi (hidden). Tajriba/nazorat qismlaridan biri
+    yashirilsa, ikkinchisi ham yashiriladi: aks holda "hammasi − boshqa qism" ayirmasi uni ochib qo'yadi."""
+    attempts = [
+        finalize_if_expired(attempt)
+        for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
+    ]
+    attempts = [attempt for attempt in attempts if attempt.submitted_at]
+
+    def empty():
+        return {"count": 0, "mean": None, "distribution": [0] * 5}
+
+    questions = []
+    for question in quiz.questions.prefetch_related("choices"):
+        segments = {"all": empty(), "ai": empty(), "control": empty()}
+        for attempt in attempts:
+            value = likert_value(question, attempt.answers.get(str(question.pk), []))
+            if value is None:
+                continue
+            group = attempt.student.group
+            names = ["all"] + ([("ai" if group.ai_enabled else "control")] if group else [])
+            for name in names:
+                segments[name]["count"] += 1
+                segments[name]["distribution"][value - 1] += 1
+        small = lambda segment: 0 < segment["count"] < MIN_SURVEY_RESPONSES  # noqa: E731
+        hide = {"all"} if small(segments["all"]) else set()
+        if small(segments["ai"]) or small(segments["control"]) or hide:
+            hide |= {"ai", "control"}
+        for name, segment in segments.items():
+            segment["hidden"] = name in hide and segment["count"] > 0
+            if segment["hidden"]:
+                segment["distribution"] = None
+            elif segment["count"]:
+                total = sum(value * count for value, count in enumerate(segment["distribution"], start=1))
+                segment["mean"] = round(total / segment["count"], 2)
+        questions.append({"id": question.pk, "order": question.order, "text": question.text, **segments})
+    return {
+        "respondents": len(attempts),
+        "min_responses": MIN_SURVEY_RESPONSES,
+        "scale": LIKERT_SCALE,
+        "questions": questions,
     }
 
 

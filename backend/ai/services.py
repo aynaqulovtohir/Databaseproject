@@ -44,6 +44,7 @@ def build_analysis_messages(submission):
 def analyze_submission(submission):
     """Yechimni tahlil qiladi. Qaytaradi: (AnalysisResult, input_tokens, output_tokens)."""
     response = create_message(
+        purpose="analysis",
         max_tokens=ANALYSIS_MAX_TOKENS,
         system=prompts.ANALYSIS_SYSTEM_PROMPT,
         messages=build_analysis_messages(submission),
@@ -69,6 +70,7 @@ def chat_reply(assignment, history, question):
     Baholash mezonlari bu yerga ataylab qo'shilmaydi: ular talabaga ko'rinmasligi kerak.
     """
     response = create_message(
+        purpose="chat",
         max_tokens=CHAT_MAX_TOKENS,
         system=prompts.CHAT_SYSTEM_TEMPLATE.format(
             title=assignment.title, description=assignment.description

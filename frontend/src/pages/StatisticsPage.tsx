@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import type { AiEffectBucket, Statistics, StatisticsGroup } from '@/lib/types'
+import type { AiEffectBucket, LearningCurvePoint, Statistics, StatisticsGroup } from '@/lib/types'
 
 // Diagramma ranglari index.css dagi --series-* tokenlaridan (yorug' va qorong'i mavzu uchun alohida)
 const SERIES_1 = 'var(--series-1)'
@@ -30,7 +30,8 @@ function StatTile({ label, value, hint }: { label: string; value: string; hint?:
 
 /** Gorizontal ustun: uzunligi qiymatga mutanosib, qiymat yonida yoziladi (rangga tayanmaydi) */
 function HorizontalBar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
-  const width = max ? Math.max(2, (value / max) * 100) : 0
+  // Nol qiymat chizilmaydi (aks holda kichik ustun "bor" bo'lib ko'rinadi); kichik musbat qiymat ko'rinadigan qilinadi
+  const width = max && value > 0 ? Math.max(2, (value / max) * 100) : 0
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2" title={label}>
       <div className="h-3.5 min-w-0 flex-1">
@@ -78,6 +79,7 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
         <CardTitle>Laboratoriyalar qiyinligi</CardTitle>
         <CardDescription>
           Yechganlar ulushi qancha past va yechish uchun urinishlar qancha ko'p bo'lsa, laboratoriya shuncha qiyin.
+          Laboratoriyalar talabalar bajargan tartibda.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -124,6 +126,210 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
         ) : (
           <p className="text-sm text-muted-foreground">Bu guruhlarga hali laboratoriya berilmagan.</p>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+const CURVE_SERIES = [
+  { key: 'ai', label: 'AI yoqilgan', color: SERIES_1 },
+  { key: 'control', label: 'Nazorat', color: SERIES_2 },
+] as const
+const CURVE = { width: 640, height: 240, left: 36, right: 84, top: 12, bottom: 28 }
+
+/** O'rganish egri chizig'i: har bir laboratoriyani yechish uchun o'rtacha urinishlar (kamaysa — o'rganish tezlashgan) */
+function LearningCurveChart({ points }: { points: LearningCurvePoint[] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const series = CURVE_SERIES.filter((item) => points.some((point) => point[item.key].students > 0))
+  const values = points.flatMap((point) => series.map((item) => point[item.key].attempts_to_solve ?? 0))
+  const top = Math.max(2, Math.ceil(Math.max(...values)))
+  const plotWidth = CURVE.width - CURVE.left - CURVE.right
+  const plotHeight = CURVE.height - CURVE.top - CURVE.bottom
+  const x = (index: number) => CURVE.left + (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth)
+  const y = (value: number) => CURVE.top + plotHeight - (value / top) * plotHeight
+  const step = top <= 5 ? 1 : Math.ceil(top / 5)
+  const ticks = Array.from({ length: Math.floor(top / step) + 1 }, (_, index) => index * step)
+  const active = hover === null ? null : points[hover]
+
+  /** Bo'sh qiymatlarda chiziq uziladi */
+  function path(key: 'ai' | 'control') {
+    let d = ''
+    let open = false
+    points.forEach((point, index) => {
+      const value = point[key].attempts_to_solve
+      if (value === null) {
+        open = false
+        return
+      }
+      d += `${open ? 'L' : 'M'}${x(index)},${y(value)}`
+      open = true
+    })
+    return d
+  }
+
+  function lastLabel(key: 'ai' | 'control') {
+    for (let index = points.length - 1; index >= 0; index -= 1) {
+      const value = points[index][key].attempts_to_solve
+      if (value !== null) return { index, value }
+    }
+    return null
+  }
+
+  return (
+    <div className="grid gap-3">
+      <ul className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label="Belgilar">
+        {series.map((item) => (
+          <li key={item.key} className="flex items-center gap-1.5">
+            <span className="h-0.5 w-4 rounded-full" style={{ background: item.color }} aria-hidden="true" />
+            {item.label} guruhlar
+          </li>
+        ))}
+      </ul>
+      {/* Telefonda yozuvlar mayda bo'lib ketmasligi uchun grafik eni saqlanadi va gorizontal suriladi */}
+      <div className="overflow-x-auto">
+        <div className="relative min-w-[34rem]">
+          <svg
+            viewBox={`0 0 ${CURVE.width} ${CURVE.height}`}
+            className="w-full"
+            role="img"
+            aria-label="Laboratoriyalar bo'yicha yechish uchun o'rtacha urinishlar"
+            onMouseLeave={() => setHover(null)}
+          >
+            {ticks.map((tick) => (
+              <g key={tick} className="text-muted-foreground">
+                <line x1={CURVE.left} x2={CURVE.left + plotWidth} y1={y(tick)} y2={y(tick)} stroke="currentColor" strokeOpacity={0.15} />
+                <text x={CURVE.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="currentColor">
+                  {tick}
+                </text>
+              </g>
+            ))}
+            {points.map((point, index) => (
+              <text key={point.id} x={x(index)} y={CURVE.height - 8} textAnchor="middle" fontSize={11} className="fill-muted-foreground">
+                {point.position}
+              </text>
+            ))}
+            {active !== null && hover !== null ? (
+              <line x1={x(hover)} x2={x(hover)} y1={CURVE.top} y2={CURVE.top + plotHeight} className="stroke-muted-foreground" strokeOpacity={0.5} />
+            ) : null}
+            {series.map((item) => (
+              <g key={item.key}>
+                <path d={path(item.key)} fill="none" stroke={item.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                {points.map((point, index) => {
+                  const value = point[item.key].attempts_to_solve
+                  return value === null ? null : (
+                    <circle
+                      key={point.id}
+                      cx={x(index)}
+                      cy={y(value)}
+                      r={hover === index ? 5 : 4}
+                      fill={item.color}
+                      stroke="var(--card)"
+                      strokeWidth={2}
+                    />
+                  )
+                })}
+                {(() => {
+                  const last = lastLabel(item.key)
+                  return last ? (
+                    <text x={x(last.index) + 10} y={y(last.value)} dy="0.32em" fontSize={11} className="fill-foreground">
+                      {item.label}
+                    </text>
+                  ) : null
+                })()}
+              </g>
+            ))}
+            {/* Hover nishonlari: har bir laboratoriya ustuni bo'yicha */}
+            {points.map((point, index) => (
+              <rect
+                key={point.id}
+                x={x(index) - plotWidth / Math.max(1, points.length - 1) / 2}
+                y={CURVE.top}
+                width={plotWidth / Math.max(1, points.length - 1)}
+                height={plotHeight}
+                fill="transparent"
+                onMouseEnter={() => setHover(index)}
+              />
+            ))}
+          </svg>
+          {active !== null && hover !== null ? (
+            <div
+              className="pointer-events-none absolute top-0 z-10 w-56 rounded-md border bg-popover p-2 text-xs shadow-sm"
+              style={{
+                left: `${(x(hover) / CURVE.width) * 100}%`,
+                transform: hover > points.length / 2 ? 'translateX(calc(-100% - 12px))' : 'translateX(12px)',
+              }}
+            >
+              <div className="mb-1 font-medium">
+                {active.position}. {active.title}
+              </div>
+              {series.map((item) => {
+                const segment = active[item.key]
+                return (
+                  <div key={item.key} className="flex items-start gap-1.5">
+                    <span className="mt-1 size-2 shrink-0 rounded-full" style={{ background: item.color }} aria-hidden="true" />
+                    <span>
+                      {item.label}: {segment.attempts_to_solve ?? '—'} urinish
+                      <span className="block text-muted-foreground">
+                        {segment.solved}/{segment.students} yechgan · birinchi urinishda {formatPercent(segment.first_try_rate)}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LearningCurveCard({ points }: { points: LearningCurvePoint[] }) {
+  const hasData = points.some((point) => point.ai.attempts_to_solve !== null || point.control.attempts_to_solve !== null)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>O'rganish egri chizig'i</CardTitle>
+        <CardDescription>
+          Laboratoriyalar talabalar bajargan tartibda (gorizontal o'qda tartib raqami). Vertikal o'q — yechgan talabalarning
+          birinchi to'g'ri yechimgacha o'rtacha urinishlari. Egri chiziq pasaysa, talabalar tezroq o'rganmoqda.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {hasData ? <LearningCurveChart points={points} /> : <p className="text-sm text-muted-foreground">Hali yechilgan laboratoriya yo'q.</p>}
+        {points.length ? (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground">Jadval ko'rinishida</summary>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>№</TableHead>
+                  <TableHead>Laboratoriya</TableHead>
+                  {CURVE_SERIES.map((item) => (
+                    <TableHead key={item.key} className="text-right">
+                      {item.label}: urinish (yechgan)
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {points.map((point) => (
+                  <TableRow key={point.id}>
+                    <TableCell className="tabular-nums">{point.position}</TableCell>
+                    <TableCell className="max-w-72 truncate" title={point.title}>
+                      {point.title}
+                    </TableCell>
+                    {CURVE_SERIES.map((item) => (
+                      <TableCell key={item.key} className="text-right tabular-nums">
+                        {point[item.key].attempts_to_solve ?? '—'} ({point[item.key].solved}/{point[item.key].students})
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </details>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -274,6 +480,7 @@ export function StatisticsPage() {
           <StatTile label="O'rtacha baho" value={data.overview.average_grade === null ? '—' : String(data.overview.average_grade)} hint="100 ballik" />
         </div>
         <GroupsCard groups={data.groups} />
+        <LearningCurveCard points={data.learning_curve} />
         <div className="grid items-start gap-4 xl:grid-cols-2">
           <ErrorsCard errors={data.top_errors} />
           <AiEffectCard effect={data.ai_effect} />
