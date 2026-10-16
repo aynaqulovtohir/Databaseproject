@@ -318,15 +318,17 @@ export const MAX_SCORE = 100
 
 // ---------- Testlar ----------
 
-export type QuizKind = 'pre' | 'post' | 'practice'
+export type QuizKind = 'pre' | 'post' | 'practice' | 'survey'
 
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
   pre: 'Kirish testi',
   post: 'Chiqish testi',
   practice: 'Oddiy test',
+  survey: "So'rovnoma",
 }
 
-export type QuestionKind = 'single' | 'multiple'
+/** likert — so'rovnoma fikri: 1-5 shkala, ball qo'yilmaydi, variantlar serverda qo'shiladi */
+export type QuestionKind = 'single' | 'multiple' | 'likert'
 
 export interface QuizChoice {
   id?: number
@@ -401,6 +403,22 @@ export interface QuizResult {
         choices: { id: number; text: string; is_correct: boolean; selected: boolean }[]
       }[]
     | null
+}
+
+export interface SurveySegment {
+  count: number
+  mean: number | null
+  /** 1 dan 5 gacha har bir qiymatni tanlaganlar soni (yashirilgan bo'lsa null) */
+  distribution: number[] | null
+  /** Javoblar kam: alohida talabaning javobi ochilib qolmasligi uchun natija yashirilgan */
+  hidden: boolean
+}
+
+export interface SurveySummary {
+  respondents: number
+  min_responses: number
+  scale: string[]
+  questions: { id: number; order: number; text: string; all: SurveySegment; ai: SurveySegment; control: SurveySegment }[]
 }
 
 export interface QuizStudentResult extends PersonShort {

@@ -25,6 +25,8 @@ import {
   type QuizResult,
   type QuizStudentResult,
   type QuizTaking,
+  type SurveySegment,
+  type SurveySummary,
 } from '@/lib/types'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -61,7 +63,20 @@ function formatRemaining(milliseconds: number) {
 
 // ---------- Natija ----------
 
-function ResultView({ result }: { result: QuizResult }) {
+function ResultView({ result, survey = false }: { result: QuizResult; survey?: boolean }) {
+  if (survey) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Rahmat!</CardTitle>
+          <CardDescription>
+            Javoblaringiz qabul qilindi ({formatDateTime(result.submitted_at)}). O'qituvchi alohida javoblaringizni
+            ko'rmaydi, faqat guruh bo'yicha umumiy natijani ko'radi.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
   return (
     <div className="grid gap-4">
       <Card>
@@ -125,14 +140,14 @@ function ResultView({ result }: { result: QuizResult }) {
   )
 }
 
-function SubmittedView({ quizId }: { quizId: number }) {
+function SubmittedView({ quizId, survey }: { quizId: number; survey: boolean }) {
   const result = useQuery({
     queryKey: ['quiz-result', quizId],
     queryFn: () => api<QuizResult>(`/quizzes/${quizId}/result/`),
   })
   if (result.isPending) return <ListSkeleton rows={2} />
   if (result.isError) return <ErrorState error={result.error} onRetry={() => void result.refetch()} />
-  return <ResultView result={result.data} />
+  return <ResultView result={result.data} survey={survey} />
 }
 
 // ---------- Testni yechish ----------
@@ -202,6 +217,7 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
 
   const answered = taking.questions.filter((question) => (answers[String(question.id)] ?? []).length).length
   const unanswered = taking.questions.length - answered
+  const survey = quiz.kind === 'survey'
 
   return (
     <div className="grid gap-4">
@@ -224,12 +240,13 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
         </span>
         <Button className="ml-auto" disabled={submit.isPending} onClick={() => setConfirming(true)}>
           {submit.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-          Topshirish
+          {survey ? 'Yuborish' : 'Topshirish'}
         </Button>
       </div>
 
       {taking.questions.map((question, index) => {
-        const single = question.kind === 'single'
+        const single = question.kind !== 'multiple'
+        const likert = question.kind === 'likert'
         const selected = answers[String(question.id)] ?? []
         return (
           <Card key={question.id}>
@@ -238,13 +255,15 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
                 {index + 1}. {question.text}
               </CardTitle>
               <CardDescription>
-                {single ? 'Bitta javobni tanlang' : 'Barcha to\'g\'ri javoblarni belgilang'} · {question.points} ball
+                {likert
+                  ? 'Bu fikrga qanchalik qo\'shilasiz?'
+                  : `${single ? 'Bitta javobni tanlang' : 'Barcha to\'g\'ri javoblarni belgilang'} · ${question.points} ball`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <fieldset className="grid gap-2">
+              <fieldset className={cn('grid gap-2', likert && 'sm:grid-cols-5')}>
                 <legend className="sr-only">{index + 1}-savol javoblari</legend>
-                {question.choices.map((choice) => (
+                {question.choices.map((choice, position) => (
                   <label
                     key={choice.id}
                     className={cn(
@@ -259,7 +278,10 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
                       checked={selected.includes(choice.id)}
                       onChange={() => toggle(question.id, choice.id, single)}
                     />
-                    <span className="whitespace-pre-wrap">{choice.text}</span>
+                    <span className="whitespace-pre-wrap">
+                      {likert ? `${position + 1} — ` : ''}
+                      {choice.text}
+                    </span>
                   </label>
                 ))}
               </fieldset>
@@ -270,13 +292,13 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
 
       <ConfirmDialog
         open={confirming}
-        title="Testni topshirish"
+        title={survey ? "So'rovnomani yuborish" : 'Testni topshirish'}
         description={
           unanswered
-            ? `${unanswered} ta savolga javob bermagansiz. Topshirgandan keyin javoblarni o'zgartirib bo'lmaydi.`
-            : "Topshirgandan keyin javoblarni o'zgartirib bo'lmaydi."
+            ? `${unanswered} ta savolga javob bermagansiz. Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi.`
+            : "Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi."
         }
-        confirmLabel="Topshirish"
+        confirmLabel={survey ? 'Yuborish' : 'Topshirish'}
         pending={submit.isPending}
         onConfirm={() => {
           setConfirming(false)
@@ -313,21 +335,22 @@ function StudentView({ quiz }: { quiz: Quiz }) {
     [queryClient, quiz.id],
   )
 
+  const survey = quiz.kind === 'survey'
   let content
   if (finishedResult) {
-    content = <ResultView result={finishedResult} />
+    content = <ResultView result={finishedResult} survey={survey} />
   } else if (status === 'submitted') {
-    content = <SubmittedView quizId={quiz.id} />
+    content = <SubmittedView quizId={quiz.id} survey={survey} />
   } else if (!started) {
     content = (
       <Card>
         <CardHeader>
-          <CardTitle>Testni boshlash</CardTitle>
+          <CardTitle>{survey ? "So'rovnomani boshlash" : 'Testni boshlash'}</CardTitle>
           <CardDescription>
             {quiz.time_limit_minutes
               ? `Boshlaganingizdan keyin ${quiz.time_limit_minutes} daqiqa vaqtingiz bo'ladi; vaqt tugasa, test avtomatik topshiriladi.`
               : 'Vaqt cheklanmagan.'}{' '}
-            Test faqat bir marta topshiriladi. Javoblaringiz avtomatik saqlanadi.
+            {survey ? "So'rovnoma" : 'Test'} faqat bir marta topshiriladi. Javoblaringiz avtomatik saqlanadi.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -348,7 +371,7 @@ function StudentView({ quiz }: { quiz: Quiz }) {
     content = <ListSkeleton />
   } else if (taking.isError) {
     const result = resultFromConflict(taking.error)
-    content = result ? <ResultView result={result} /> : <ErrorState error={taking.error} onRetry={() => void taking.refetch()} />
+    content = result ? <ResultView result={result} survey={survey} /> : <ErrorState error={taking.error} onRetry={() => void taking.refetch()} />
   } else {
     content = <Taker quiz={quiz} taking={taking.data} onFinished={handleFinished} />
   }
@@ -368,6 +391,7 @@ function StudentView({ quiz }: { quiz: Quiz }) {
 // ---------- Admin va o'qituvchi ----------
 
 function ResultsCard({ quiz }: { quiz: Quiz }) {
+  const survey = quiz.kind === 'survey'
   const results = useQuery({
     queryKey: ['quiz-results', quiz.id],
     queryFn: () => api<QuizStudentResult[]>(`/quizzes/${quiz.id}/results/`),
@@ -385,8 +409,12 @@ function ResultsCard({ quiz }: { quiz: Quiz }) {
             <TableHead>Talaba</TableHead>
             <TableHead>Guruh</TableHead>
             <TableHead>Holat</TableHead>
-            <TableHead className="text-right">Ball</TableHead>
-            <TableHead className="text-right">Foiz</TableHead>
+            {survey ? null : (
+              <>
+                <TableHead className="text-right">Ball</TableHead>
+                <TableHead className="text-right">Foiz</TableHead>
+              </>
+            )}
             <TableHead>Topshirilgan</TableHead>
           </TableRow>
         </TableHeader>
@@ -398,8 +426,12 @@ function ResultsCard({ quiz }: { quiz: Quiz }) {
               <TableCell>
                 <Badge variant={row.status === 'submitted' ? 'default' : 'outline'}>{STATUS_LABELS[row.status]}</Badge>
               </TableCell>
-              <TableCell className="text-right tabular-nums">{row.score === null ? '—' : `${row.score} / ${row.max_score}`}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.percent === null ? '—' : `${row.percent}%`}</TableCell>
+              {survey ? null : (
+                <>
+                  <TableCell className="text-right tabular-nums">{row.score === null ? '—' : `${row.score} / ${row.max_score}`}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.percent === null ? '—' : `${row.percent}%`}</TableCell>
+                </>
+              )}
               <TableCell>{formatDateTime(row.submitted_at)}</TableCell>
             </TableRow>
           ))}
@@ -419,7 +451,101 @@ function ResultsCard({ quiz }: { quiz: Quiz }) {
           Natijalar
           {results.data?.length ? ` (${submitted.length} / ${results.data.length} topshirgan)` : ''}
         </CardTitle>
-        <CardDescription>{average === null ? 'Hali hech kim topshirmagan.' : `O'rtacha natija: ${average}%`}</CardDescription>
+        <CardDescription>
+          {survey
+            ? "Kim javob berganini ko'rasiz, javoblarning o'zini emas."
+            : average === null
+              ? 'Hali hech kim topshirmagan.'
+              : `O'rtacha natija: ${average}%`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  )
+}
+
+function SegmentCell({ segment }: { segment: SurveySegment }) {
+  if (!segment.count) return <TableCell className="text-right text-muted-foreground">—</TableCell>
+  if (segment.hidden) {
+    return (
+      <TableCell className="text-right text-xs text-muted-foreground" title="Javoblar kam: natija maxfiylik uchun yashirilgan">
+        yashirin
+      </TableCell>
+    )
+  }
+  return (
+    <TableCell className="text-right tabular-nums">
+      {segment.mean?.toFixed(2)}
+      <span className="block text-xs text-muted-foreground">{segment.count} ta javob</span>
+    </TableCell>
+  )
+}
+
+/** Javoblar taqsimoti: 1 dan 5 gacha har bir qiymat ulushi bitta chiziqda */
+function DistributionBar({ segment, scale }: { segment: SurveySegment; scale: string[] }) {
+  if (!segment.count) return <span className="text-xs text-muted-foreground">Javob yo'q</span>
+  if (!segment.distribution) return <span className="text-xs text-muted-foreground">Javoblar kam</span>
+  const { distribution } = segment
+  const shades = ['bg-red-400', 'bg-orange-300', 'bg-zinc-300', 'bg-emerald-300', 'bg-emerald-500']
+  const label = distribution.map((count, index) => `${index + 1} (${scale[index]}): ${count}`).join(', ')
+  return (
+    <div className="flex h-3 w-full min-w-24 overflow-hidden rounded-full bg-muted" role="img" aria-label={label} title={label}>
+      {distribution.map((count, index) =>
+        count ? <div key={index} className={shades[index]} style={{ width: `${(100 * count) / segment.count}%` }} /> : null,
+      )}
+    </div>
+  )
+}
+
+function SurveyCard({ quiz }: { quiz: Quiz }) {
+  const summary = useQuery({
+    queryKey: ['quiz-survey', quiz.id],
+    queryFn: () => api<SurveySummary>(`/quizzes/${quiz.id}/survey/`),
+  })
+
+  let content
+  if (summary.isPending) content = <ListSkeleton rows={2} />
+  else if (summary.isError) content = <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />
+  else if (!summary.data.respondents) content = <EmptyState icon={Users} title="Hali hech kim javob bermagan" />
+  else
+    content = (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fikr</TableHead>
+            <TableHead className="w-40">Taqsimot (1 → 5)</TableHead>
+            <TableHead className="text-right">Hammasi</TableHead>
+            <TableHead className="text-right">AI yoqilgan</TableHead>
+            <TableHead className="text-right">Nazorat</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {summary.data.questions.map((question, index) => (
+            <TableRow key={question.id}>
+              <TableCell className="max-w-md whitespace-normal">
+                {index + 1}. {question.text}
+              </TableCell>
+              <TableCell>
+                <DistributionBar segment={question.all} scale={summary.data.scale} />
+              </TableCell>
+              <SegmentCell segment={question.all} />
+              <SegmentCell segment={question.ai} />
+              <SegmentCell segment={question.control} />
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>So'rovnoma natijasi{summary.data?.respondents ? ` (${summary.data.respondents} ta javob)` : ''}</CardTitle>
+        <CardDescription>
+          O'rtacha qiymat 1 dan 5 gacha: 1 — mutlaqo qo'shilmayman, 5 — to'liq qo'shilaman. Talabalar ochiq javob berishi
+          uchun {summary.data?.min_responses ?? 3} tadan kam javobli natija yashiriladi. Alohida javoblar anonim eksportda
+          (Statistika → tadqiqot eksporti) taxallus bilan beriladi.
+        </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
     </Card>
@@ -432,6 +558,7 @@ function StaffView({ quiz }: { quiz: Quiz }) {
   const { groups } = useGroupOptions()
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const survey = quiz.kind === 'survey'
 
   const remove = useMutation({
     mutationFn: () => api(`/quizzes/${quiz.id}/`, { method: 'DELETE' }),
@@ -466,43 +593,46 @@ function StaffView({ quiz }: { quiz: Quiz }) {
         }
       />
       <div className="grid gap-4">
+        {survey ? <SurveyCard quiz={quiz} /> : null}
         <ResultsCard quiz={quiz} />
-        <Card>
-          <CardHeader>
-            <CardTitle>Savollar</CardTitle>
-            <CardDescription>
-              To'g'ri javoblar yashil bilan belgilangan.{' '}
-              {quiz.show_answers ? "Talabaga topshirgandan keyin ko'rsatiladi." : "Talabaga ko'rsatilmaydi."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            {(quiz.questions ?? []).map((question, index) => (
-              <div key={question.id ?? index} className="grid gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                <p className="text-sm font-medium whitespace-pre-wrap">
-                  {index + 1}. {question.text}{' '}
-                  <span className="font-normal text-muted-foreground">
-                    ({question.kind === 'single' ? 'bitta javob' : 'bir nechta javob'}, {question.points} ball)
-                  </span>
-                </p>
-                <ul className="grid gap-1">
-                  {question.choices.map((choice, position) => (
-                    <li
-                      key={choice.id ?? position}
-                      className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900')}
-                    >
-                      {choice.is_correct ? (
-                        <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" />
-                      ) : (
-                        <span className="size-4 shrink-0" aria-hidden="true" />
-                      )}
-                      {choice.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        {survey ? null : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Savollar</CardTitle>
+              <CardDescription>
+                To'g'ri javoblar yashil bilan belgilangan.{' '}
+                {quiz.show_answers ? "Talabaga topshirgandan keyin ko'rsatiladi." : "Talabaga ko'rsatilmaydi."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {(quiz.questions ?? []).map((question, index) => (
+                <div key={question.id ?? index} className="grid gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                  <p className="text-sm font-medium whitespace-pre-wrap">
+                    {index + 1}. {question.text}{' '}
+                    <span className="font-normal text-muted-foreground">
+                      ({question.kind === 'single' ? 'bitta javob' : 'bir nechta javob'}, {question.points} ball)
+                    </span>
+                  </p>
+                  <ul className="grid gap-1">
+                    {question.choices.map((choice, position) => (
+                      <li
+                        key={choice.id ?? position}
+                        className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900')}
+                      >
+                        {choice.is_correct ? (
+                          <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" />
+                        ) : (
+                          <span className="size-4 shrink-0" aria-hidden="true" />
+                        )}
+                        {choice.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {editing ? <QuizDialog quiz={quiz} onClose={() => setEditing(false)} /> : null}

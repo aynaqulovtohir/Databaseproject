@@ -23,7 +23,8 @@ from users.models import User
 from .checker import ERROR_TIPS
 from .models import LabAttempt, LabGrade
 
-QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy"}
+QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "practice": "oddiy", "survey": "sorovnoma"}
+QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
 QUIZ_STATUSES = {"submitted": "topshirgan", "in_progress": "boshlagan", "not_started": "boshlamagan"}
 
 QUIZ_COLUMNS = [
@@ -52,6 +53,7 @@ ANSWER_COLUMNS = [
     "ball",
     "maksimal_ball",
     "togri",
+    "javob",
 ]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
@@ -227,9 +229,9 @@ testlar.csv — har bir talaba va test (kirish/chiqish testlari)
 -------------------------------------------------------------
 Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
 test_id, test
-test_turi                   kirish | chiqish | oddiy
+test_turi                   kirish | chiqish | oddiy | sorovnoma
 holat                       topshirgan | boshlagan | boshlamagan
-ball, maksimal_ball, foiz   topshirmagan bo'lsa bo'sh
+ball, maksimal_ball, foiz   topshirmagan bo'lsa va so'rovnomada bo'sh
 boshlangan, topshirilgan
 davomiylik_daqiqa           boshlangandan topshirilgangacha
 
@@ -237,9 +239,13 @@ test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar t
 ------------------------------------------------------------------------------------------
 test_id, test_turi
 savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
-savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob)
-ball, maksimal_ball         savol bo'yicha
-togri                       to'liq ball olganmi: 1 / 0
+savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob) |
+                            likert (so'rovnoma fikri, ball qo'yilmaydi)
+ball, maksimal_ball         savol bo'yicha (likert savolida bo'sh)
+togri                       to'liq ball olganmi: 1 / 0 (likert savolida bo'sh)
+javob                       faqat likert savolida: 1 — mutlaqo qo'shilmayman, 2 — qo'shilmayman,
+                            3 — betarafman, 4 — qo'shilaman, 5 — to'liq qo'shilaman
+                            (javob berilmagan bo'lsa bo'sh)
 
 Xato toifalari
 --------------
@@ -356,10 +362,10 @@ def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
 def _quiz_rows(quizzes):
     """testlar.csv va test_javoblari.csv qatorlari."""
     from quizzes.models import QuizAttempt
-    from quizzes.services import attempt_status, finalize_if_expired, percent
+    from quizzes.services import attempt_status, finalize_if_expired, likert_value, percent
 
     quiz_rows, answer_rows = [], []
-    for quiz in sorted(quizzes.prefetch_related("groups", "questions"), key=lambda item: item.pk):
+    for quiz in sorted(quizzes.prefetch_related("groups", "questions__choices"), key=lambda item: item.pk):
         attempts = {
             attempt.student_id: finalize_if_expired(attempt)
             for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
@@ -377,6 +383,7 @@ def _quiz_rows(quizzes):
         for student_id in sorted(students, key=pseudonym):
             attempt = attempts.get(student_id)
             submitted = bool(attempt and attempt.submitted_at)
+            scored = submitted and quiz.kind != "survey"
             quiz_rows.append(
                 [
                     pseudonym(student_id),
@@ -386,9 +393,9 @@ def _quiz_rows(quizzes):
                     quiz.title,
                     kind,
                     QUIZ_STATUSES[attempt_status(attempt)],
-                    attempt.score if submitted else "",
-                    attempt.max_score if submitted else "",
-                    percent(attempt) if submitted else "",
+                    attempt.score if scored else "",
+                    attempt.max_score if scored else "",
+                    percent(attempt) if scored else "",
                     _local(attempt.started_at) if attempt else "",
                     _local(attempt.submitted_at) if submitted else "",
                     _minutes(attempt.started_at, attempt.submitted_at) if submitted else "",
@@ -398,6 +405,8 @@ def _quiz_rows(quizzes):
                 continue
             for question in questions:
                 earned = attempt.results.get(str(question.pk), 0)
+                likert = question.kind == "likert"
+                answer = likert_value(question, attempt.answers.get(str(question.pk), [])) if likert else None
                 answer_rows.append(
                     [
                         pseudonym(student_id),
@@ -405,10 +414,11 @@ def _quiz_rows(quizzes):
                         quiz.pk,
                         kind,
                         question.order,
-                        "bitta" if question.kind == "single" else "kop",
-                        earned,
-                        question.points,
-                        _flag(earned >= question.points),
+                        QUESTION_KINDS.get(question.kind, question.kind),
+                        "" if likert else earned,
+                        "" if likert else question.points,
+                        "" if likert else _flag(earned >= question.points),
+                        "" if answer is None else answer,
                     ]
                 )
     return quiz_rows, answer_rows

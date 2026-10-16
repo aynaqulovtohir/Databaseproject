@@ -1,4 +1,5 @@
-"""Testlar: kirish/chiqish testlari va oddiy testlar (bitta yoki bir nechta to'g'ri javobli savollar).
+"""Testlar: kirish/chiqish testlari, oddiy testlar (bitta yoki bir nechta to'g'ri javobli savollar)
+va so'rovnomalar (Likert shkalasi, 1-5, ball qo'yilmaydi).
 
 Tadqiqot uchun: bitta talaba testni bir marta topshiradi, vaqt serverda nazorat qilinadi,
 talabalar boshlagandan keyin savollar o'zgartirilmaydi.
@@ -12,12 +13,23 @@ from django.utils import timezone
 # Vaqt tugaganidan keyin ham tarmoq kechikishi uchun qabul qilinadigan qo'shimcha vaqt
 GRACE_SECONDS = 30
 
+# Likert savolining variantlari (tartib raqami — shkaladagi qiymat). Har bir Likert savoliga
+# avtomatik qo'shiladi, shunda javoblar oddiy savollardagidek variant id'lari bilan saqlanadi.
+LIKERT_SCALE = [
+    "Mutlaqo qo'shilmayman",
+    "Qo'shilmayman",
+    "Betarafman",
+    "Qo'shilaman",
+    "To'liq qo'shilaman",
+]
+
 
 class Quiz(models.Model):
     class Kind(models.TextChoices):
         PRE = "pre", "Kirish testi"
         POST = "post", "Chiqish testi"
         PRACTICE = "practice", "Oddiy test"
+        SURVEY = "survey", "So'rovnoma"
 
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.PRACTICE)
     title = models.CharField("sarlavha", max_length=200)
@@ -51,6 +63,7 @@ class Question(models.Model):
     class Kind(models.TextChoices):
         SINGLE = "single", "Bitta to'g'ri javob"
         MULTIPLE = "multiple", "Bir nechta to'g'ri javob"
+        LIKERT = "likert", "Likert shkalasi (1-5)"
 
     quiz = models.ForeignKey(Quiz, verbose_name="test", on_delete=models.CASCADE, related_name="questions")
     order = models.PositiveSmallIntegerField("tartib raqami")

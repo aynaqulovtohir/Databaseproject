@@ -17,6 +17,7 @@ import { QUIZ_KIND_LABELS, type Quiz } from '@/lib/types'
 function QuizStatusBadge({ quiz }: { quiz: Quiz }) {
   const attempt = quiz.my_attempt
   if (attempt?.status === 'submitted') {
+    if (quiz.kind === 'survey') return <Badge className="bg-emerald-100 text-emerald-800">Javob berilgan</Badge>
     return <Badge className="bg-emerald-100 text-emerald-800 tabular-nums">Natija: {attempt.percent}%</Badge>
   }
   if (attempt?.status === 'in_progress') return <Badge className="bg-amber-100 text-amber-800">Boshlangan</Badge>

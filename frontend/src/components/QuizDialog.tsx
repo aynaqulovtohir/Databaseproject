@@ -41,10 +41,11 @@ function emptyQuestion(): QuizQuestion {
 }
 
 /** Savollarni tekshiradi: xato bo'lsa birinchi xato matnini qaytaradi */
-function questionsProblem(questions: QuizQuestion[]): string | null {
+function questionsProblem(questions: QuizQuestion[], survey: boolean): string | null {
   for (const [index, question] of questions.entries()) {
     const number = index + 1
     if (!question.text.trim()) return `${number}-savol matni bo'sh.`
+    if (survey) continue
     if (question.choices.length < 2) return `${number}-savolda kamida 2 ta javob varianti bo'lsin.`
     if (question.choices.some((choice) => !choice.text.trim())) return `${number}-savolda bo'sh javob varianti bor.`
     const correct = question.choices.filter((choice) => choice.is_correct).length
@@ -58,6 +59,7 @@ function QuestionEditor({
   question,
   number,
   total,
+  survey,
   onChange,
   onMove,
   onRemove,
@@ -65,6 +67,8 @@ function QuestionEditor({
   question: QuizQuestion
   number: number
   total: number
+  /** So'rovnomada savol faqat fikr matnidan iborat (javob — 1-5 shkala) */
+  survey: boolean
   onChange: (question: QuizQuestion) => void
   onMove: (offset: -1 | 1) => void
   onRemove: () => void
@@ -118,86 +122,94 @@ function QuestionEditor({
         aria-label={`${number}-savol matni`}
         className="min-h-16"
         maxLength={2000}
-        placeholder="Savol matni"
+        placeholder={survey ? 'Fikr, masalan: «AI maslahatlari xatoni topishimga yordam berdi.»' : 'Savol matni'}
         value={question.text}
         onChange={(event) => onChange({ ...question, text: event.target.value })}
       />
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Savol turi</span>
-          <select
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-            value={question.kind}
-            onChange={(event) => setKind(event.target.value as QuizQuestion['kind'])}
-          >
-            <option value="single">Bitta to'g'ri javob</option>
-            <option value="multiple">Bir nechta to'g'ri javob</option>
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Ball</span>
-          <Input
-            type="number"
-            min={1}
-            max={100}
-            className="h-9 w-20"
-            value={question.points}
-            onChange={(event) => onChange({ ...question, points: Math.max(1, Number(event.target.value) || 1) })}
-          />
-        </label>
-      </div>
-      <div className="grid gap-2">
-        <span className="text-xs text-muted-foreground">
-          Javob variantlari: to'g'risini belgilang {question.kind === 'multiple' ? '(bir nechta bo\'lishi mumkin)' : ''}
-        </span>
-        {question.choices.map((choice, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <input
-              type={question.kind === 'single' ? 'radio' : 'checkbox'}
-              name={`${prefix}-correct`}
-              aria-label={`${index + 1}-variant to'g'ri`}
-              className="size-4 shrink-0"
-              checked={choice.is_correct}
-              onChange={(event) => setCorrect(index, event.target.checked)}
-            />
-            <Input
-              aria-label={`${number}-savol, ${index + 1}-variant`}
-              className="h-9 flex-1"
-              maxLength={1000}
-              placeholder={`${index + 1}-variant`}
-              value={choice.text}
-              onChange={(event) =>
-                onChange({
-                  ...question,
-                  choices: question.choices.map((item, position) =>
-                    position === index ? { ...item, text: event.target.value } : item,
-                  ),
-                })
-              }
-            />
+      {survey ? (
+        <p className="text-xs text-muted-foreground">
+          Talaba 1 dan 5 gacha shkalada javob beradi: 1 — mutlaqo qo'shilmayman, 5 — to'liq qo'shilaman.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1 text-sm">
+              <span className="text-xs text-muted-foreground">Savol turi</span>
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={question.kind}
+                onChange={(event) => setKind(event.target.value as QuizQuestion['kind'])}
+              >
+                <option value="single">Bitta to'g'ri javob</option>
+                <option value="multiple">Bir nechta to'g'ri javob</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-xs text-muted-foreground">Ball</span>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                className="h-9 w-20"
+                value={question.points}
+                onChange={(event) => onChange({ ...question, points: Math.max(1, Number(event.target.value) || 1) })}
+              />
+            </label>
+          </div>
+          <div className="grid gap-2">
+            <span className="text-xs text-muted-foreground">
+              Javob variantlari: to'g'risini belgilang {question.kind === 'multiple' ? '(bir nechta bo\'lishi mumkin)' : ''}
+            </span>
+            {question.choices.map((choice, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type={question.kind === 'single' ? 'radio' : 'checkbox'}
+                  name={`${prefix}-correct`}
+                  aria-label={`${index + 1}-variant to'g'ri`}
+                  className="size-4 shrink-0"
+                  checked={choice.is_correct}
+                  onChange={(event) => setCorrect(index, event.target.checked)}
+                />
+                <Input
+                  aria-label={`${number}-savol, ${index + 1}-variant`}
+                  className="h-9 flex-1"
+                  maxLength={1000}
+                  placeholder={`${index + 1}-variant`}
+                  value={choice.text}
+                  onChange={(event) =>
+                    onChange({
+                      ...question,
+                      choices: question.choices.map((item, position) =>
+                        position === index ? { ...item, text: event.target.value } : item,
+                      ),
+                    })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`${index + 1}-variantni o'chirish`}
+                  disabled={question.choices.length <= 2}
+                  onClick={() => onChange({ ...question, choices: question.choices.filter((_, position) => position !== index) })}
+                >
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`${index + 1}-variantni o'chirish`}
-              disabled={question.choices.length <= 2}
-              onClick={() => onChange({ ...question, choices: question.choices.filter((_, position) => position !== index) })}
+              variant="outline"
+              className="justify-self-start"
+              disabled={question.choices.length >= MAX_CHOICES}
+              onClick={() => onChange({ ...question, choices: [...question.choices, { text: '', is_correct: false }] })}
             >
-              <Trash2 aria-hidden="true" />
+              <Plus aria-hidden="true" />
+              Variant qo'shish
             </Button>
           </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          className="justify-self-start"
-          disabled={question.choices.length >= MAX_CHOICES}
-          onClick={() => onChange({ ...question, choices: [...question.choices, { text: '', is_correct: false }] })}
-        >
-          <Plus aria-hidden="true" />
-          Variant qo'shish
-        </Button>
-      </div>
+        </>
+      )}
     </fieldset>
   )
 }
@@ -222,7 +234,13 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
   const [timeLimit, setTimeLimit] = useState(quiz?.time_limit_minutes ? String(quiz.time_limit_minutes) : '')
   const [showAnswers, setShowAnswers] = useState(quiz?.show_answers ?? false)
   const [groupIds, setGroupIds] = useState<number[]>(quiz?.groups ?? [])
-  const [questions, setQuestions] = useState<QuizQuestion[]>(quiz?.questions ?? [emptyQuestion()])
+  const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
+    // So'rovnoma savollarida variantlar shkaladan olingan: tahrirlashda ular kerak emas
+    (quiz?.questions ?? [emptyQuestion()]).map((question) =>
+      question.kind === 'likert' ? { ...emptyQuestion(), text: question.text } : question,
+    ),
+  )
+  const survey = kind === 'survey'
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
@@ -234,16 +252,20 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
         opens_at: opensAt ? new Date(opensAt).toISOString() : null,
         closes_at: closesAt ? new Date(closesAt).toISOString() : null,
         time_limit_minutes: timeLimit ? Number(timeLimit) : null,
-        show_answers: showAnswers,
+        show_answers: survey ? false : showAnswers,
         groups: groupIds,
       }
       if (!locked) {
-        body.questions = questions.map((question) => ({
-          text: question.text.trim(),
-          kind: question.kind,
-          points: question.points,
-          choices: question.choices.map((choice) => ({ text: choice.text.trim(), is_correct: choice.is_correct })),
-        }))
+        body.questions = questions.map((question) =>
+          survey
+            ? { text: question.text.trim(), kind: 'likert' }
+            : {
+                text: question.text.trim(),
+                kind: question.kind,
+                points: question.points,
+                choices: question.choices.map((choice) => ({ text: choice.text.trim(), is_correct: choice.is_correct })),
+              },
+        )
       }
       return quiz
         ? api<Quiz>(`/quizzes/${quiz.id}/`, { method: 'PATCH', body })
@@ -263,7 +285,7 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
     const problems: Record<string, string> = {}
     if (!groupIds.length) problems.groups = 'Kamida bitta guruh tanlang.'
     if (!locked) {
-      const problem = questions.length ? questionsProblem(questions) : 'Kamida bitta savol qo\'shing.'
+      const problem = questions.length ? questionsProblem(questions, survey) : 'Kamida bitta savol qo\'shing.'
       if (problem) problems.questions = problem
     }
     setErrors(problems)
@@ -283,7 +305,7 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
           <DialogTitle>{quiz ? 'Testni tahrirlash' : 'Yangi test'}</DialogTitle>
           <DialogDescription>
             Kirish testi o'qitishdan oldin, chiqish testi keyin o'tkaziladi. Natijalarni solishtirish uchun ularga bir xil
-            savollarni bering.
+            savollarni bering. So'rovnomada ball qo'yilmaydi: talabalar fikrlarga 1–5 shkalada baho beradi.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
@@ -340,15 +362,17 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
               />
             </FormField>
           </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-0.5 size-4" checked={showAnswers} onChange={(event) => setShowAnswers(event.target.checked)} />
-            <span>
-              Topshirgandan keyin talabaga to'g'ri javoblarni ko'rsatish
-              <span className="block text-xs text-muted-foreground">
-                Kirish testida belgilamang: aks holda talabalar chiqish testining javoblarini oldindan bilib oladi.
+          {survey ? null : (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5 size-4" checked={showAnswers} onChange={(event) => setShowAnswers(event.target.checked)} />
+              <span>
+                Topshirgandan keyin talabaga to'g'ri javoblarni ko'rsatish
+                <span className="block text-xs text-muted-foreground">
+                  Kirish testida belgilamang: aks holda talabalar chiqish testining javoblarini oldindan bilib oladi.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
           <FormField id="quiz_groups" label="Guruhlar" error={errors.groups}>
             <CheckList
               idPrefix="quiz-group"
@@ -375,6 +399,7 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
                     question={question}
                     number={index + 1}
                     total={questions.length}
+                    survey={survey}
                     onChange={(next) => setQuestions(questions.map((item, position) => (position === index ? next : item)))}
                     onMove={(offset) => moveQuestion(index, offset)}
                     onRemove={() => setQuestions(questions.filter((_, position) => position !== index))}
