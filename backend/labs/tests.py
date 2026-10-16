@@ -678,11 +678,13 @@ class DesignLabsTests(BaseTestCase):
         self.assertTrue(all(lab.groups.filter(pk=self.group_a.pk).exists() for lab in labs))
         # Ro'yxatda birinchi laboratoriya (ER-model 1) yuqorida turadi
         from .design_labs import ALL_LABS, ER_LABS
+        from .interview_labs import INTERVIEW_LABS
 
         all_labs = Lab.objects.filter(author=self.teacher_a, title__in=[item["title"] for item in ALL_LABS])
         self.assertEqual(all_labs.count(), len(ALL_LABS))
         self.assertEqual(all_labs.order_by("-created_at", "-id").first().title, ALL_LABS[0]["title"])
-        self.assertEqual(all_labs.filter(kind="er").count(), len(ER_LABS))
+        self.assertEqual(all_labs.filter(kind="er").count(), len(ER_LABS) + len(INTERVIEW_LABS))
+        self.assertEqual(sum(lab.is_interview for lab in all_labs.filter(kind="er")), len(INTERVIEW_LABS))
 
         with self.assertRaises(CommandError):
             call_command("seed_design_labs", author="student_a1", stdout=StringIO())
@@ -740,7 +742,10 @@ class ResearchExportTests(BaseTestCase):
         self.assertIn("attachment;", response["Content-Disposition"])
         self.assertEqual(
             set(files),
-            {"urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv", "README.txt"},
+            {
+                "urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv",
+                "kompetentlik.csv", "README.txt",
+            },
         )
         everything = "".join(files.values())
         for secret in ("student_a1", "Zuhriddin", "SELEC narx", SOLUTION.strip()[:20]):

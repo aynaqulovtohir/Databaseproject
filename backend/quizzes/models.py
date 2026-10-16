@@ -1,4 +1,4 @@
-"""Testlar: kirish/chiqish testlari, oddiy testlar (bitta yoki bir nechta to'g'ri javobli savollar)
+"""Testlar: kirish/chiqish va kechiktirilgan testlar, oddiy testlar (bitta yoki bir nechta to'g'ri javobli savollar)
 va so'rovnomalar (Likert shkalasi, 1-5, ball qo'yilmaydi).
 
 Tadqiqot uchun: bitta talaba testni bir marta topshiradi, vaqt serverda nazorat qilinadi,
@@ -28,6 +28,8 @@ class Quiz(models.Model):
     class Kind(models.TextChoices):
         PRE = "pre", "Kirish testi"
         POST = "post", "Chiqish testi"
+        # Kurs tugagandan bir necha hafta keyin o'sha savollar bilan: bilim qanchalik saqlanganini o'lchaydi
+        DELAYED = "delayed", "Kechiktirilgan test"
         PRACTICE = "practice", "Oddiy test"
         SURVEY = "survey", "So'rovnoma"
 

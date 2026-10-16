@@ -1,10 +1,12 @@
-"""Kirish va chiqish testlarini bir xil savollar bilan yaratadi (question_bank.py).
+"""Kirish, chiqish va kechiktirilgan testlarni bir xil savollar bilan yaratadi (question_bank.py).
 
 Ishga tushirish:
     python manage.py seed_entry_test --author <o'qituvchi> --group <guruh> [--group ...]
-        [--kind pre|post|both] [--time-limit 30]
+        [--kind pre|post|delayed|both] [--time-limit 30]
     python manage.py seed_entry_test --markdown     # savollar va javoblar kaliti (dissertatsiya ilovasi uchun)
 
+Kechiktirilgan test (--kind delayed) kurs tugagandan bir necha hafta keyin o'sha savollar bilan o'tkaziladi:
+bilim qanchalik saqlanganini o'lchaydi; ochilish vaqtini keyinga qo'ying.
 Qayta ishga tushirilsa, bor test takrorlanmaydi (faqat guruhlar qo'shiladi).
 Testlar sukut bo'yicha darhol ochiq; ochilish vaqtini o'qituvchi sahifada belgilaydi.
 """
@@ -17,7 +19,7 @@ from ...models import Quiz
 from ...question_bank import QUESTIONS, TEST_DESCRIPTION, TEST_TITLE
 from ...serializers import QuestionSerializer, QuizSerializer
 
-KIND_TITLES = {"pre": "kirish testi", "post": "chiqish testi"}
+KIND_TITLES = {"pre": "kirish testi", "post": "chiqish testi", "delayed": "kechiktirilgan test"}
 LETTERS = "ABCDEFGHIJ"
 
 
@@ -53,12 +55,12 @@ def markdown():
 
 
 class Command(BaseCommand):
-    help = "Kirish va chiqish testlarini bir xil savollar bilan yaratadi"
+    help = "Kirish, chiqish (va kechiktirilgan) testlarini bir xil savollar bilan yaratadi"
 
     def add_arguments(self, parser):
         parser.add_argument("--author", help="Test muallifi (o'qituvchi yoki admin logini)")
         parser.add_argument("--group", action="append", default=[], help="Biriktiriladigan guruh nomi")
-        parser.add_argument("--kind", choices=["pre", "post", "both"], default="both")
+        parser.add_argument("--kind", choices=["pre", "post", "delayed", "both"], default="both")
         parser.add_argument("--time-limit", type=int, default=30, help="Vaqt chegarasi, daqiqa (0 — cheklanmagan)")
         parser.add_argument("--markdown", action="store_true", help="Savollar va javoblar kalitini Markdown'da chiqarish")
 

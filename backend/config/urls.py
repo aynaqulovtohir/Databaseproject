@@ -15,4 +15,5 @@ urlpatterns = [
     path("api/", include("notifications.urls")),
     path("api/", include("labs.urls")),
     path("api/", include("quizzes.urls")),
+    path("api/", include("competence.urls")),
 ]

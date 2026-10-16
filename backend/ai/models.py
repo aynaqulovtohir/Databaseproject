@@ -95,6 +95,7 @@ class AIUsage(models.Model):
         VARIANT = "variant", "Topshiriq varianti"
         BUGGY_CODE = "buggy_code", "Xatoli kod yaratish"
         MISTAKES_SUMMARY = "mistakes_summary", "Xatolar xulosasi"
+        INTERVIEW = "interview", "Buyurtmachi bilan suhbat"
         OTHER = "other", "Boshqa"
 
     purpose = models.CharField("maqsad", max_length=20, choices=Purpose.choices, default=Purpose.OTHER)

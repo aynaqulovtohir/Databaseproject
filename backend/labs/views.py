@@ -33,7 +33,7 @@ from .quota import (
     sandbox_down_response,
 )
 from .er import build_fixed, compare
-from .models import AIAction, BlindReview, Lab, LabAttempt, LabChatMessage, LabGrade
+from .models import AIAction, BlindReview, InterviewMessage, Lab, LabAttempt, LabChatMessage, LabGrade
 from .research import build_export
 from .sandbox import SandboxUnavailable
 from .serializers import (
@@ -187,7 +187,17 @@ class LabViewSet(viewsets.ModelViewSet):
             return Response({"detail": detail}, status=status.HTTP_409_CONFLICT), None
 
     @staticmethod
-    def save_attempt(lab, student, payload, result, is_submission=False):
+    def confidence(request):
+        """Talaba belgilagan ishonch (1-5) yoki None — belgilamagan."""
+        value = request.data.get("confidence")
+        if value in (None, ""):
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
+            raise ValidationError({"confidence": "Ishonch 1 dan 5 gacha butun son bo'lishi kerak."})
+        return value
+
+    @staticmethod
+    def save_attempt(lab, student, payload, result, is_submission=False, confidence=None):
         return LabAttempt.objects.create(
             lab=lab,
             student=student,
@@ -198,6 +208,7 @@ class LabViewSet(viewsets.ModelViewSet):
             feedback={"error": result["error"], "differences": result["differences"]},
             is_submission=is_submission,
             ai_enabled=student.ai_allowed,
+            confidence=confidence,
         )
 
     @action(
@@ -210,6 +221,7 @@ class LabViewSet(viewsets.ModelViewSet):
     def run(self, request, pk=None):
         """Kodni ishga tushirib tekshiradi. Talabaning har bir ishga tushirishi urinish sifatida saqlanadi."""
         lab = self.get_object()
+        confidence = self.confidence(request)
         result, payload = self.check(request, lab)
         if payload is None:
             return result
@@ -217,7 +229,7 @@ class LabViewSet(viewsets.ModelViewSet):
         result["attempt_id"] = None
         result["ai_available"] = result["ai_explain"] = False
         if request.user.is_student:
-            attempt = self.save_attempt(lab, request.user, payload, result)
+            attempt = self.save_attempt(lab, request.user, payload, result, confidence=confidence)
             result["attempt_id"] = attempt.pk
             ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
             result["ai_available"] = not result["is_correct"] and ai_left
@@ -298,11 +310,12 @@ class LabViewSet(viewsets.ModelViewSet):
         if not request.user.is_student:
             raise PermissionDenied("Baholashga faqat talaba topshira oladi.")
         lab = self.get_object()
+        confidence = self.confidence(request)
         result, payload = self.check(request, lab)
         if payload is None:
             return result
 
-        attempt = self.save_attempt(lab, request.user, payload, result, is_submission=True)
+        attempt = self.save_attempt(lab, request.user, payload, result, is_submission=True, confidence=confidence)
         if lab.kind == Lab.Kind.ER:
             score, comment, source = grade_diagram_attempt(attempt, payload["ratio"])
             # Noto'g'ri diagramma: tuzatilgan variant faqat topshirilgandan keyin ko'rsatiladi
@@ -350,8 +363,10 @@ class LabViewSet(viewsets.ModelViewSet):
             labs = labs.filter(pk__in=lab_ids)
         from quizzes.views import visible_quizzes
 
+        from .statistics import allowed_groups
+
         filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
-        response = HttpResponse(build_export(labs, visible_quizzes(request.user)), content_type="application/zip")
+        response = HttpResponse(build_export(labs, visible_quizzes(request.user), allowed_groups(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
@@ -465,6 +480,8 @@ class LabViewSet(viewsets.ModelViewSet):
             starter_sql=lab.starter_sql,
             reference_diagram=lab.reference_diagram,
             given_diagram=lab.given_diagram,
+            requirements=lab.requirements,
+            client_persona=lab.client_persona,
             norm_task=lab.norm_task,
             plan_query=lab.plan_query,
             plan_forbidden=lab.plan_forbidden,
@@ -881,6 +898,91 @@ class LabChatView(APIView):
                 lab=self.lab, student=request.user, role=LabChatMessage.Role.ASSISTANT, content=answer
             )
             record_ai_action(request.user, AIAction.Kind.LAB_CHAT)
+        return Response(self.payload(), status=status.HTTP_201_CREATED)
+
+
+class LabInterviewView(APIView):
+    """Talablarni aniqlash: AI-buyurtmachi bilan suhbat. GET — yozishma va aniqlangan talablar, POST {content} — savol.
+
+    Faqat talaba, faqat o'ziga ko'rinadigan "talablarni aniqlash" laboratoriyasida va AI yoqilgan guruhda.
+    Suhbat kunlik AI limitidan yechilmaydi (bitta suhbatda ko'p savol bo'ladi), uning o'rniga har bir laboratoriyada
+    savollar soni cheklangan (LAB_INTERVIEW_QUESTION_LIMIT).
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "lab_ai"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_student:
+            raise PermissionDenied("Buyurtmachi bilan suhbat faqat talaba uchun.")
+        if not request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shartida berilgan.")
+        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+        if not self.lab.is_interview:
+            raise PermissionDenied("Bu laboratoriyada buyurtmachi bilan suhbat yo'q.")
+
+    def own_messages(self):
+        return InterviewMessage.objects.filter(lab=self.lab, student=self.request.user)
+
+    def payload(self):
+        from django.conf import settings
+
+        from .interview import progress_payload
+
+        messages = list(self.own_messages())
+        solved = LabAttempt.objects.filter(lab=self.lab, student=self.request.user, is_correct=True).exists()
+        asked = sum(1 for message in messages if message.role == InterviewMessage.Role.USER)
+        return {
+            "messages": [
+                {"id": message.pk, "role": message.role, "content": message.content, "created_at": message.created_at}
+                for message in messages
+            ],
+            "questions_left": max(0, settings.LAB_INTERVIEW_QUESTION_LIMIT - asked),
+            **progress_payload(self.lab, messages, solved),
+        }
+
+    def get(self, request, pk):
+        return Response(self.payload())
+
+    def post(self, request, pk):
+        from django.conf import settings
+
+        from .interview import HISTORY_LIMIT, client_reply, question_block
+
+        content = request.data.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValidationError({"content": "Savol matni bo'sh bo'lmasligi kerak."})
+        if len(content) > 1000:
+            raise ValidationError({"content": "Savol 1000 belgidan oshmasligi kerak."})
+        if not is_configured():
+            return Response({"detail": "AI yordamchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        asked = self.own_messages().filter(role=InterviewMessage.Role.USER).count()
+        if asked >= settings.LAB_INTERVIEW_QUESTION_LIMIT:
+            return Response(
+                {"detail": "Bu laboratoriyada savollar soni tugadi. Aniqlagan talablaringiz asosida diagrammani chizing."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        recent = list(self.own_messages().order_by("-created_at", "-id")[:HISTORY_LIMIT])[::-1]
+        history = [
+            {"role": message.role, "content": question_block(message.content) if message.role == "user" else message.content}
+            for message in recent
+        ]
+        try:
+            answer, revealed = client_reply(self.lab, history, content.strip())
+        except AIError as exc:
+            return ai_error_response(exc, "savol")
+        with transaction.atomic():
+            InterviewMessage.objects.create(
+                lab=self.lab, student=request.user, role=InterviewMessage.Role.USER, content=content.strip()
+            )
+            InterviewMessage.objects.create(
+                lab=self.lab, student=request.user, role=InterviewMessage.Role.ASSISTANT, content=answer, revealed=revealed
+            )
         return Response(self.payload(), status=status.HTTP_201_CREATED)
 
 

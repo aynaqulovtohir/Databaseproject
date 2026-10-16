@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "notifications",
     "labs",
     "quizzes",
+    "competence",
 ]
 
 MIDDLEWARE = [
@@ -218,6 +219,8 @@ LAB_DB = {
 }
 # Bitta talaba kuniga oladigan AI maslahatlari soni
 LAB_AI_DAILY_LIMIT = env.int("LAB_AI_DAILY_LIMIT", default=40)
+# Talablarni aniqlash: bitta laboratoriyada AI-buyurtmachiga beriladigan savollar soni (kunlik limitdan alohida)
+LAB_INTERVIEW_QUESTION_LIMIT = env.int("LAB_INTERVIEW_QUESTION_LIMIT", default=40)
 # Bitta talabaning kuniga AI baholaydigan topshirishlari soni (undan keyin avtomatik baho qo'yiladi)
 LAB_AI_GRADES_DAILY_LIMIT = env.int("LAB_AI_GRADES_DAILY_LIMIT", default=20)
 

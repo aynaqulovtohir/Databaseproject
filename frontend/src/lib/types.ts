@@ -304,6 +304,11 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** Talablarni aniqlash: yashirin talablar va buyurtmachi roli. Faqat admin va o'qituvchiga */
+  requirements?: InterviewRequirement[]
+  client_persona?: string
+  /** Talaba uchun: talablarni aniqlash laboratoriyasi bo'lsa */
+  interview?: LabInterviewInfo | null
   /** O'qituvchi tanlagan mavzu (bo'sh — avtomatik) va amaldagi mavzu */
   topic?: string
   effective_topic?: string
@@ -436,6 +441,29 @@ export interface Viva {
 }
 
 /** Laboratoriya murabbiyi bilan yozishma */
+/** Talablarni aniqlash: buyurtmachining talabi */
+export interface InterviewRequirement {
+  id: string
+  text: string
+  kind: 'entity' | 'attribute' | 'relationship' | 'rule'
+}
+
+/** Talablarni aniqlash laboratoriyasi (talaba uchun). AI yoqilgan guruhga talablar ko'rsatilmaydi */
+export interface LabInterviewInfo {
+  total: number
+  ai: boolean
+  requirements: InterviewRequirement[] | null
+}
+
+export interface InterviewState {
+  messages: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }[]
+  questions_left: number
+  total: number
+  found: InterviewRequirement[]
+  /** Laboratoriya to'g'ri yechilgandan keyin: aniqlanmagan talablar */
+  missed: InterviewRequirement[] | null
+}
+
 export interface LabChatState {
   messages: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }[]
   /** Bugun qolgan umumiy AI yordamlari soni */
@@ -549,11 +577,12 @@ export const MAX_SCORE = 100
 
 // ---------- Testlar ----------
 
-export type QuizKind = 'pre' | 'post' | 'practice' | 'survey'
+export type QuizKind = 'pre' | 'post' | 'delayed' | 'practice' | 'survey'
 
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
   pre: 'Kirish testi',
   post: 'Chiqish testi',
+  delayed: 'Kechiktirilgan test',
   practice: 'Oddiy test',
   survey: "So'rovnoma",
 }
@@ -757,6 +786,9 @@ export interface StatisticsGroup {
   post_test: number | null
   pre_count: number
   post_count: number
+  /** Kechiktirilgan test (kurs tugagandan bir necha hafta keyin) */
+  delayed_test: number | null
+  delayed_count: number
   gain: number | null
 }
 
@@ -813,4 +845,143 @@ export interface LabMistakesReport {
   stuck: number
   wrong_attempts: number
   items: LabMistake[]
+}
+
+// Kompetentlik modeli (competence ilovasi)
+export type CompetenceStage = 'initial' | 'final' | 'delayed'
+export type CompetenceLevel = 'low' | 'medium' | 'high'
+
+export interface CompetenceIndicator {
+  id: number
+  name: string
+  source: string
+  source_label: string
+  weight: number
+  topics: string[]
+  ai_only: boolean
+  stages: CompetenceStage[]
+}
+
+export interface CompetenceComponent {
+  id: number
+  name: string
+  description: string
+  medium_from: number
+  high_from: number
+  stages: CompetenceStage[]
+  indicators: CompetenceIndicator[]
+}
+
+export interface CompetenceModel {
+  components: CompetenceComponent[]
+  stages: { key: CompetenceStage; label: string }[]
+  levels: { key: CompetenceLevel; label: string }[]
+  overall_thresholds: { medium_from: number; high_from: number }
+}
+
+export interface CompetenceScore {
+  score: number | null
+  level: CompetenceLevel | null
+}
+
+export interface CompetenceDistribution {
+  counts: Record<CompetenceLevel, number>
+  percents: Record<CompetenceLevel, number | null>
+  measured: number
+  unmeasured: number
+}
+
+export interface CompetenceSummaryItem {
+  distribution: CompetenceDistribution
+  mean: number | null
+}
+
+export interface CompetenceSummary {
+  components: (CompetenceSummaryItem & { component: number })[]
+  overall: CompetenceSummaryItem
+}
+
+export interface CompetenceReport {
+  group: { id: number; name: string; ai_enabled: boolean }
+  stage: CompetenceStage
+  students: { id: number; name: string; components: Record<string, CompetenceScore>; overall: CompetenceScore }[]
+  summary: CompetenceSummary
+}
+
+export interface CompetenceComparison {
+  groups: { id: number; name: string; ai_enabled: boolean; students: number; stages: Record<CompetenceStage, CompetenceSummary> }[]
+  cohorts: Record<'experimental' | 'control', { groups: number; students: number; stages: Record<CompetenceStage, CompetenceSummary> }>
+}
+
+export type CompetenceCohort = 'experimental' | 'control'
+
+export interface StatTestChi {
+  chi2: number
+  df: number
+  p: number
+  cramers_v: number
+  min_expected: number
+  reliable: boolean
+}
+
+export interface StatTestT {
+  t: number
+  df: number
+  p: number
+  cohens_d: number | null
+  hedges_g: number | null
+}
+
+export interface StatTestU {
+  u: number
+  z: number
+  p: number
+  approximate: boolean
+}
+
+export interface StatPaired {
+  n: number
+  mean_diff: number
+  t: number
+  df: number
+  p: number
+  d_z: number
+}
+
+export interface StatDescribe {
+  n: number
+  mean: number | null
+  sd: number | null
+}
+
+export interface CompetenceEfficiencyStage {
+  describe: Record<CompetenceCohort, StatDescribe>
+  levels: Record<CompetenceCohort, number[]>
+  chi_square: StatTestChi | null
+  t_test: StatTestT | null
+  mann_whitney: StatTestU | null
+  efficiency_ratio: number | null
+}
+
+/** Ikki kesim orasidagi o'zgarish: har bir guruh ichida (juftlangan t) va guruhlar farqi (Uelch t) */
+export type CompetenceChange = Record<
+  CompetenceCohort,
+  { n: number; before_mean: number | null; after_mean: number | null; paired: StatPaired | null }
+> & { difference: StatTestT | null }
+
+export interface CompetenceEfficiencyRow {
+  key: string
+  name: string
+  stages: Record<CompetenceStage, CompetenceEfficiencyStage>
+  /** Tajriba boshidan oxirigacha */
+  growth: CompetenceChange
+  /** Tajriba oxiridan kechiktirilgan testgacha (bilim saqlanishi) */
+  retention: CompetenceChange
+}
+
+export interface CompetenceEfficiency {
+  alpha: number
+  min_expected: number
+  students: Record<CompetenceCohort, number>
+  rows: CompetenceEfficiencyRow[]
 }

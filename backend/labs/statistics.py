@@ -227,11 +227,11 @@ def build_statistics(user, group=None):
         "without_advice": {**without_advice, "rate": _rate(without_advice["solved"], without_advice["pairs"])},
     }
 
-    # ---- Guruhlar taqqoslashi (kirish va chiqish testlari bilan) ----
+    # ---- Guruhlar taqqoslashi (kirish, chiqish va kechiktirilgan testlar bilan) ----
     quizzes = list(quizzes_qs.filter(groups__in=groups).distinct().prefetch_related("groups"))
-    quiz_percents = defaultdict(lambda: {"pre": [], "post": []})
+    quiz_percents = defaultdict(lambda: {"pre": [], "post": [], "delayed": []})
     for attempt in QuizAttempt.objects.filter(
-        quiz__in=[quiz for quiz in quizzes if quiz.kind in ("pre", "post")], student_id__in=student_ids
+        quiz__in=[quiz for quiz in quizzes if quiz.kind in ("pre", "post", "delayed")], student_id__in=student_ids
     ).select_related("quiz"):
         attempt = finalize_if_expired(attempt)
         if attempt.submitted_at:
@@ -243,6 +243,7 @@ def build_statistics(user, group=None):
         group_pairs = [(lab_id, sid) for lab_id, ids in assigned.items() for sid in ids if sid in members]
         pre = _mean(quiz_percents[item.pk]["pre"])
         post = _mean(quiz_percents[item.pk]["post"])
+        delayed = _mean(quiz_percents[item.pk]["delayed"])
         group_rows.append(
             {
                 "id": item.pk,
@@ -255,6 +256,8 @@ def build_statistics(user, group=None):
                 "post_test": post,
                 "pre_count": len(quiz_percents[item.pk]["pre"]),
                 "post_count": len(quiz_percents[item.pk]["post"]),
+                "delayed_test": delayed,
+                "delayed_count": len(quiz_percents[item.pk]["delayed"]),
                 "gain": _round(post - pre) if pre is not None and post is not None else None,
             }
         )

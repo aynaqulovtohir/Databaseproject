@@ -14,6 +14,7 @@ import type { AiEffectBucket, LearningCurvePoint, Statistics, StatisticsGroup } 
 // Diagramma ranglari index.css dagi --series-* tokenlaridan (yorug' va qorong'i mavzu uchun alohida)
 const SERIES_1 = 'var(--series-1)'
 const SERIES_2 = 'var(--series-2)'
+const SERIES_3 = 'var(--series-3)'
 
 function formatPercent(value: number | null) {
   return value === null ? '—' : `${value}%`
@@ -373,6 +374,10 @@ function TestBars({ group, max }: { group: StatisticsGroup; max: number }) {
   const bars = [
     { key: 'pre', label: 'Kirish', value: group.pre_test, count: group.pre_count, color: SERIES_1 },
     { key: 'post', label: 'Chiqish', value: group.post_test, count: group.post_count, color: SERIES_2 },
+    // Kechiktirilgan test o'tkazilgan bo'lsagina ko'rsatiladi
+    ...(group.delayed_count
+      ? [{ key: 'delayed', label: 'Keyin', value: group.delayed_test, count: group.delayed_count, color: SERIES_3 }]
+      : []),
   ]
   return (
     <div className="grid gap-0.5">
@@ -399,8 +404,8 @@ function GroupsCard({ groups }: { groups: StatisticsGroup[] }) {
       <CardHeader>
         <CardTitle>Guruhlar taqqoslashi</CardTitle>
         <CardDescription>
-          Kirish va chiqish testlarining o'rtacha natijasi (%) va o'sish. Tajriba guruhida AI yoqilgan, nazorat guruhida
-          o'chirilgan.
+          Kirish, chiqish va kechiktirilgan (kurs tugagandan keyin) testlarning o'rtacha natijasi (%) va o'sish. Tajriba
+          guruhida AI yoqilgan, nazorat guruhida o'chirilgan.
         </CardDescription>
         <ul className="flex flex-wrap gap-4 pt-1 text-xs text-muted-foreground" aria-label="Belgilar">
           <li className="flex items-center gap-1.5">
@@ -409,6 +414,11 @@ function GroupsCard({ groups }: { groups: StatisticsGroup[] }) {
           <li className="flex items-center gap-1.5">
             <span className="size-3 rounded-sm" style={{ background: SERIES_2 }} aria-hidden="true" /> Chiqish testi
           </li>
+          {groups.some((group) => group.delayed_count) ? (
+            <li className="flex items-center gap-1.5">
+              <span className="size-3 rounded-sm" style={{ background: SERIES_3 }} aria-hidden="true" /> Kechiktirilgan test
+            </li>
+          ) : null}
         </ul>
       </CardHeader>
       <CardContent>

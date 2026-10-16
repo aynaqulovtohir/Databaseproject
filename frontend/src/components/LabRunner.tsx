@@ -3,6 +3,7 @@ import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Se
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
+import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { PlanAssistant } from '@/components/PlanAssistant'
 import { SelfExplain } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
+import { useConfidence } from '@/lib/confidence'
 import {
   GRADE_SOURCE_LABELS,
   MAX_SCORE,
@@ -388,11 +390,16 @@ export function LabRunner({
 }: LabRunnerProps) {
   const [code, setCode] = useState(initialCode)
   const [fieldError, setFieldError] = useState<string | null>(null)
+  // Talaba tekshirishdan oldin o'z javobiga ishonchini belgilaydi (kalibrlash uchun, ixtiyoriy)
+  const confidence = useConfidence()
 
   const mutation = useMutation({
-    mutationFn: ({ sqlCode, mode }: { sqlCode: string; mode: RunMode }) =>
-      api<LabRunResult>(`/labs/${labId}/${mode}/`, { method: 'POST', body: { sql_code: sqlCode } }),
-    onSuccess: (result, { sqlCode }) => onResult?.(result, sqlCode),
+    mutationFn: ({ sqlCode, mode, level }: { sqlCode: string; mode: RunMode; level: number | null }) =>
+      api<LabRunResult>(`/labs/${labId}/${mode}/`, { method: 'POST', body: { sql_code: sqlCode, ...confidence.body(level) } }),
+    onSuccess: (result, { sqlCode, level }) => {
+      if (gradable) confidence.record(level, result.is_correct)
+      onResult?.(result, sqlCode)
+    },
     onError: (error) => {
       const message = fieldErrors(error).sql_code
       if (message) setFieldError(message)
@@ -419,7 +426,7 @@ export function LabRunner({
     if (!canRun) return
     setFieldError(null)
     setShown('check')
-    mutation.mutate({ sqlCode: code, mode })
+    mutation.mutate({ sqlCode: code, mode, level: gradable ? confidence.value : null })
   }
 
   function tryCode() {
@@ -477,6 +484,7 @@ export function LabRunner({
             </p>
           ) : null}
         </div>
+        {gradable ? <ConfidencePicker value={confidence.value} onChange={confidence.setValue} note={confidence.note} /> : null}
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" size="lg" variant="outline" disabled={!canRun} onClick={tryCode}>
             {trying ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}

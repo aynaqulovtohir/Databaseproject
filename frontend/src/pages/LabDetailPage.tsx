@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
+import { InterviewPanel, RequirementList } from '@/components/InterviewPanel'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { LabDialog } from '@/components/LabDialog'
 import { LabGenerateCard } from '@/components/LabGenerateCard'
@@ -714,6 +715,40 @@ function CoachCard({ labId, getWork }: { labId: number; getWork: () => LabWork }
   )
 }
 
+/** Talablarni aniqlash: AI yoqilgan guruhda buyurtmachi bilan suhbat, nazorat guruhida to'liq talablar ro'yxati */
+function InterviewCard({ lab }: { lab: Lab }) {
+  if (!lab.interview) return null
+  if (!lab.interview.ai) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Buyurtmachi talablari</CardTitle>
+          <CardDescription>Buyurtmachi bilan kelishilgan talablar. Shular asosida ER-diagramma chizing.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RequirementList items={lab.interview.requirements ?? []} />
+        </CardContent>
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Buyurtmachi bilan suhbat</CardTitle>
+        <CardDescription>
+          Shartda talablar ro'yxati yo'q: ularni buyurtmachidan (AI) o'zingiz aniqlaysiz. U faqat so'ralgan narsani,
+          texnik bo'lmagan tilda aytadi — kimlar va nimalar haqida ma'lumot saqlanishini, ular haqida nima yozilishini va
+          ular qanday bog'langanini («bittami yoki bir nechta?») so'rang. Barcha {lab.interview.total} ta talabni
+          aniqlashga harakat qiling.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <InterviewPanel labId={lab.id} />
+      </CardContent>
+    </Card>
+  )
+}
+
 function StudentView({ lab }: { lab: Lab }) {
   const user = useUser()
   const queryClient = useQueryClient()
@@ -740,6 +775,8 @@ function StudentView({ lab }: { lab: Lab }) {
       },
     })
     void queryClient.invalidateQueries({ queryKey: ['labs'] })
+    // Yechilgandan keyin buyurtmachi suhbatida aniqlanmagan talablar ham ko'rsatiladi
+    if (result.is_correct && lab.interview?.ai) void queryClient.invalidateQueries({ queryKey: ['lab-interview', lab.id] })
     // Normallashtirish javobi (last_answer) serverda tuzilma sifatida saqlanadi: qayta o'qib olinadi
     if (lab.kind === 'norm') void queryClient.invalidateQueries({ queryKey: ['lab', lab.id] })
   }
@@ -755,6 +792,7 @@ function StudentView({ lab }: { lab: Lab }) {
         />
         <div className="grid gap-4">
           <ConditionCard lab={lab} />
+          <InterviewCard lab={lab} />
           <Card>
             <CardHeader>
               <CardTitle>Mening ER-diagrammam</CardTitle>

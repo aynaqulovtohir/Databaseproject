@@ -5,6 +5,7 @@ from users.models import StudentGroup
 
 from .checker import LabSetupError, format_error, validate_concurrent, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
+from .interview import RequirementsError, validate_requirements
 from .norm import NormError, parse_answer, parse_task, reference_solution
 from .models import MAX_SQL_LENGTH, Lab
 from .sandbox import SandboxUnavailable
@@ -77,6 +78,8 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "hidden_setup_sql",
             "reference_diagram",
             "given_diagram",
+            "requirements",
+            "client_persona",
             "norm_task",
             "norm_reference",
             "plan_query",
@@ -104,6 +107,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             return self.validate_norm(attrs)
         attrs["norm_task"] = None
         attrs["reference_diagram"] = None
+        attrs["requirements"], attrs["client_persona"] = [], ""
         given = attrs.get("given_diagram")
         if given is not None:
             try:
@@ -126,6 +130,11 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         if not diagram["entities"]:
             raise serializers.ValidationError({"reference_diagram": "Namunaviy diagrammada kamida bitta obyekt bo'lsin."})
         attrs["reference_diagram"] = diagram
+        if "requirements" in attrs:
+            try:
+                attrs["requirements"] = validate_requirements(attrs["requirements"])
+            except RequirementsError as exc:
+                raise serializers.ValidationError({"requirements": str(exc)})
         # ER laboratoriyasida SQL ishlatilmaydi
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["starter_sql"] = ""
@@ -146,6 +155,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["starter_sql"] = ""
         attrs["reference_diagram"] = attrs["given_diagram"] = None
+        attrs["requirements"], attrs["client_persona"] = [], ""
         attrs["concurrent"] = False
         return attrs
 
@@ -207,6 +217,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
 
     author = AuthorSerializer(read_only=True)
     my_progress = serializers.SerializerMethodField()
+    interview = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
@@ -226,8 +237,18 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "author",
             "created_at",
             "my_progress",
+            "interview",
         ]
         read_only_fields = fields
+
+    def get_interview(self, lab):
+        """Talablarni aniqlash laboratoriyasi: AI yoqilgan guruhga talablar ko'rsatilmaydi (ularni buyurtmachidan
+        so'rab aniqlaydi), nazorat guruhiga esa an'anaviy shart sifatida to'liq beriladi."""
+        if not lab.is_interview:
+            return None
+        request = self.context.get("request")
+        ai = bool(request and request.user.ai_allowed)
+        return {"total": len(lab.requirements), "ai": ai, "requirements": None if ai else lab.requirements}
 
     def get_my_progress(self, lab):
         # Talabaning o'z urinishlari view'da oldindan yuklab qo'yiladi (yangisidan eskisiga)

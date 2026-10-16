@@ -3,11 +3,13 @@ import { CircleCheck, CircleX, Loader2, Search, Send, Sparkles, Wrench } from 'l
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { ErEditor, ErFixLegend } from '@/components/ErEditor'
 import { AiAdvice, GradeCard } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
+import { useConfidence } from '@/lib/confidence'
 import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
 import type { ErDiagram, ErFix, LabRunResult } from '@/lib/types'
 
@@ -107,11 +109,18 @@ export function ErLabRunner({
 }: ErLabRunnerProps) {
   const [diagram, setDiagram] = useState<ErDiagram>(initialDiagram ?? EMPTY_DIAGRAM)
   const [fieldError, setFieldError] = useState<string | null>(null)
+  const confidence = useConfidence()
 
   const mutation = useMutation({
-    mutationFn: ({ mode }: { mode: RunMode }) =>
-      api<LabRunResult>(`/labs/${labId}/${mode}/`, { method: 'POST', body: { diagram: cleanDiagram(diagram) } }),
-    onSuccess: (result) => onResult?.(result, diagram),
+    mutationFn: ({ mode, level }: { mode: RunMode; level: number | null }) =>
+      api<LabRunResult>(`/labs/${labId}/${mode}/`, {
+        method: 'POST',
+        body: { diagram: cleanDiagram(diagram), ...confidence.body(level) },
+      }),
+    onSuccess: (result, { level }) => {
+      if (gradable) confidence.record(level, result.is_correct)
+      onResult?.(result, diagram)
+    },
     onError: (error) => {
       const message = fieldErrors(error).diagram
       if (message) setFieldError(message)
@@ -121,7 +130,7 @@ export function ErLabRunner({
 
   function run(mode: RunMode) {
     setFieldError(null)
-    mutation.mutate({ mode })
+    mutation.mutate({ mode, level: gradable ? confidence.value : null })
   }
 
   const canRun = !mutation.isPending && diagram.entities.length > 0
@@ -146,6 +155,7 @@ export function ErLabRunner({
           {fieldError}
         </p>
       ) : null}
+      {gradable ? <ConfidencePicker value={confidence.value} onChange={confidence.setValue} note={confidence.note} /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => run('run')}>
           {running ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}

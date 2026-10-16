@@ -15,6 +15,7 @@ from users.models import StudentGroup, User
 from ...checker import LabSetupError, validate_concurrent, validate_lab_sql, validate_plan
 from ...design_labs import ALL_LABS
 from ...er import DiagramError, validate_diagram
+from ...interview import RequirementsError, validate_requirements
 from ...models import Lab
 from ...norm import NormError, parse_task
 
@@ -44,6 +45,7 @@ class Command(BaseCommand):
             try:
                 if lab_data.get("kind") == Lab.Kind.ER:
                     validate_diagram(lab_data["reference_diagram"])
+                    validate_requirements(lab_data.get("requirements", []))
                 elif lab_data.get("kind") == Lab.Kind.NORM:
                     task = lab_data["norm_task"]
                     fds = "\n".join(f"{', '.join(fd['lhs'])} -> {', '.join(fd['rhs'])}" for fd in task["fds"])
@@ -69,6 +71,8 @@ class Command(BaseCommand):
                 raise CommandError(f"«{lab_data['title']}» topshirig'ida xato: {exc}")
             except DiagramError as exc:
                 raise CommandError(f"«{lab_data['title']}» diagrammasida xato: {exc}")
+            except RequirementsError as exc:
+                raise CommandError(f"«{lab_data['title']}» talablarida xato: {exc}")
 
         created = updated = 0
         with transaction.atomic():
