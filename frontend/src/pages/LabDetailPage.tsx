@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Copy, Pencil, ShieldCheck, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, Copy, Lightbulb, Pencil, ShieldCheck, Trash2, TriangleAlert, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -26,6 +26,7 @@ import {
   type ErDiagram,
   type Lab,
   type LabRunResult,
+  type LabMistakesReport,
   type LabStudentProgress,
   type SimilarityReport,
   type SimilarPair,
@@ -131,6 +132,99 @@ function ConditionCard({ lab }: { lab: Lab }) {
 }
 
 // ---------- Admin va o'qituvchi ----------
+
+/** Eng ko'p uchraydigan xatolar: o'qituvchi keyingi darsda nimani qayta tushuntirishni ko'radi. */
+function MistakesCard({ lab }: { lab: Lab }) {
+  const { groups } = useGroupOptions()
+  const [group, setGroup] = useState('')
+  const report = useQuery({
+    queryKey: ['lab-mistakes', lab.id, group],
+    queryFn: () => api<LabMistakesReport>(`/labs/${lab.id}/mistakes/${group ? `?group=${group}` : ''}`),
+  })
+  const labGroups = groups.filter((item) => lab.groups?.includes(item.id))
+
+  let content
+  if (report.isPending) {
+    content = <ListSkeleton rows={2} />
+  } else if (report.isError) {
+    content = <ErrorState error={report.error} onRetry={() => void report.refetch()} />
+  } else if (!report.data.items.length) {
+    content = (
+      <EmptyState
+        icon={TriangleAlert}
+        title={report.data.attempted ? "Noto'g'ri urinishlar yo'q" : 'Hali hech kim urinib ko\'rmagan'}
+      />
+    )
+  } else {
+    const data = report.data
+    content = (
+      <div className="grid gap-4">
+        <p className="text-sm text-muted-foreground">
+          {data.attempted} / {data.students} talaba urinib ko'rgan, {data.solved} tasi yechgan,{' '}
+          <span className={data.stuck ? 'font-medium text-foreground' : ''}>{data.stuck} tasi hali qiynalmoqda</span>.
+          Noto'g'ri urinishlar: {data.wrong_attempts}.
+        </p>
+        <ol className="grid gap-3">
+          {data.items.map((item, index) => (
+            <li key={index} className="grid gap-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="min-w-0 break-words">
+                  <span className="mr-1.5 text-xs text-muted-foreground">
+                    {item.kind === 'error' ? 'SQL xatosi' : 'Natija farqi'}
+                  </span>
+                  {item.text}
+                </span>
+                <span className="shrink-0 text-right tabular-nums">
+                  <span className="font-medium">{item.share}%</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {item.students} talaba · {item.attempts} urinish
+                  </span>
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                <div className="h-full rounded-full bg-primary/70" style={{ width: `${item.share}%` }} />
+              </div>
+              {item.tip ? (
+                <p className="flex gap-1.5 text-xs text-muted-foreground">
+                  <Lightbulb className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  {item.tip}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Eng ko'p uchraydigan xatolar</CardTitle>
+        <CardDescription>
+          Foiz — urinib ko'rgan talabalarning qanchasi shu xatoga kamida bir marta duch kelgani. Keyingi darsda
+          nimani qayta tushuntirish kerakligini ko'rsatadi.
+        </CardDescription>
+        {labGroups.length > 1 ? (
+          <select
+            aria-label="Guruh"
+            className="mt-2 h-9 justify-self-start rounded-md border bg-background px-2 text-sm"
+            value={group}
+            onChange={(event) => setGroup(event.target.value)}
+          >
+            <option value="">Barcha guruhlar</option>
+            {labGroups.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  )
+}
 
 function ProgressCard({ lab }: { lab: Lab }) {
   const [viewing, setViewing] = useState<LabStudentProgress | null>(null)
@@ -407,6 +501,7 @@ function StaffView({ lab }: { lab: Lab }) {
         <GivenModelCard lab={lab} />
         {lab.kind === 'er' ? <ErStaffCards lab={lab} /> : <SqlStaffCards lab={lab} />}
         <ProgressCard lab={lab} />
+        <MistakesCard lab={lab} />
         <SimilarityCard lab={lab} />
       </div>
 

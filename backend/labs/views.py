@@ -24,6 +24,7 @@ from users.models import User
 from .access import visible_labs
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code, try_code
+from .mistakes import build_report
 from .er import build_fixed, compare
 from .models import BlindReview, Lab, LabAttempt, LabGrade
 from .research import build_export
@@ -391,6 +392,24 @@ class LabViewSet(viewsets.ModelViewSet):
         )
         copy.groups.set(groups)
         return Response(LabSerializer(copy, context=self.get_serializer_context()).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def mistakes(self, request, pk=None):
+        """O'qituvchi uchun: eng ko'p uchraydigan xatolar (?group=<id> — bitta guruh bo'yicha)."""
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        groups = lab.groups.all()
+        group_id = request.query_params.get("group")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            groups = groups.filter(pk=group_id)
+        student_ids = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups).values_list(
+            "pk", flat=True
+        )
+        attempts = LabAttempt.objects.filter(lab=lab).only("student_id", "is_correct", "feedback").order_by("id")
+        return Response(build_report(attempts, student_ids))
 
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):

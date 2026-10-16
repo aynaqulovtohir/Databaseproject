@@ -685,3 +685,22 @@ export interface Statistics {
   groups: StatisticsGroup[]
 }
 
+/** Laboratoriya bo'yicha eng ko'p uchraydigan xatolar (o'qituvchi uchun) */
+export interface LabMistake {
+  kind: 'error' | 'difference'
+  text: string
+  tip: string
+  attempts: number
+  students: number
+  /** Urinib ko'rgan talabalarning necha foizi shu xatoga duch kelgan */
+  share: number
+}
+
+export interface LabMistakesReport {
+  students: number
+  attempted: number
+  solved: number
+  stuck: number
+  wrong_attempts: number
+  items: LabMistake[]
+}
