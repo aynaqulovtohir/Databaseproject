@@ -3,7 +3,7 @@ from rest_framework import serializers
 from learning.serializers import AuthorSerializer, GroupsValidationMixin
 from users.models import StudentGroup
 
-from .checker import LabSetupError, format_error, validate_lab_sql
+from .checker import LabSetupError, format_error, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
 from .models import MAX_SQL_LENGTH, Lab
 from .sandbox import SandboxUnavailable
@@ -51,6 +51,8 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "hidden_setup_sql",
             "reference_diagram",
             "given_diagram",
+            "plan_query",
+            "plan_forbidden",
             "author",
             "groups",
             "created_at",
@@ -88,7 +90,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"reference_diagram": "Namunaviy diagrammada kamida bitta obyekt bo'lsin."})
         attrs["reference_diagram"] = diagram
         # ER laboratoriyasida SQL ishlatilmaydi
-        attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = ""
+        attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["given_diagram"] = None
         return attrs
 
@@ -98,14 +100,25 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         setup_sql = attrs.get("setup_sql", current.setup_sql if current else "")
         solution_sql = attrs.get("solution_sql", current.solution_sql if current else "")
         hidden_sql = attrs.get("hidden_setup_sql", current.hidden_setup_sql if current else "")
-        changed = current is None or (setup_sql, solution_sql, hidden_sql) != (
+        plan_query = attrs.get("plan_query", current.plan_query if current else "")
+        plan_forbidden = attrs.get("plan_forbidden", current.plan_forbidden if current else "Seq Scan")
+        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden)
+        changed = current is None or values != (
             current.setup_sql,
             current.solution_sql,
             current.hidden_setup_sql,
+            current.plan_query,
+            current.plan_forbidden,
         )
+        if plan_query.strip() and not solution_sql.strip():
+            raise serializers.ValidationError({"solution_sql": "Reja tekshiriladigan laboratoriyada namunaviy yechim (indeks) kerak."})
         if changed and (setup_sql.strip() or solution_sql.strip() or hidden_sql.strip()):
             try:
                 validate_lab_sql(setup_sql, solution_sql, hidden_sql)
+                if plan_query.strip():
+                    validate_plan(
+                        setup_sql, solution_sql, plan_query, [item.strip() for item in plan_forbidden.split(",") if item.strip()]
+                    )
             except LabSetupError as exc:
                 raise serializers.ValidationError({exc.field: f"Kod xato berdi. {format_error(exc.error)}"})
             except SandboxUnavailable:
@@ -140,6 +153,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "theory",
             "setup_sql",
             "given_diagram",
+            "plan_query",
             "author",
             "created_at",
             "my_progress",

@@ -27,6 +27,11 @@ class Lab(models.Model):
     # SQL laboratoriyasida talabaga beriladigan ER-model (ER → SQL): talaba shu model bo'yicha jadvallarni yaratadi.
     # Talabaga ko'rinadi; tekshiruv o'zgarmaydi — jadvallar namunaviy yechim bilan solishtiriladi
     given_diagram = models.JSONField("berilgan ER-model", null=True, blank=True)
+    # Indeks laboratoriyasi: talaba kodidan keyin shu so'rovning rejasi (EXPLAIN) olinadi va unda taqiqlangan
+    # tugunlar (masalan, Seq Scan) bo'lmasligi kerak. So'rovning o'zi bajarilmaydi. Talabaga ko'rinadi
+    plan_query = models.TextField("rejasi tekshiriladigan so'rov", blank=True, max_length=5000)
+    # Vergul bilan: rejada bo'lmasligi kerak bo'lgan tugunlar
+    plan_forbidden = models.CharField("rejada taqiqlangan tugunlar", max_length=200, blank=True, default="Seq Scan")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="muallif",

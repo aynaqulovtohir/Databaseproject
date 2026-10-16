@@ -174,6 +174,62 @@ HIDDEN_MISMATCH = (
 )
 
 
+# Indeks laboratoriyasida taqiqlash mumkin bo'lgan reja tugunlari va talabaga tushuntirish
+PLAN_NODE_TIPS = {
+    "Seq Scan": "jadval boshidan oxirigacha to'liq o'qilyapti — shartdagi ustun(lar)ga mos indeks kerak",
+    "Sort": "natija alohida saralanyapti — indeks saralash tartibini ham qamrab olsin",
+    "Bitmap Heap Scan": "indeks faqat qisman ishlatilyapti — shartning barcha ustunlarini qamrab oluvchi indeks kerak",
+}
+
+
+# Taqiqlangan tugun bo'lmasa ham, reja namunaviy yechimnikidan shuncha marta qimmat bo'lsa — indeks mos emas
+# (masalan, ustunlar tartibi teskari tarkibli indeks). To'g'ri indekslar odatda ~1x, noto'g'rilari 8x dan ortiq
+PLAN_COST_FACTOR = 2.0
+
+
+def forbidden_nodes(lab):
+    return [item.strip() for item in lab.plan_forbidden.split(",") if item.strip()]
+
+
+def _plan_differences(outcome, forbidden):
+    if outcome.plan_error:
+        return [f"Tekshiriladigan so'rovning rejasini olib bo'lmadi: {outcome.plan_error.message}"]
+    differences = []
+    for node_type in forbidden:
+        relations = sorted({node.relation for node in outcome.plan_nodes if node.node_type == node_type and node.relation})
+        if any(node.node_type == node_type for node in outcome.plan_nodes):
+            where = f" ({', '.join(relations)})" if relations else ""
+            differences.append(f"So'rov rejasida hali ham «{node_type}» bor{where}: {PLAN_NODE_TIPS.get(node_type, '')}.")
+    return differences
+
+
+def validate_plan(setup_sql, solution_sql, plan_query, forbidden):
+    """Indeks laboratoriyasi: indekssiz rejada taqiqlangan tugun bor, namunaviy yechimdan keyin esa yo'q."""
+    unknown = [item for item in forbidden if item not in PLAN_NODE_TIPS]
+    if unknown or not forbidden:
+        raise LabSetupError(
+            "plan_forbidden", SqlError(f"Ruxsat etilgan tugunlar: {', '.join(PLAN_NODE_TIPS)}.")
+        )
+    before = run_sql("SELECT 1", setup_sql, plan_query)
+    if before.error or before.plan_error:
+        raise LabSetupError("plan_query", before.error or before.plan_error)
+    if not _plan_differences(before, forbidden):
+        raise LabSetupError(
+            "plan_query",
+            SqlError("Indekssiz ham rejada taqiqlangan tugun yo'q: laboratoriya hech narsani tekshirmaydi."),
+        )
+    after = run_sql(solution_sql, setup_sql, plan_query)
+    if after.error:
+        raise LabSetupError("solution_sql", after.error)
+    remaining = _plan_differences(after, forbidden)
+    if remaining:
+        raise LabSetupError("solution_sql", SqlError(f"Namunaviy yechimdan keyin ham: {remaining[0]}"))
+
+
+def _plan_payload(outcome):
+    return outcome.plan or None
+
+
 def _table_columns(tables):
     return {name: set(state.columns) for name, state in tables.items()}
 
@@ -229,7 +285,7 @@ def try_code(lab, sql_code):
 
     Namunaviy yechim ishga tushirilmaydi: javobdan yechim haqida hech narsa bilib bo'lmaydi.
     """
-    outcome = run_sql(sql_code, lab.setup_sql)
+    outcome = run_sql(sql_code, lab.setup_sql, lab.plan_query)
     if outcome.setup_failed:
         raise LabSetupError("setup_sql", outcome.error)
     return {
@@ -237,6 +293,7 @@ def try_code(lab, sql_code):
         "result": _result_payload(outcome.result),
         "status_message": outcome.status_message,
         "tables": _tables_payload(outcome.tables),
+        "plan": _plan_payload(outcome),
     }
 
 
@@ -260,14 +317,15 @@ def _passes_hidden(lab, sql_code, ordered):
 
 def check_code(lab, sql_code):
     """Kodni ishga tushiradi va tekshiruv natijasini lug'at ko'rinishida qaytaradi."""
-    outcome = run_sql(sql_code, lab.setup_sql)
+    outcome = run_sql(sql_code, lab.setup_sql, lab.plan_query)
     if outcome.setup_failed:
         raise LabSetupError("setup_sql", outcome.error)
 
     has_solution = bool(lab.solution_sql.strip())
     differences = []
+    expected = None
     if outcome.error is None and has_solution:
-        expected = run_sql(lab.solution_sql, lab.setup_sql)
+        expected = run_sql(lab.solution_sql, lab.setup_sql, lab.plan_query)
         if expected.error:
             raise LabSetupError("setup_sql" if expected.setup_failed else "solution_sql", expected.error)
         ordered = bool(re.search(r"\border\s+by\b", lab.solution_sql, re.IGNORECASE))
@@ -275,6 +333,21 @@ def check_code(lab, sql_code):
         differences += _compare_tables(outcome.tables, expected.tables)
         if not differences and lab.hidden_setup_sql.strip() and not _passes_hidden(lab, sql_code, ordered):
             differences = [HIDDEN_MISMATCH]
+    if outcome.error is None and lab.plan_query.strip():
+        plan_differences = _plan_differences(outcome, forbidden_nodes(lab))
+        if (
+            not plan_differences
+            and expected is not None
+            and expected.plan_cost
+            and outcome.plan_cost is not None
+            and outcome.plan_cost > PLAN_COST_FACTOR * expected.plan_cost
+        ):
+            plan_differences.append(
+                "Rejada taqiqlangan tugun yo'q, lekin so'rov hali ham sekin: rejalashtiruvchi baholagan narx "
+                f"kutilganidan {outcome.plan_cost / expected.plan_cost:.0f} marta yuqori. Indeks so'rovdagi shartga "
+                "mos kelishini tekshiring (tarkibli indeksda ustunlar tartibi muhim)."
+            )
+        differences += plan_differences
 
     return {
         "is_correct": outcome.error is None and not differences,
@@ -283,4 +356,5 @@ def check_code(lab, sql_code):
         "status_message": outcome.status_message,
         "differences": differences[:MAX_DIFFERENCES],
         "checked_against_solution": has_solution,
+        "plan": _plan_payload(outcome),
     }

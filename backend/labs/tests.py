@@ -73,6 +73,16 @@ class SandboxTests(APITestCase):
         self.assertIsNone(run_sql("CREATE TABLE t (id INT);").error)
         self.assertIsNone(run_sql("CREATE TABLE t (id INT);").error)
 
+    def test_too_much_data_is_stopped(self):
+        """Diskni to'ldirish: hajm chegarasidan oshgan kod to'xtatiladi (chegara testda kichraytirilgan)."""
+        from . import sandbox
+
+        code = "CREATE TABLE t (s TEXT);" + "INSERT INTO t SELECT repeat('x', 500) FROM generate_series(1, 20000);" * 200
+        with patch.object(sandbox, "MAX_STORAGE_BYTES", sandbox._storage_used_now() + 20 * 1024 * 1024):
+            outcome = run_sql(code)
+        self.assertIn("juda ko'p ma'lumot", outcome.error.message)
+        self.assertIsNone(run_sql("SELECT 1").error)
+
     def test_platform_tables_are_unreachable(self):
         for script in ["SELECT * FROM users_user;", "SELECT * FROM public.users_user;"]:
             self.assertIsNotNone(run_sql(script).error, script)
@@ -1738,3 +1748,122 @@ class ErSqlLabsTests(BaseTestCase):
         Lab.objects.filter(pk=self.lab.pk).update(given_diagram=diagram)
         copy = Lab.objects.get(pk=self.client.post(f"{self.url}duplicate/").data["id"])
         self.assertEqual(copy.given_diagram, diagram)
+
+
+class IndexLabsTests(BaseTestCase):
+    """Indeks va EXPLAIN: reja talaba sessiyasida tekshiriladi, aldash urinishlari o'tmaydi (index_labs.py)."""
+
+    @staticmethod
+    def index_lab(number):
+        from .index_labs import INDEX_LABS
+
+        data = dict(INDEX_LABS[number - 1])
+        data.pop("theory")
+        return Lab(**data)
+
+    def check(self, number, code):
+        from .checker import check_code
+
+        return check_code(self.index_lab(number), code)
+
+    def test_solutions_pass(self):
+        from .index_labs import INDEX_LABS
+
+        for number, lab_data in enumerate(INDEX_LABS, start=1):
+            result = self.check(number, lab_data["solution_sql"])
+            self.assertTrue(result["is_correct"], (number, result["differences"]))
+            self.assertTrue(any("Index" in line for line in result["plan"]), number)
+
+    def test_wrong_or_missing_indexes_fail(self):
+        cases = [
+            (1, "SELECT 1", "Seq Scan"),
+            (1, "CREATE INDEX ON foydalanuvchi (ism)", "Seq Scan"),
+            # Faqat mijoz_id: qidiruv tezlashadi, lekin saralash qoladi
+            (2, "CREATE INDEX ON buyurtma (mijoz_id)", "Sort"),
+            # Ustunlar tartibi teskari yoki faqat sana: Sort yo'q, lekin reja ancha qimmat
+            (2, "CREATE INDEX ON buyurtma (sana, mijoz_id)", "marta yuqori"),
+            (2, "CREATE INDEX ON buyurtma (sana)", "marta yuqori"),
+            # Oddiy indeks lower(email) ga yordam bermaydi
+            (3, "CREATE INDEX ON mijoz (email)", "Seq Scan"),
+        ]
+        for number, code, node in cases:
+            result = self.check(number, code)
+            self.assertFalse(result["is_correct"], code)
+            self.assertTrue(any(node in item for item in result["differences"]), (code, result["differences"]))
+
+    def test_cheating_attempts_fail(self):
+        attempts = [
+            "SET enable_seqscan = off",
+            "SET enable_seqscan = off; SET enable_sort = off; SET enable_bitmapscan = off",
+            # Ma'lumotni o'chirib yuborish yoki jadvalni almashtirish
+            "TRUNCATE foydalanuvchi; CREATE INDEX ON foydalanuvchi (email)",
+            "DELETE FROM foydalanuvchi WHERE id > 10; CREATE INDEX ON foydalanuvchi (email)",
+            "ALTER TABLE foydalanuvchi RENAME TO f2; CREATE VIEW foydalanuvchi AS SELECT * FROM f2",
+            "DROP TABLE foydalanuvchi",
+        ]
+        for code in attempts:
+            self.assertFalse(self.check(1, code)["is_correct"], code)
+
+    def test_alternative_correct_indexes_pass(self):
+        cases = [
+            (1, "ALTER TABLE foydalanuvchi ADD CONSTRAINT email_noyob UNIQUE (email)"),
+            (1, "CREATE INDEX ON foydalanuvchi USING hash (email)"),
+            (1, "CREATE INDEX ON foydalanuvchi (email, ism)"),
+            (2, "CREATE INDEX ON buyurtma (mijoz_id, sana DESC)"),
+            (2, "CREATE INDEX ON buyurtma (mijoz_id, sana, summa)"),
+            (3, "CREATE INDEX ON mijoz USING hash (lower(email))"),
+            (3, "CREATE INDEX ON mijoz ((lower(email)))"),
+        ]
+        for number, code in cases:
+            result = self.check(number, code)
+            self.assertTrue(result["is_correct"], (code, result["differences"]))
+
+    def test_try_mode_shows_plan(self):
+        from .checker import try_code
+
+        result = try_code(self.index_lab(1), "SELECT 1")
+        self.assertTrue(result["plan"][0].startswith("Seq Scan"))
+        self.assertNotIn("is_correct", result)
+
+    def test_theory_examples_run(self):
+        import re
+
+        from .index_labs import INDEX_LABS
+
+        for lab_data in INDEX_LABS:
+            examples = re.findall(r"```sql\n(.*?)```", lab_data["theory"], re.DOTALL)
+            self.assertTrue(examples, lab_data["title"])
+            for code in examples:
+                self.assertIsNone(run_sql(code).error, lab_data["title"])
+                self.assertNotIn(lab_data["solution_sql"], code)
+
+    def test_api_visibility_and_validation(self):
+        from .index_labs import INDEX_LABS
+
+        lab_data = INDEX_LABS[0]
+        self.auth_as(self.teacher_a)
+        fields = {"setup_sql": lab_data["setup_sql"], "plan_query": lab_data["plan_query"]}
+        # Namunaviy yechim indeks yaratmasa — rad etiladi
+        response = self.client.patch(self.url, {**fields, "solution_sql": "SELECT 1"}, format="json")
+        self.assertIn("solution_sql", response.data)
+        # Indekssiz ham Seq Scan bo'lmasa — laboratoriya hech narsani tekshirmaydi
+        response = self.client.patch(
+            self.url,
+            {**fields, "solution_sql": lab_data["solution_sql"], "plan_query": "SELECT ism FROM foydalanuvchi WHERE id = 5"},
+            format="json",
+        )
+        self.assertIn("plan_query", response.data)
+        response = self.client.patch(
+            self.url, {**fields, "solution_sql": lab_data["solution_sql"], "plan_forbidden": "Hash Join"}, format="json"
+        )
+        self.assertIn("plan_forbidden", response.data)
+        response = self.client.patch(self.url, {**fields, "solution_sql": lab_data["solution_sql"]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        self.auth_as(self.student_a1)
+        data = self.client.get(self.url).data
+        self.assertEqual(data["plan_query"], lab_data["plan_query"])
+        self.assertNotIn("plan_forbidden", data)
+        response = self.run_code("CREATE INDEX ON foydalanuvchi (email)")
+        self.assertTrue(response.data["is_correct"], response.data["differences"])
+        self.assertTrue(response.data["plan"])

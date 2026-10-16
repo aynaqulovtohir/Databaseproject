@@ -3,6 +3,7 @@ import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Se
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
+import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
@@ -122,6 +123,19 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
           ) : null}
         </>
       )}
+    </div>
+  )
+}
+
+function PlanView({ plan }: { plan?: string[] | null }) {
+  if (!plan?.length) return null
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">So'rov rejasi (EXPLAIN)</h3>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Shartdagi so'rov qanday bajarilishi: Seq Scan — jadval to'liq o'qiladi, Index Scan — indeks ishlatiladi.
+      </p>
+      <SqlCode code={plan.join('\n')} />
     </div>
   )
 }
@@ -260,6 +274,7 @@ function TryResult({ result }: { result: LabTryResult }) {
       <p className="text-xs text-muted-foreground">
         Bu sinov: natija namunaviy yechim bilan solishtirilmadi va urinish hisoblanmadi.
       </p>
+      <PlanView plan={result.plan} />
       {result.result ? <ResultTable table={result.result} /> : null}
       <TablesSummary tables={result.tables} />
     </div>
@@ -422,6 +437,7 @@ export function LabRunner({ labId, initialCode = '', gradable = false, onResult 
         <div className="grid gap-4" aria-live="polite">
           {result.grade ? <GradeCard grade={result.grade} best={result.best_grade} /> : null}
           <Verdict result={result} />
+          <PlanView plan={result.plan} />
           {result.result ? <ResultTable table={result.result} /> : null}
           {!result.error && !result.result && result.status_message ? (
             <p className="text-xs text-muted-foreground">

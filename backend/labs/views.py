@@ -384,6 +384,8 @@ class LabViewSet(viewsets.ModelViewSet):
             hidden_setup_sql=lab.hidden_setup_sql,
             reference_diagram=lab.reference_diagram,
             given_diagram=lab.given_diagram,
+            plan_query=lab.plan_query,
+            plan_forbidden=lab.plan_forbidden,
             author=request.user,
         )
         copy.groups.set(groups)

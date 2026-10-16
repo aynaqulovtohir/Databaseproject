@@ -72,6 +72,15 @@ function ConditionCard({ lab }: { lab: Lab }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
+        {lab.kind === 'sql' && lab.plan_query?.trim() ? (
+          <div>
+            <h3 className="mb-1 text-sm font-medium">Tekshiriladigan so'rov</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.
+            </p>
+            <SqlCode code={lab.plan_query.trim()} />
+          </div>
+        ) : null}
         {lab.kind === 'sql' && lab.given_diagram?.entities.length ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Berilgan ER-model</h3>
