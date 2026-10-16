@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FormField } from '@/components/FormField'
+import { PasswordInput } from '@/components/PasswordInput'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
@@ -163,9 +164,8 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
             error={errors.password}
             hint="Kamida 8 belgi; faqat raqamlardan iborat bo'lmasin."
           >
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               className="h-10"
               autoComplete="new-password"
               aria-invalid={Boolean(errors.password)}

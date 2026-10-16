@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 
 import { FormField } from '@/components/FormField'
+import { PasswordInput } from '@/components/PasswordInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -70,10 +71,9 @@ export function LoginPage() {
                 />
               </FormField>
               <FormField id="password" label="Parol">
-                <Input
+                <PasswordInput
                   id="password"
                   name="password"
-                  type="password"
                   autoComplete="current-password"
                   required
                   className="h-10"
