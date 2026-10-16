@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AnalysisPanel } from '@/components/AnalysisPanel'
+import { VivaPanel } from '@/components/VivaPanel'
 import { AssignmentDialog } from '@/components/AssignmentDialog'
 import { ChatPanel } from '@/components/ChatPanel'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -325,6 +326,12 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
             <div>
               <h3 className="mb-2 text-sm font-medium">AI tahlili</h3>
               <AnalysisPanel submissionId={submission.id} />
+            </div>
+          ) : null}
+          {user.ai_enabled ? (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Loyiha himoyasi</h3>
+              <VivaPanel submissionId={submission.id} />
             </div>
           ) : null}
         </div>

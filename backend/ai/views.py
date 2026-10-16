@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from learning.access import visible_assignments
@@ -17,7 +18,7 @@ from users.permissions import IsAdmin
 from submissions.access import visible_submissions
 
 from .client import AIError, AINotConfigured, AITransientError
-from .models import AIAnalysis, ChatMessage
+from .models import AIAnalysis, ChatMessage, VivaSession
 from .serializers import (
     ChatMessageSerializer,
     ChatQuestionSerializer,
@@ -173,3 +174,92 @@ class AIUsageView(APIView):
         if not days.isdigit() or not 1 <= int(days) <= 365:
             raise ValidationError({"days": "Kunlar soni 1 dan 365 gacha butun son bo'lsin."})
         return Response(usage_report(int(days)))
+
+
+def viva_payload(viva, staff):
+    data = {
+        "status": viva.status,
+        "questions": viva.questions,
+        "answers": viva.answers,
+        "feedback": viva.feedback,
+        "created_at": viva.created_at,
+        "answered_at": viva.answered_at,
+    }
+    if staff:
+        data["understanding"] = viva.understanding
+        data["teacher_summary"] = viva.teacher_summary
+    return data
+
+
+class SubmissionVivaView(APIView):
+    """Loyiha himoyasi. GET — holat (yo'q bo'lsa null); POST — talaba savollarni oladi;
+    POST answers/ {answers: [...]} — talaba javob beradi, AI baholaydi.
+
+    Savollar va baholash umumiy kunlik AI limitidan yechiladi. Tushunish darajasini faqat o'qituvchi ko'radi.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "lab_ai"
+
+    def get_throttles(self):
+        # O'qish cheklanmaydi, faqat AI'ga yuboriladigan so'rovlar
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def submission(self, request, pk):
+        return get_object_or_404(visible_submissions(request.user), pk=pk)
+
+    def get(self, request, submission_pk, step=None):
+        submission = self.submission(request, submission_pk)
+        viva = VivaSession.objects.filter(submission=submission).first()
+        return Response({"viva": viva_payload(viva, not request.user.is_student) if viva else None})
+
+    def post(self, request, submission_pk, step=None):
+        from labs.models import AIAction
+        from labs.quota import ai_error_response, record_ai_action, refuse_ai
+
+        from .viva import MAX_ANSWER_LENGTH, evaluate_answers, generate_questions
+
+        if not request.user.is_student:
+            raise PermissionDenied("Himoyadan faqat yechim egasi o'tadi.")
+        submission = self.submission(request, submission_pk)
+        refused = refuse_ai(request.user)
+        if refused:
+            return refused
+        viva = VivaSession.objects.filter(submission=submission).first()
+
+        if step is None:
+            if viva:
+                raise ValidationError({"detail": "Bu yechim bo'yicha himoya savollari allaqachon berilgan."})
+            try:
+                questions = generate_questions(submission)
+            except AIError as exc:
+                return ai_error_response(exc, "so'rov")
+            viva = VivaSession.objects.create(submission=submission, questions=questions)
+            record_ai_action(request.user, AIAction.Kind.VIVA)
+            return Response({"viva": viva_payload(viva, False)}, status=status.HTTP_201_CREATED)
+
+        if viva is None or viva.status != VivaSession.Status.ASKED:
+            raise ValidationError({"detail": "Javob beriladigan himoya savollari yo'q."})
+        answers = request.data.get("answers")
+        if (
+            not isinstance(answers, list)
+            or len(answers) != len(viva.questions)
+            or not all(isinstance(answer, str) and len(answer) <= MAX_ANSWER_LENGTH for answer in answers)
+        ):
+            raise ValidationError(
+                {"answers": f"Har bir savolga javob yozing (har biri {MAX_ANSWER_LENGTH} belgidan oshmasin)."}
+            )
+        answers = [answer.strip() for answer in answers]
+        if not any(answers):
+            raise ValidationError({"answers": "Kamida bitta savolga javob yozing."})
+        try:
+            feedback, understanding, summary = evaluate_answers(submission, viva.questions, answers)
+        except AIError as exc:
+            return ai_error_response(exc, "javob")
+        viva.answers, viva.feedback = answers, feedback
+        viva.understanding, viva.teacher_summary = understanding, summary
+        viva.status = VivaSession.Status.EVALUATED
+        viva.answered_at = timezone.now()
+        viva.save()
+        record_ai_action(request.user, AIAction.Kind.VIVA)
+        return Response({"viva": viva_payload(viva, False)})

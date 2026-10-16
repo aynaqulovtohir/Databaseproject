@@ -118,3 +118,36 @@ class AIUsage(models.Model):
 
     def __str__(self):
         return f"{self.get_purpose_display()} / {self.model_name}: {self.input_tokens}+{self.output_tokens}"
+
+
+class VivaSession(models.Model):
+    """Loyiha himoyasi: AI talabaning O'Z yechimi bo'yicha savollar beradi, talaba javob yozadi, AI baholaydi.
+
+    Maqsad — talaba yechimni tushunganini (va o'zi yozganini) tekshirish. Bahoga avtomatik ta'sir qilmaydi:
+    tushunish darajasini o'qituvchi ko'radi va o'zi qaror qiladi.
+    """
+
+    class Status(models.TextChoices):
+        ASKED = "asked", "Savollar berildi"
+        EVALUATED = "evaluated", "Baholandi"
+
+    submission = models.OneToOneField(
+        "submissions.Submission", verbose_name="yechim", on_delete=models.CASCADE, related_name="viva"
+    )
+    status = models.CharField("holati", max_length=10, choices=Status.choices, default=Status.ASKED)
+    questions = models.JSONField("savollar", default=list)
+    answers = models.JSONField("javoblar", default=list, blank=True)
+    # Talabaga ko'rinadi: har bir javob bo'yicha izoh
+    feedback = models.JSONField("izohlar", default=list, blank=True)
+    # Faqat o'qituvchi va adminga: tushunish darajasi (0-100) va xulosa
+    understanding = models.PositiveSmallIntegerField("tushunish darajasi", null=True, blank=True)
+    teacher_summary = models.TextField("o'qituvchi uchun xulosa", blank=True)
+    created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
+    answered_at = models.DateTimeField("javob berilgan vaqti", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "loyiha himoyasi"
+        verbose_name_plural = "loyiha himoyalari"
+
+    def __str__(self):
+        return f"{self.submission} ({self.get_status_display()})"

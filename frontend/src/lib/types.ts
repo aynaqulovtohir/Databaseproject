@@ -407,6 +407,19 @@ export interface BuggyCode {
   differences: string[]
 }
 
+/** Loyiha himoyasi (viva) */
+export interface Viva {
+  status: 'asked' | 'evaluated'
+  questions: string[]
+  answers: string[]
+  feedback: { score: 0 | 1 | 2; comment: string }[]
+  created_at: string
+  answered_at: string | null
+  /** Faqat o'qituvchi va adminga */
+  understanding?: number | null
+  teacher_summary?: string
+}
+
 /** Laboratoriya murabbiyi bilan yozishma */
 export interface LabChatState {
   messages: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }[]
