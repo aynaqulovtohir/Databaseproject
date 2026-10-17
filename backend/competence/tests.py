@@ -2,7 +2,7 @@
 from io import StringIO
 
 from django.core.management import CommandError, call_command
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
 from labs.models import LabAttempt
@@ -146,6 +146,8 @@ class CompetenceTests(BaseTestCase):
         # Suhbatni boshlamagan talaba — o'lchanmagan (nol emas)
         self.assertIsNone(self.score(final, self.student_a2, component)["score"])
 
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
+
     def test_comparison_splits_experimental_and_control(self):
         self.group_b.ai_enabled = False
         self.group_b.save()
@@ -170,6 +172,8 @@ class CompetenceTests(BaseTestCase):
         self.assertEqual([row["id"] for row in groups], [self.group_b.pk])
         self.assertEqual(self.client.get(REPORT, {"group": self.group_b.pk, "stage": "boshqa"}).status_code, 400)
         self.assertEqual(self.client.get(REPORT, {"group": "x"}).status_code, 400)
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_research_export_has_anonymous_competence_rows(self):
         import csv
@@ -249,6 +253,7 @@ class StatsTests(SimpleTestCase):
 
 
 class EfficiencyTests(CompetenceTests):
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
     def test_efficiency_compares_cohorts_and_growth(self):
         self.group_b.ai_enabled = False
         self.group_b.save()
@@ -274,6 +279,8 @@ class EfficiencyTests(CompetenceTests):
         # O'sishlar farqi: tajriba [50, 50], nazorat [20, 10] — tajriba guruhi ko'proq o'sgan
         self.assertGreater(row["growth"]["difference"]["t"], 0)
         self.assertEqual(row["growth"]["control"]["paired"]["mean_diff"], 15.0)
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_delayed_stage_and_retention(self):
         self.group_b.ai_enabled = False

@@ -2,6 +2,7 @@ import { Database, LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { ConsentPrompt } from '@/components/Consent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -100,6 +101,7 @@ export function AppShell() {
         <main className="mx-auto w-full max-w-6xl flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
+        <ConsentPrompt />
       </div>
     </div>
   )

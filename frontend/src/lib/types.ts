@@ -17,6 +17,22 @@ export interface Me {
   teaching_groups: GroupShort[]
   /** Talabaga AI yordamchisi ko'rsatiladimi (tajribada nazorat guruhida o'chiriladi) */
   ai_enabled: boolean
+  /** Talabadan tadqiqotga rozilik so'ralishi kerakmi */
+  consent_needed: boolean
+}
+
+/** Ilmiy tadqiqotda ishtirok etishga rozilik */
+export interface ConsentStatus {
+  required: boolean
+  version: string
+  title: string
+  /** Rozilik matni xatboshilari */
+  text: string[]
+  contact: string
+  /** null — hali qaror berilmagan */
+  agreed: boolean | null
+  decided_at: string | null
+  needs_decision: boolean
 }
 
 export interface TelegramStatus {
@@ -318,6 +334,52 @@ export interface Lab {
   created_at: string
   /** Faqat talabaga keladi */
   my_progress?: LabProgress
+  /** Modul (id) — faqat admin va o'qituvchi yuboradi */
+  module?: number | null
+  module_detail: LabModuleShort | null
+  /** Moduldagi o'rni (1 dan) */
+  position: number
+  /** O'qituvchi belgilagan murakkablik: 1 — eng sodda, 5 — eng murakkab */
+  level: number | null
+  /** Talaba uchun: oldingi laboratoriya yechilmaguncha yopiq */
+  locked?: boolean
+  blocked_by?: { id: number; title: string } | null
+}
+
+export interface LabModuleShort {
+  id: number
+  title: string
+  description: string
+  order: number
+  /** Ichidagi laboratoriyalar oldingisi yechilgandan keyin ochiladi */
+  sequential: boolean
+}
+
+export interface LabModule extends LabModuleShort {
+  author: PersonShort
+  labs: { id: number; title: string; kind: LabKind; level: number | null; position: number }[]
+  created_at: string
+}
+
+/** Qiynalayotgan laboratoriya bo'yicha shaxsiy tavsiya */
+export interface StudyAdvice {
+  summary: string
+  struggles: { title: string; explanation: string }[]
+  steps: string[]
+  review: string[]
+  source: 'ai' | 'rules'
+  attempts: number
+  created_at: string
+}
+
+export interface StudyAdviceState {
+  advice: StudyAdvice | null
+  /** Tavsiya oxirgi urinishdan keyin tuzilgan */
+  fresh: boolean
+  wrong_attempts: number
+  min_wrong: number
+  can_request: boolean
+  ai: boolean
 }
 
 export interface LabRunError {
@@ -1056,4 +1118,69 @@ export interface AIQualityState {
     total: number
     ratings: { rating: AIRating; label: string; count: number; percent: number | null; ci95: [number, number] | null }[]
   }[]
+}
+
+// ---------- Laboratoriyalarning psixometrik tahlili ----------
+
+export type LabLevelKey = 'very_easy' | 'easy' | 'medium' | 'hard' | 'very_hard'
+
+export interface LabLevel {
+  /** 1 — juda oson ... 5 — juda qiyin */
+  number: number
+  key: LabLevelKey
+  label: string
+}
+
+export interface ScaleLabel {
+  key: string
+  label: string
+}
+
+export interface LabAnalysisRow {
+  id: number
+  title: string
+  kind: 'sql' | 'er' | 'norm'
+  topic: string
+  assigned: number
+  started: number
+  /** Kamida min_students talaba boshlagan bo'lsa true */
+  analysed: boolean
+  in_reliability: boolean
+  solved_rate: number | null
+  first_try_rate: number | null
+  attempts_to_solve: number | null
+  minutes_to_solve: number | null
+  hint_rate: number | null
+  /** Qiyinlik indeksi (0-1): o'rtacha ball ulushi */
+  p: number | null
+  level: LabLevel | null
+  /** Tuzatilgan korrelyatsiya (ajrata olish) */
+  r: number | null
+  discrimination: ScaleLabel | null
+  /** Yuqori va quyi 27% farqi */
+  d: number | null
+  alpha_if_deleted: number | null
+  cohorts: Record<'ai' | 'control', { students: number; p: number | null }> | null
+  verdict: { key: 'good' | 'review' | 'replace'; label: string } | null
+  advice: string[]
+}
+
+export interface LabAnalysis {
+  consent_required: boolean
+  students: number
+  excluded_no_consent: number
+  min_students: number
+  reliable_students: number
+  levels: (LabLevel & { above: number | null })[]
+  distribution: (LabLevel & { count: number })[]
+  reliability: {
+    alpha: number | null
+    interpretation: ScaleLabel | null
+    labs: number
+    students: number
+    mean: number | null
+    sd: number | null
+    sem: number | null
+  }
+  labs: LabAnalysisRow[]
 }

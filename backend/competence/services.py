@@ -24,6 +24,7 @@ from labs.models import InterviewMessage, Lab, LabAttempt, PeerReview
 from labs.peer_review import accuracy as peer_accuracy
 from quizzes.models import Question, QuizAttempt
 from quizzes.services import finalize_if_expired, likert_value, percent
+from users.consent import participant_ids
 from users.models import User
 
 from . import stats
@@ -337,10 +338,14 @@ COHORTS = ("experimental", "control")
 
 
 def collect_profiles(components, groups):
-    """Har bir guruh va kesim uchun talabalar profillari: [(guruh, talabalar, {kesim: [(ballar, umumiy)]})]."""
+    """Har bir guruh va kesim uchun talabalar profillari: [(guruh, talabalar, {kesim: [(ballar, umumiy)]})].
+
+    Tadqiqot hisobi (taqqoslash va samaradorlik): faqat tadqiqotga rozi talabalar (users/consent.py).
+    """
+    allowed = participant_ids()
     result = []
     for group in groups:
-        students = group_students(group)
+        students = [student for student in group_students(group) if allowed is None or student.pk in allowed]
         by_stage = {}
         for stage in STAGES:
             data = Data(components, students, stage)

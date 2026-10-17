@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from .views import (
     ChangePasswordView,
+    ConsentView,
     LoginView,
     LogoutView,
     MeView,
@@ -21,4 +22,5 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
     path("auth/me/", MeView.as_view(), name="auth-me"),
     path("auth/change-password/", ChangePasswordView.as_view(), name="auth-change-password"),
+    path("auth/consent/", ConsentView.as_view(), name="auth-consent"),
 ] + router.urls

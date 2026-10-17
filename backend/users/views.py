@@ -11,6 +11,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from . import consent
 from .models import StudentGroup, User
 from .permissions import IsAdmin
 from .serializers import (
@@ -138,3 +139,23 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Parol o'zgartirildi."}, status=status.HTTP_200_OK)
+
+
+class ConsentView(APIView):
+    """Tadqiqotga rozilik: GET — matn va joriy qaror, POST {"agreed": true|false} — talaba qarori."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "consent"
+
+    def get(self, request):
+        return Response(consent.status_payload(request.user))
+
+    def post(self, request):
+        if not request.user.is_student:
+            raise ValidationError({"detail": "Rozilik faqat talabalardan so'raladi."})
+        agreed = request.data.get("agreed")
+        if not isinstance(agreed, bool):
+            raise ValidationError({"agreed": "Qiymat true yoki false bo'lishi kerak."})
+        consent.record_decision(request.user, agreed)
+        return Response(consent.status_payload(request.user))

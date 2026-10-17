@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { CheckList } from '@/components/CheckList'
 import { ErEditor } from '@/components/ErEditor'
 import { FormField } from '@/components/FormField'
+import { LEVEL_LABELS } from '@/components/LabLevel'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -17,7 +18,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabKind } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'topic', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'topic', 'level', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -69,6 +70,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
   const [topic, setTopic] = useState(lab?.topic ?? '')
+  const [level, setLevel] = useState(lab?.level ? String(lab.level) : '')
   const [normAttributes, setNormAttributes] = useState(lab?.norm_task?.attributes.join(', ') ?? '')
   const [normFds, setNormFds] = useState(fdsText(lab))
   const [normTarget, setNormTarget] = useState<'3NF' | 'BCNF'>(lab?.norm_task?.target ?? '3NF')
@@ -77,7 +79,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const common = { title: title.trim(), description, theory, topic, groups: groupIds }
+      const common = { title: title.trim(), description, theory, topic, level: level ? Number(level) : null, groups: groupIds }
       const body =
         kind === 'er'
           ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
@@ -398,6 +400,26 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               {TOPIC_OPTIONS.map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField
+            id="lab_level"
+            label="Murakkablik darajasi"
+            error={errors.level}
+            hint="Modulda laboratoriyalar soddadan murakkabga joylanadi. Tartib va modul — «Modullar» oynasida."
+          >
+            <select
+              id="lab_level"
+              className="h-10 justify-self-start rounded-md border bg-background px-2 text-sm"
+              value={level}
+              onChange={(event) => setLevel(event.target.value)}
+            >
+              <option value="">Belgilanmagan</option>
+              {LEVEL_LABELS.map((label, index) => (
+                <option key={label} value={index + 1}>
+                  {index + 1} — {label}
                 </option>
               ))}
             </select>
