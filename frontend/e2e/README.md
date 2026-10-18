@@ -36,3 +36,9 @@ Buyruq faqat `E2E=1` bo'lsa va baza nomi `_e2e` bilan tugasa ishlaydi.
 Login minutiga 5 marta bilan cheklangan, shuning uchun har bir rol uchun bir marta kiriladi
 (`auth.setup.ts`) va sessiya `e2e/.auth/` da saqlanib boshqa testlarda qayta ishlatiladi.
 Yangi test login qilsa, jami loginlar soni 5 dan oshmasligini kuzating.
+
+## Playwright'ni yangilash
+
+Dependabot `@playwright/test` ni yangilamaydi: paket versiyasi (`package.json`, aniq versiya) va
+`docker-compose.e2e.yml` dagi `mcr.microsoft.com/playwright:vX.Y.Z-noble` obrazi bir xil bo'lishi kerak.
+Ikkalasini bitta PR'da birga o'zgartiring.

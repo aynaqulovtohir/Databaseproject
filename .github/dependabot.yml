@@ -1,0 +1,60 @@
+# Haftalik yangilash PR'lari: har biri CI (backend, frontend, brauzer testlari) dan o'tadi, merge qo'lda.
+# cooldown: yangi versiya kamida 14 kun e'lon qilingan bo'lishi kerak (buzilgan yoki zararli reliz odatda shu
+# muddatda olib tashlanadi). Xavfsizlik tuzatishlari bu muddatni kutmaydi.
+# Kichik (minor/patch) yangilanishlar har ekotizimda bitta PR'ga yig'iladi, katta (major) versiyalar alohida keladi.
+version: 2
+updates:
+  # Workflow'dagi action'lar SHA bilan bog'langan: Dependabot SHA'ni ham, yonidagi versiya izohini ham yangilaydi
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    groups:
+      pip-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+    ignore:
+      # Versiyasi docker-compose.e2e.yml dagi Playwright obrazi bilan bir xil bo'lishi kerak: ikkalasi birga, qo'lda
+      - dependency-name: "@playwright/test"
+
+  # Obrazlar: katta versiyalar (Node, Caddy, Python) qo'lda yangilanadi
+  - package-ecosystem: docker
+    directories: [/backend, /frontend]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    groups:
+      docker:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # 3.13 -> 3.14 kabi o'tish ham katta o'zgarish
+      - dependency-name: "*python"
+        update-types: ["version-update:semver-minor"]
