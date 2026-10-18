@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 import { storageState, type SavedRole } from './accounts.ts'
 import { collectPageErrors, expectPageOpened } from './helpers.ts'

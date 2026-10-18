@@ -146,3 +146,7 @@ docker compose -f docker-compose.prod.yml logs --tail 50 backup    # zaxira nusx
 - Talabalar SQL kodi `lab_db` da bajariladi: u asosiy bazadan ajratilgan, internetga chiqmaydi va xotira/CPU/disk
   bilan cheklangan.
 - Login'ga bitta IP'dan daqiqasiga 5 ta urinish mumkin (Caddy orqali foydalanuvchining haqiqiy IP'si aniqlanadi).
+- Refresh token har yangilanishda almashtiriladi. Eski nusxa qayta kelsa (o'g'irlangan cookie belgisi)
+  foydalanuvchining barcha sessiyalari yopiladi va logda `Ishlatilgan refresh token qayta keldi` ogohlantirishi
+  chiqadi. Chiqish, parol almashtirish va bloklash ham sessiyalarni darhol yopadi (access token esa 30 daqiqagacha
+  ishlashda davom etadi). Bu o'zgarish birinchi marta o'rnatilganda hamma bir marta qayta kiradi.

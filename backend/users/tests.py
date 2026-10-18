@@ -1,9 +1,13 @@
 """Kirish va ruxsatlar testlari."""
-from django.core.cache import cache
-from rest_framework import status
-from rest_framework.test import APITestCase
+from datetime import timedelta
 
-from .models import StudentGroup, User
+from django.core.cache import cache
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APIClient, APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import IssuedRefreshToken, StudentGroup, User
 
 PASSWORD = "Kuchli-Parol-2026"
 
@@ -345,3 +349,122 @@ class SuperuserTests(APITestCase):
     def test_createsuperuser_gets_admin_role(self):
         user = User.objects.create_superuser("root", password=PASSWORD)
         self.assertEqual(user.role, User.Role.ADMIN)
+
+
+class RefreshRevocationTests(BaseTestCase):
+    """Refresh token almashtiriladi, bekor qilinadi va o'g'irlangan nusxa sessiyalarni yopadi (users/tokens.py)."""
+
+    def refresh(self, cookie=None):
+        if cookie is not None:
+            self.client.cookies["refresh_token"] = cookie
+        return self.client.post("/api/auth/refresh/")
+
+    def cookie(self):
+        return self.client.cookies["refresh_token"].value
+
+    def age_tokens(self, user):
+        # Token ikki daqiqa oldin almashtirilgandek: bir vaqtda ochilgan tablar oralig'idan ancha keyin
+        IssuedRefreshToken.objects.filter(user=user, used_at__isnull=False).update(
+            used_at=timezone.now() - timedelta(minutes=2)
+        )
+
+    def test_refresh_rotates_cookie_and_keeps_session_expiry(self):
+        self.login("student1")
+        first = self.cookie()
+        response = self.refresh()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        second = response.cookies["refresh_token"].value
+        self.assertNotEqual(second, first)
+        self.assertTrue(response.cookies["refresh_token"]["httponly"])
+        # Sessiya login vaqtidan hisoblanadi: yangilash uni uzaytirmaydi
+        self.assertEqual(RefreshToken(second)["exp"], RefreshToken(first)["exp"])
+        self.assertEqual(self.refresh().status_code, status.HTTP_200_OK)
+
+    def test_reused_token_revokes_all_sessions(self):
+        self.login("student1")
+        stolen = self.cookie()
+        self.assertEqual(self.refresh().status_code, status.HTTP_200_OK)
+        current = self.cookie()
+        self.age_tokens(self.student)
+        # Hujumchi eski nusxani ishlatadi: rad etiladi va haqiqiy foydalanuvchining sessiyasi ham yopiladi
+        response = self.refresh(stolen)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.cookies["refresh_token"].value, "")
+        self.assertEqual(self.refresh(current).status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(IssuedRefreshToken.objects.filter(user=self.student, revoked_at__isnull=True).exists())
+
+    def test_reuse_by_attacker_first_is_detected(self):
+        # Hujumchi birinchi bo'lib yangilaydi; foydalanuvchi eski cookie bilan kelganda ikkala sessiya yopiladi
+        self.login("student1")
+        stolen = self.cookie()
+        attacker = APIClient()
+        attacker.cookies["refresh_token"] = stolen
+        attacker_response = attacker.post("/api/auth/refresh/")
+        self.assertEqual(attacker_response.status_code, status.HTTP_200_OK)
+        self.age_tokens(self.student)
+        self.assertEqual(self.refresh(stolen).status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(attacker.post("/api/auth/refresh/").status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_concurrent_tabs_within_grace_get_access_only(self):
+        self.login("student1")
+        old = self.cookie()
+        self.assertEqual(self.refresh().status_code, status.HTTP_200_OK)
+        current = self.cookie()
+        # Ikkinchi tab xuddi shu paytda eski cookie bilan keldi
+        other_tab = APIClient()
+        other_tab.cookies["refresh_token"] = old
+        response = other_tab.post("/api/auth/refresh/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertNotIn("refresh_token", response.cookies)
+        # Sessiyalar yopilmadi
+        self.assertEqual(self.refresh(current).status_code, status.HTTP_200_OK)
+
+    def test_logout_revokes_token(self):
+        self.login("student1")
+        cookie = self.cookie()
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, status.HTTP_204_NO_CONTENT)
+        # Cookie nusxasi saqlab qolingan bo'lsa ham ishlamaydi
+        self.assertEqual(self.refresh(cookie).status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_with_bad_cookie(self):
+        self.client.cookies["refresh_token"] = "soxta-token"
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_change_password_revokes_other_sessions_keeps_current(self):
+        self.login("student1")
+        other_device = self.cookie()
+        self.auth_as(self.student)
+        response = self.client.post(
+            "/api/auth/change-password/", {"old_password": PASSWORD, "new_password": "Yangi-Parol-2026"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        current = response.cookies["refresh_token"].value
+        self.assertEqual(self.refresh(other_device).status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.refresh(current).status_code, status.HTTP_200_OK)
+
+    def admin_change_revokes(self, change):
+        student = APIClient()
+        student.post("/api/auth/login/", {"username": "student1", "password": PASSWORD})
+        self.auth_as(self.admin)
+        response = self.client.patch(f"/api/users/{self.student.pk}/", change)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Blokdan chiqarilsa ham eski sessiya qaytmaydi
+        User.objects.filter(pk=self.student.pk).update(is_active=True)
+        self.assertEqual(student.post("/api/auth/refresh/").status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_admin_password_reset_revokes_sessions(self):
+        self.admin_change_revokes({"password": "Admin-Bergan-2026"})
+
+    def test_admin_block_revokes_sessions(self):
+        self.admin_change_revokes({"is_active": False})
+
+    def test_unregistered_token_rejected(self):
+        # Ro'yxatga olinmagan (masalan, bu o'zgarishdan oldin berilgan) token imzosi to'g'ri bo'lsa ham qabul qilinmaydi
+        self.assertEqual(self.refresh(str(RefreshToken.for_user(self.student))).status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_expired_records_cleaned_on_login(self):
+        self.login("student1")
+        IssuedRefreshToken.objects.filter(user=self.student).update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.login("student1")
+        self.assertEqual(IssuedRefreshToken.objects.filter(user=self.student).count(), 1)
