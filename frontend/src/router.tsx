@@ -1,30 +1,13 @@
 import { Loader2 } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { AppShell } from '@/components/layout/AppShell'
+import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import type { Role } from '@/lib/types'
-import { AIUsagePage } from '@/pages/admin/AIUsagePage'
-import { AIQualityPage } from '@/pages/AIQualityPage'
-import { GroupsPage } from '@/pages/admin/GroupsPage'
-import { UsersPage } from '@/pages/admin/UsersPage'
-import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
-import { AssignmentsPage } from '@/pages/AssignmentsPage'
-import { ExpertPage } from '@/pages/ExpertPage'
-import { BlindReviewPage } from '@/pages/BlindReviewPage'
-import { CompetencePage } from '@/pages/CompetencePage'
-import { HomePage } from '@/pages/HomePage'
-import { LabDetailPage } from '@/pages/LabDetailPage'
-import { LabsPage } from '@/pages/LabsPage'
 import { LoginPage } from '@/pages/LoginPage'
-import { QuizDetailPage } from '@/pages/QuizDetailPage'
-import { QuizzesPage } from '@/pages/QuizzesPage'
-import { StatisticsPage } from '@/pages/StatisticsPage'
-import { MaterialsPage } from '@/pages/MaterialsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
-import { RiskPage } from '@/pages/RiskPage'
-import { ProfilePage } from '@/pages/ProfilePage'
-import { SubmissionPage } from '@/pages/SubmissionPage'
 
 function FullPageLoader() {
   return (
@@ -51,6 +34,42 @@ export function RequireRole({ roles }: { roles: Role[] }) {
   return <Outlet />
 }
 
+/** Sahifa kodi yuklanmadi (tarmoq uzildi yoki yangi versiya chiqdi) yoki sahifada kutilmagan xato. */
+function RouteError() {
+  return (
+    <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-4 text-center" role="alert">
+      <p className="text-sm text-muted-foreground">Sahifani ochib bo'lmadi. Internet aloqasini tekshirib, sahifani yangilang.</p>
+      <Button variant="outline" onClick={() => window.location.reload()}>
+        Yangilash
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Sahifa kodi alohida bo'lakda: faqat shu sahifa birinchi marta ochilganda yuklanadi.
+ * Login va 404 sahifalari bundan mustasno — ular darhol kerak bo'ladi.
+ */
+function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) {
+  return async () => {
+    try {
+      const module = await load()
+      sessionStorage.removeItem(RELOADED_KEY)
+      return { Component: module[name] }
+    } catch (error) {
+      // Yangi versiya chiqqach eski oynadagi bo'lak nomlari endi yo'q: bir marta yangilab ko'ramiz
+      if (!sessionStorage.getItem(RELOADED_KEY)) {
+        sessionStorage.setItem(RELOADED_KEY, '1')
+        window.location.reload()
+        return new Promise<never>(() => {})
+      }
+      throw error
+    }
+  }
+}
+
+const RELOADED_KEY = 'chunk-reload'
+
 function LoginRoute() {
   const { loading } = useAuth()
   if (loading) return <FullPageLoader />
@@ -58,44 +77,51 @@ function LoginRoute() {
 }
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginRoute /> },
-  // Ekspert baholashi: login yo'q, shaxsiy havola tokeni bilan
-  { path: '/expert/:token', element: <ExpertPage /> },
   {
-    element: <RequireAuth />,
+    // Sahifa birinchi ochilganda uning kodi yuklanguncha
+    HydrateFallback: FullPageLoader,
+    ErrorBoundary: RouteError,
     children: [
-      { path: '/', element: <HomePage /> },
-      { path: '/profile', element: <ProfilePage /> },
-      { path: '/materials', element: <MaterialsPage /> },
-      { path: '/assignments', element: <AssignmentsPage /> },
-      { path: '/assignments/:id', element: <AssignmentDetailPage /> },
-      { path: '/labs', element: <LabsPage /> },
-      { path: '/labs/:id', element: <LabDetailPage /> },
-      { path: '/quizzes', element: <QuizzesPage /> },
-      { path: '/quizzes/:id', element: <QuizDetailPage /> },
+      { path: '/login', element: <LoginRoute /> },
+      // Ekspert baholashi: login yo'q, shaxsiy havola tokeni bilan
+      { path: '/expert/:token', lazy: page(() => import('@/pages/ExpertPage'), 'ExpertPage') },
       {
-        element: <RequireRole roles={['admin', 'teacher']} />,
+        element: <RequireAuth />,
         children: [
-          { path: '/statistics', element: <StatisticsPage /> },
-          { path: '/competence', element: <CompetencePage /> },
-          { path: '/risk', element: <RiskPage /> },
-          { path: '/ai-quality', element: <AIQualityPage /> },
-          { path: '/blind-review', element: <BlindReviewPage /> },
+          { path: '/', lazy: page(() => import('@/pages/HomePage'), 'HomePage') },
+          { path: '/profile', lazy: page(() => import('@/pages/ProfilePage'), 'ProfilePage') },
+          { path: '/materials', lazy: page(() => import('@/pages/MaterialsPage'), 'MaterialsPage') },
+          { path: '/assignments', lazy: page(() => import('@/pages/AssignmentsPage'), 'AssignmentsPage') },
+          { path: '/assignments/:id', lazy: page(() => import('@/pages/AssignmentDetailPage'), 'AssignmentDetailPage') },
+          { path: '/labs', lazy: page(() => import('@/pages/LabsPage'), 'LabsPage') },
+          { path: '/labs/:id', lazy: page(() => import('@/pages/LabDetailPage'), 'LabDetailPage') },
+          { path: '/quizzes', lazy: page(() => import('@/pages/QuizzesPage'), 'QuizzesPage') },
+          { path: '/quizzes/:id', lazy: page(() => import('@/pages/QuizDetailPage'), 'QuizDetailPage') },
+          {
+            element: <RequireRole roles={['admin', 'teacher']} />,
+            children: [
+              { path: '/statistics', lazy: page(() => import('@/pages/StatisticsPage'), 'StatisticsPage') },
+              { path: '/competence', lazy: page(() => import('@/pages/CompetencePage'), 'CompetencePage') },
+              { path: '/risk', lazy: page(() => import('@/pages/RiskPage'), 'RiskPage') },
+              { path: '/ai-quality', lazy: page(() => import('@/pages/AIQualityPage'), 'AIQualityPage') },
+              { path: '/blind-review', lazy: page(() => import('@/pages/BlindReviewPage'), 'BlindReviewPage') },
+            ],
+          },
+          {
+            element: <RequireRole roles={['admin']} />,
+            children: [
+              { path: '/users', lazy: page(() => import('@/pages/admin/UsersPage'), 'UsersPage') },
+              { path: '/groups', lazy: page(() => import('@/pages/admin/GroupsPage'), 'GroupsPage') },
+              { path: '/ai-usage', lazy: page(() => import('@/pages/admin/AIUsagePage'), 'AIUsagePage') },
+            ],
+          },
+          {
+            element: <RequireRole roles={['admin', 'teacher']} />,
+            children: [{ path: '/submissions/:id', lazy: page(() => import('@/pages/SubmissionPage'), 'SubmissionPage') }],
+          },
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
-      {
-        element: <RequireRole roles={['admin']} />,
-        children: [
-          { path: '/users', element: <UsersPage /> },
-          { path: '/groups', element: <GroupsPage /> },
-          { path: '/ai-usage', element: <AIUsagePage /> },
-        ],
-      },
-      {
-        element: <RequireRole roles={['admin', 'teacher']} />,
-        children: [{ path: '/submissions/:id', element: <SubmissionPage /> }],
-      },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

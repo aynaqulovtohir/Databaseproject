@@ -40,9 +40,17 @@
 	handle {
 		root * /srv/app
 		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-		@assets path /assets/*
-		header @assets Cache-Control "public, max-age=31536000, immutable"
-		try_files {path} /index.html
-		file_server
+		# Bo'laklar nomida xesh bor: abadiy keshlanadi. Yo'q bo'lak index.html emas, 404 qaytaradi
+		handle /assets/* {
+			@exists file
+			header @exists Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+		# index.html har safar tekshiriladi: yangi versiya chiqqach yangi bo'lak nomlari darhol ko'rinadi
+		handle {
+			header Cache-Control "no-cache"
+			try_files {path} /index.html
+			file_server
+		}
 	}
 }

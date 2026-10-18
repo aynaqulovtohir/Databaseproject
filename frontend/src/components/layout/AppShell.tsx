@@ -1,6 +1,6 @@
 import { Database, LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigation } from 'react-router-dom'
 
 import { ConsentPrompt } from '@/components/Consent'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +52,17 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
+/** Keyingi sahifaning kodi yuklanayotganini bildiradi (sahifalar alohida bo'laklarda). */
+function NavigationProgress() {
+  const navigation = useNavigation()
+  if (navigation.state === 'idle') return null
+  return (
+    <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden" role="progressbar" aria-label="Sahifa yuklanmoqda">
+      <div className="h-full w-1/3 animate-pulse bg-primary" />
+    </div>
+  )
+}
+
 export function AppShell() {
   const user = useUser()
   const { logout } = useAuth()
@@ -96,6 +107,7 @@ export function AppShell() {
               <span className="sr-only sm:hidden">Chiqish</span>
             </Button>
           </div>
+          <NavigationProgress />
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 p-4 lg:p-6">
