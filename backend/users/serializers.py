@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from .consent import needs_decision
 from .models import StudentGroup, User
 
 
@@ -126,11 +127,16 @@ class MeSerializer(serializers.ModelSerializer):
     group = GroupShortSerializer(read_only=True)
     teaching_groups = GroupShortSerializer(many=True, read_only=True)
     ai_enabled = serializers.BooleanField(source="ai_allowed", read_only=True)
+    # Talabadan tadqiqotga rozilik so'ralishi kerakmi (kirgandan keyin oyna ko'rsatiladi)
+    consent_needed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "first_name", "last_name", "role", "group", "teaching_groups", "ai_enabled"]
+        fields = ["id", "username", "first_name", "last_name", "role", "group", "teaching_groups", "ai_enabled", "consent_needed"]
         read_only_fields = fields
+
+    def get_consent_needed(self, user):
+        return needs_decision(user)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

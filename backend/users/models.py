@@ -27,6 +27,12 @@ class User(AbstractUser):
         related_name="students",
     )
 
+    # Ilmiy tadqiqotda ishtirok etishga rozilik (faqat talabalar): None — hali qaror bermagan.
+    # Batafsil: users/consent.py; har bir qaror tarixi ResearchConsent jadvalida
+    research_consent = models.BooleanField("tadqiqotga rozilik", null=True, blank=True)
+    research_consent_version = models.CharField("rozilik matni versiyasi", max_length=10, blank=True)
+    research_consent_at = models.DateTimeField("rozilik qarori vaqti", null=True, blank=True)
+
     objects = UserManager()
 
     class Meta:
@@ -78,3 +84,20 @@ class StudentGroup(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ResearchConsent(models.Model):
+    """Rozilik qarorlari tarixi: yozuvlar o'zgartirilmaydi va o'chirilmaydi (axloqiy nazorat uchun)."""
+
+    user = models.ForeignKey(User, verbose_name="foydalanuvchi", on_delete=models.CASCADE, related_name="consent_history")
+    agreed = models.BooleanField("rozi")
+    version = models.CharField("rozilik matni versiyasi", max_length=10)
+    created_at = models.DateTimeField("vaqti")
+
+    class Meta:
+        verbose_name = "tadqiqotga rozilik qarori"
+        verbose_name_plural = "tadqiqotga rozilik qarorlari"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.user} / {'rozi' if self.agreed else 'rozi emas'} / {self.created_at:%Y-%m-%d}"

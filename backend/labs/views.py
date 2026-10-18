@@ -20,6 +20,7 @@ from learning.permissions import IsStaffRoleOrReadOnly
 from users.models import User
 
 from .access import visible_labs
+from .sequence import ensure_unlocked, lock_map
 from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
 from .checker import LabSetupError, check_code, try_code
 from .mistakes import build_report
@@ -104,7 +105,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = visible_labs(user).select_related("author")
+        queryset = visible_labs(user).select_related("author", "module")
         if user.is_student:
             own_attempts = LabAttempt.objects.filter(student=user).only(
                 "lab_id",
@@ -130,7 +131,16 @@ class LabViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["include_last_code"] = self.action == "retrieve"
+        user = self.request.user
+        if user.is_authenticated and user.is_student and self.action in ("list", "retrieve"):
+            context["locks"] = lock_map(user, visible_labs(user).select_related("module"))
         return context
+
+    def get_object(self):
+        """Talaba uchun: ketma-ket moduldagi laboratoriya oldingisi yechilmaguncha ochilmaydi (barcha amallar)."""
+        lab = super().get_object()
+        ensure_unlocked(self.request.user, lab)
+        return lab
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -454,7 +464,7 @@ class LabViewSet(viewsets.ModelViewSet):
         from .mastery import group_report, student_report
 
         if request.user.is_student:
-            return Response(student_report(request.user, list(visible_labs(request.user))))
+            return Response(student_report(request.user, list(visible_labs(request.user).select_related("module"))))
         group_id = request.query_params.get("group", "")
         if not group_id.isdigit():
             raise ValidationError({"group": "Guruhni tanlang."})
@@ -739,7 +749,8 @@ class LabAttemptAdviceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
+        attempt = get_object_or_404(LabAttempt.objects.select_related("lab__module"), pk=pk, student=request.user)
+        ensure_unlocked(request.user, attempt.lab)
         if attempt.is_correct:
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
         if not request.user.ai_allowed:
@@ -802,7 +813,8 @@ class LabAttemptExplainView(APIView):
     def post(self, request, pk):
         from .self_explain import evaluate_explanation
 
-        attempt = get_object_or_404(LabAttempt.objects.select_related("lab"), pk=pk, student=request.user)
+        attempt = get_object_or_404(LabAttempt.objects.select_related("lab__module"), pk=pk, student=request.user)
+        ensure_unlocked(request.user, attempt.lab)
         if not attempt.is_correct:
             raise ValidationError({"detail": "Tushuntirish to'g'ri yechimdan keyin yoziladi."})
         text = request.data.get("text")
@@ -844,7 +856,8 @@ class LabChatView(APIView):
             raise PermissionDenied("Murabbiy faqat talaba uchun.")
         if not request.user.ai_allowed:
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
-        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+        self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
+        ensure_unlocked(request.user, self.lab)
 
     def own_messages(self):
         return LabChatMessage.objects.filter(lab=self.lab, student=self.request.user)
@@ -931,7 +944,8 @@ class LabInterviewView(APIView):
             raise PermissionDenied("Buyurtmachi bilan suhbat faqat talaba uchun.")
         if not request.user.ai_allowed:
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shartida berilgan.")
-        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+        self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
+        ensure_unlocked(request.user, self.lab)
         if not self.lab.is_interview:
             raise PermissionDenied("Bu laboratoriyada buyurtmachi bilan suhbat yo'q.")
 
@@ -1011,7 +1025,8 @@ class LabPeerReviewView(APIView):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
             raise PermissionDenied("O'zaro baholash faqat talaba uchun.")
-        self.lab = get_object_or_404(visible_labs(request.user), pk=kwargs["pk"])
+        self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
+        ensure_unlocked(request.user, self.lab)
         if self.lab.kind != Lab.Kind.ER:
             raise PermissionDenied("O'zaro baholash faqat ER-diagramma laboratoriyalarida.")
 
@@ -1142,3 +1157,122 @@ class StatisticsView(APIView):
                 raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
             group = get_object_or_404(allowed_groups(request.user), pk=group_id)
         return Response(build_statistics(request.user, group))
+
+
+class LabAnalysisView(APIView):
+    """Laboratoriyalarning psixometrik tahlili (qiyinlik 5 darajada, ajrata olish, Cronbach α).
+
+    ?group=<id> bilan bitta guruh, aks holda barcha ruxsat etilgan guruhlar. Faqat tadqiqotga rozi talabalar.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .psychometrics import analyse, lab_queryset
+        from .statistics import allowed_groups
+
+        if request.user.is_student:
+            raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
+        groups = allowed_groups(request.user)
+        group_id = request.query_params.get("group")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            groups = [get_object_or_404(groups, pk=group_id)]
+        return Response(analyse(lab_queryset(request.user), groups))
+
+
+class LabStudyAdviceView(APIView):
+    """Qiynalayotgan laboratoriya bo'yicha shaxsiy tavsiya. GET — oxirgi tavsiya va holat, POST — yangisini tuzish.
+
+    AI yoqilgan guruhda AI (kunlik limitdan yechiladi), nazorat guruhida xato turlari bo'yicha tavsiya.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "lab_ai"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_student:
+            raise PermissionDenied("Tavsiya faqat talaba uchun.")
+        self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
+        ensure_unlocked(request.user, self.lab)
+
+    def get(self, request, pk):
+        from .study_advice import status_payload
+
+        return Response(status_payload(self.lab, request.user, request.user.ai_allowed))
+
+    def post(self, request, pk):
+        from .quota import ai_usable
+        from .study_advice import create_advice, status_payload
+
+        current = status_payload(self.lab, request.user, request.user.ai_allowed)
+        if current["fresh"]:
+            return Response(current)
+        if current["wrong_attempts"] < current["min_wrong"]:
+            raise ValidationError(
+                {"detail": f"Tavsiya kamida {current['min_wrong']} ta noto'g'ri urinishdan keyin beriladi: avval o'zingiz urinib ko'ring."}
+            )
+        use_ai = ai_usable(request.user)
+        if use_ai:
+            refused = refuse_ai(request.user)
+            if refused:
+                return refused
+            try:
+                create_advice(self.lab, request.user, use_ai=True)
+            except AIError as exc:
+                return ai_error_response(exc, "tavsiya")
+            record_ai_action(request.user, AIAction.Kind.STUDY_ADVICE)
+        else:
+            create_advice(self.lab, request.user, use_ai=False)
+        return Response(status_payload(self.lab, request.user, request.user.ai_allowed), status=status.HTTP_201_CREATED)
+
+
+class LabModuleViewSet(viewsets.ModelViewSet):
+    """Laboratoriyalar modullari: admin — barchasi, o'qituvchi — o'zi yaratganlari. Talaba modullarni
+    laboratoriyalar ro'yxatida ko'radi (bu yerda emas)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if request.user.is_student:
+            raise PermissionDenied("Modullarni faqat admin va o'qituvchi boshqaradi.")
+
+    def get_queryset(self):
+        from .models import LabModule
+
+        queryset = LabModule.objects.select_related("author").prefetch_related("labs")
+        user = self.request.user
+        return queryset if user.is_admin else queryset.filter(author=user)
+
+    def get_serializer_class(self):
+        from .serializers import LabModuleSerializer
+
+        return LabModuleSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def reorder(self, request, pk=None):
+        """{"labs": [id, ...]} — moduldagi laboratoriyalar tartibi (soddadan murakkabga). Ro'yxatdagi laboratoriyalar
+        shu modulga o'tkaziladi; modulda bo'lib, ro'yxatda yo'qlari moduldan chiqariladi."""
+        module = self.get_object()
+        ids = request.data.get("labs")
+        if not isinstance(ids, list) or not all(isinstance(item, int) and not isinstance(item, bool) for item in ids):
+            raise ValidationError({"labs": "Laboratoriyalar id ro'yxati kerak."})
+        if len(set(ids)) != len(ids):
+            raise ValidationError({"labs": "Laboratoriya takrorlangan."})
+        labs = {lab.pk: lab for lab in visible_labs(request.user).filter(pk__in=ids)}
+        if len(labs) != len(ids):
+            raise ValidationError({"labs": "Faqat o'zingizning laboratoriyalaringizni qo'shishingiz mumkin."})
+        with transaction.atomic():
+            Lab.objects.filter(module=module).exclude(pk__in=ids).update(module=None, position=0)
+            for position, lab_id in enumerate(ids, start=1):
+                Lab.objects.filter(pk=lab_id).update(module=module, position=position)
+        return Response(self.get_serializer(self.get_queryset().get(pk=module.pk)).data)

@@ -3,6 +3,33 @@ from django.conf import settings
 from django.db import models
 
 MAX_SQL_LENGTH = 50_000
+MAX_LEVEL = 5
+
+
+class LabModule(models.Model):
+    """Laboratoriyalar moduli (masalan, «1-modul: ER-model»). Modullar `order` bo'yicha, ichidagi laboratoriyalar
+    `Lab.position` bo'yicha soddadan murakkabga tartiblanadi; tartibni o'qituvchi yoki admin belgilaydi.
+
+    Ketma-ket (sequential) modullardagi laboratoriyalar bitta zanjir hosil qiladi: talaba oldingi laboratoriyani
+    yechmaguncha keyingisi ochilmaydi (labs/sequence.py).
+    """
+
+    title = models.CharField("nomi", max_length=200)
+    description = models.TextField("izoh", blank=True, max_length=2000)
+    order = models.PositiveSmallIntegerField("tartib raqami", default=0)
+    sequential = models.BooleanField("ketma-ket ochiladi", default=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="muallif", on_delete=models.PROTECT, related_name="lab_modules"
+    )
+    created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "laboratoriyalar moduli"
+        verbose_name_plural = "laboratoriyalar modullari"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.title
 
 
 class Lab(models.Model):
@@ -65,6 +92,13 @@ class Lab(models.Model):
         related_name="labs",
     )
     groups = models.ManyToManyField("users.StudentGroup", verbose_name="guruhlar", related_name="labs")
+    # Modul va undagi o'rni (soddadan murakkabga). Modulsiz laboratoriya qulflanmaydi
+    module = models.ForeignKey(
+        LabModule, verbose_name="modul", null=True, blank=True, on_delete=models.SET_NULL, related_name="labs"
+    )
+    position = models.PositiveSmallIntegerField("moduldagi tartib raqami", default=0)
+    # O'qituvchi belgilagan murakkablik: 1 — eng sodda, 5 — eng murakkab (psixometrik qiyinlik alohida hisoblanadi)
+    level = models.PositiveSmallIntegerField("murakkablik darajasi (1-5)", null=True, blank=True)
     created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
 
     class Meta:
@@ -306,6 +340,7 @@ class AIAction(models.Model):
         LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
         SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
         VIVA = "viva", "Loyiha himoyasi"
+        STUDY_ADVICE = "study_advice", "Laboratoriya bo'yicha tavsiya"
 
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="ai_actions"
@@ -363,3 +398,32 @@ class LabChatMessage(models.Model):
         verbose_name_plural = "murabbiy xabarlari"
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["lab", "student"])]
+
+
+class StudyAdvice(models.Model):
+    """Talaba qiynalayotgan laboratoriya bo'yicha tavsiya: qaysi joyini tushunmagani va nima qilish kerakligi.
+
+    Talabaning shu laboratoriyadagi xatolaridan tuziladi: AI yoqilgan guruhda — AI, nazorat guruhida — xato
+    turlari bo'yicha tayyor maslahatlardan (labs/study_advice.py). Yangi urinish bo'lmaguncha qayta tuzilmaydi.
+    """
+
+    class Source(models.TextChoices):
+        AI = "ai", "Sun'iy intellekt"
+        RULES = "rules", "Xato turlari bo'yicha"
+
+    lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="study_advice")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="study_advice"
+    )
+    # Tavsiya shu urinishgacha bo'lgan xatolardan tuzilgan
+    last_attempt = models.ForeignKey(LabAttempt, verbose_name="oxirgi urinish", on_delete=models.CASCADE, related_name="+")
+    attempts = models.PositiveIntegerField("hisobga olingan urinishlar")
+    # {"summary": str, "struggles": [{"title", "explanation"}], "steps": [str], "review": [str]}
+    content = models.JSONField("tavsiya")
+    source = models.CharField("manba", max_length=10, choices=Source.choices)
+    created_at = models.DateTimeField("vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "laboratoriya bo'yicha tavsiya"
+        verbose_name_plural = "laboratoriya bo'yicha tavsiyalar"
+        ordering = ["-created_at", "-id"]

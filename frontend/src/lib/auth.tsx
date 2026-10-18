@@ -10,6 +10,8 @@ interface AuthContextValue {
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  /** Foydalanuvchi ma'lumotlarini serverdan qayta oladi (masalan, rozilik qaroridan keyin) */
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -73,7 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession])
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout])
+  const refreshUser = useCallback(async () => {
+    setUser(await api<Me>('/auth/me/'))
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, loading, login, logout, refreshUser }),
+    [user, loading, login, logout, refreshUser],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

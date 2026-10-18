@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart3 } from 'lucide-react'
 import { useState } from 'react'
 
+import { LabAnalysisCard } from '@/components/LabAnalysisCard'
 import { GroupMasteryCard } from '@/components/LearningPath'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
@@ -497,6 +498,7 @@ export function StatisticsPage() {
           <AiEffectCard effect={data.ai_effect} />
         </div>
         <LabsCard labs={data.labs} />
+        <LabAnalysisCard groupId={groupId} />
         {groupId ? <GroupMasteryCard groupId={groupId} /> : null}
       </div>
     )

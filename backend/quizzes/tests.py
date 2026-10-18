@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.cache import cache
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -267,6 +268,7 @@ class ScoringTests(QuizTestCase):
 
 
 class QuizExportTests(QuizTestCase):
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
     def test_quiz_results_in_research_export_with_same_pseudonym(self):
         import csv
         import io
@@ -456,6 +458,8 @@ class SurveyTests(QuizTestCase):
         regular = self.create_quiz()
         self.auth_as(self.teacher)
         self.assertEqual(self.client.get(f"/api/quizzes/{regular.pk}/survey/").status_code, 400)
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_survey_answers_in_export(self):
         import csv

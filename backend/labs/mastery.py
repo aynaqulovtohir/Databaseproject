@@ -11,6 +11,7 @@ LLM ishlatilmaydi: hisob tez, arzon va tushuntirib berish mumkin.
 from collections import defaultdict
 
 from .models import Lab, LabAttempt
+from .sequence import chain, lock_map
 
 P_INIT = 0.2  # boshlanishda bilish ehtimoli
 P_LEARN = 0.15  # har bir imkoniyatda o'rganish
@@ -115,7 +116,14 @@ def student_report(student, labs):
     )
     topics = student_mastery(labs, attempts)
     solved_ids = {attempt.lab_id for attempt in attempts if attempt.is_correct}
-    lab, reason = recommend(labs, topics, solved_ids)
+    # Modullar zanjiri: navbatdagi (birinchi yechilmagan) laboratoriya o'qituvchi belgilagan tartibda
+    chained = [item for item in chain(labs) if item.pk not in solved_ids]
+    if chained:
+        lab = chained[0]
+        reason = f"«{lab.module.title}» modulida navbatdagi laboratoriya: keyingilari shu yechilgandan keyin ochiladi."
+    else:
+        locks = lock_map(student, labs)
+        lab, reason = recommend([item for item in labs if locks[item.pk] is None], topics, solved_ids)
     return {
         "topics": topics_payload(topics),
         "next": {"id": lab.pk, "title": lab.title, "topic": lab.effective_topic, "reason": reason} if lab else None,

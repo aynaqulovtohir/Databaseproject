@@ -3,6 +3,7 @@ import { CheckCircle2, ExternalLink, Loader2, Send } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 
+import { ConsentCard } from '@/components/Consent'
 import { FormField } from '@/components/FormField'
 import { PasswordInput } from '@/components/PasswordInput'
 import { PageHeader } from '@/components/PageHeader'
@@ -237,6 +238,7 @@ function TelegramCard() {
 }
 
 export function ProfilePage() {
+  const user = useUser()
   return (
     <>
       <PageHeader title="Profil" />
@@ -245,7 +247,10 @@ export function ProfilePage() {
           <AccountCard />
           <TelegramCard />
         </div>
-        <PasswordCard />
+        <div className="grid content-start gap-4">
+          <PasswordCard />
+          {user.role === 'student' ? <ConsentCard /> : null}
+        </div>
       </div>
     </>
   )

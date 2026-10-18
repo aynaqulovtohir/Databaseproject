@@ -7,7 +7,7 @@ from .checker import LabSetupError, format_error, validate_concurrent, validate_
 from .er import DiagramError, validate_diagram
 from .interview import RequirementsError, validate_requirements
 from .norm import NormError, parse_answer, parse_task, reference_solution
-from .models import MAX_SQL_LENGTH, Lab
+from .models import MAX_LEVEL, MAX_SQL_LENGTH, Lab, LabModule
 from .sandbox import SandboxUnavailable
 
 SQL_TOO_LONG = "SQL kod {max_length} belgidan oshmasligi kerak."
@@ -28,10 +28,41 @@ def _task_input(value):
     return parse_task(attributes, fds, value.get("target"))
 
 
+class LabModuleSerializer(serializers.ModelSerializer):
+    """Modul va undagi laboratoriyalar (tartib bilan). Laboratoriyalar /lab-modules/<id>/reorder/ orqali joylanadi."""
+
+    author = AuthorSerializer(read_only=True)
+    labs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabModule
+        fields = ["id", "title", "description", "order", "sequential", "author", "labs", "created_at"]
+        read_only_fields = ["id", "author", "labs", "created_at"]
+
+    def get_labs(self, module):
+        labs = sorted(module.labs.all(), key=lambda lab: (lab.position, lab.pk))
+        return [{"id": lab.pk, "title": lab.title, "kind": lab.kind, "level": lab.level, "position": lab.position} for lab in labs]
+
+
+def module_short(module):
+    if module is None:
+        return None
+    return {"id": module.pk, "title": module.title, "description": module.description, "order": module.order, "sequential": module.sequential}
+
+
+def validate_level(value):
+    if value is not None and not 1 <= value <= MAX_LEVEL:
+        raise serializers.ValidationError(f"Murakkablik 1 dan {MAX_LEVEL} gacha bo'lishi kerak.")
+    return value
+
+
 class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
     """Admin va o'qituvchi uchun."""
 
     author = AuthorSerializer(read_only=True)
+    module = serializers.PrimaryKeyRelatedField(queryset=LabModule.objects.all(), required=False, allow_null=True)
+    module_detail = serializers.SerializerMethodField()
+    level = serializers.IntegerField(required=False, allow_null=True, validators=[validate_level])
     # Normallashtirish laboratoriyasi: o'qituvchiga ko'rinadigan hisoblangan javob (talabaga yuborilmaydi)
     norm_reference = serializers.SerializerMethodField()
     groups = serializers.PrimaryKeyRelatedField(many=True, queryset=StudentGroup.objects.all())
@@ -87,11 +118,25 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "concurrent",
             "topic",
             "effective_topic",
+            "module",
+            "module_detail",
+            "position",
+            "level",
             "author",
             "groups",
             "created_at",
         ]
         read_only_fields = ["id", "created_at", "effective_topic"]
+
+    def get_module_detail(self, lab):
+        return module_short(lab.module)
+
+    def validate_module(self, module):
+        """O'qituvchi faqat o'zi yaratgan modulni tanlaydi (admin — istalganini)."""
+        user = self.context["request"].user
+        if module is not None and not user.is_admin and module.author_id != user.pk:
+            raise serializers.ValidationError("Faqat o'zingiz yaratgan modulni tanlashingiz mumkin.")
+        return module
 
     def get_norm_reference(self, lab):
         return reference_solution(lab.norm_task) if lab.kind == Lab.Kind.NORM and lab.norm_task else None
@@ -218,6 +263,9 @@ class StudentLabSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)
     my_progress = serializers.SerializerMethodField()
     interview = serializers.SerializerMethodField()
+    module_detail = serializers.SerializerMethodField()
+    locked = serializers.SerializerMethodField()
+    blocked_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
@@ -234,12 +282,39 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "plan_query",
             "concurrent",
             "effective_topic",
+            "module_detail",
+            "position",
+            "level",
+            "locked",
+            "blocked_by",
             "author",
             "created_at",
             "my_progress",
             "interview",
         ]
         read_only_fields = fields
+
+    def get_module_detail(self, lab):
+        return module_short(lab.module)
+
+    def _blocker(self, lab):
+        return self.context.get("locks", {}).get(lab.pk)
+
+    def get_locked(self, lab):
+        return self._blocker(lab) is not None
+
+    def get_blocked_by(self, lab):
+        blocker = self._blocker(lab)
+        return {"id": blocker.pk, "title": blocker.title} if blocker else None
+
+    def to_representation(self, lab):
+        data = super().to_representation(lab)
+        if data["locked"]:
+            # Qulflangan laboratoriyaning shartlari ko'rsatilmaydi (ro'yxatda faqat nomi va qaysi biri qulflagani)
+            for field in ("description", "theory", "setup_sql", "starter_sql", "given_diagram", "norm_task", "plan_query"):
+                data[field] = "" if isinstance(data[field], str) else None
+            data["interview"] = None
+        return data
 
     def get_interview(self, lab):
         """Talablarni aniqlash laboratoriyasi: AI yoqilgan guruhga talablar ko'rsatilmaydi (ularni buyurtmachidan

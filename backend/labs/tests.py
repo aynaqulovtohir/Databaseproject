@@ -731,11 +731,15 @@ class ResearchExportTests(BaseTestCase):
         response, _ = self.export(self.student_a1)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
+
     def test_teacher_sees_only_own_labs(self):
         _, (_, tables) = self.export(self.teacher_b)
         self.assertEqual(tables["urinishlar.csv"], [])
         _, (_, tables) = self.export(self.teacher_a)
         self.assertEqual(len(tables["urinishlar.csv"]), 3)
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_export_is_anonymous(self):
         response, (files, tables) = self.export(self.admin)
@@ -744,7 +748,7 @@ class ResearchExportTests(BaseTestCase):
             set(files),
             {
                 "urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv",
-                "ozaro_baholash.csv", "ai_sifati.csv", "kompetentlik.csv", "README.txt",
+                "ozaro_baholash.csv", "ai_sifati.csv", "kompetentlik.csv", "laboratoriyalar_tahlili.csv", "README.txt",
             },
         )
         everything = "".join(files.values())
@@ -757,6 +761,8 @@ class ResearchExportTests(BaseTestCase):
         _, (_, again) = self.export(self.admin)
         self.assertEqual(tables["urinishlar.csv"][0]["talaba"], again["urinishlar.csv"][0]["talaba"])
 
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
+
     def test_attempt_rows_and_categories(self):
         _, (_, tables) = self.export(self.teacher_a)
         rows = tables["urinishlar.csv"]
@@ -767,6 +773,8 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
         self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_summary_includes_students_who_did_not_start(self):
         _, (_, tables) = self.export(self.teacher_a)
@@ -945,6 +953,8 @@ class ErLabTests(BaseTestCase):
         response = self.client.patch(f"/api/labs/{response.data['id']}/", {"kind": "sql"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
+
     def test_progress_and_export_include_er(self):
         self.auth_as(self.student_a1)
         self.post("run", ER_WRONG)
@@ -1026,6 +1036,8 @@ class AiDisabledGroupTests(BaseTestCase):
         # O'qituvchi tahlilni ko'raveradi
         self.auth_as(self.teacher_a)
         self.assertNotEqual(self.client.get(f"/api/submissions/{submission.pk}/analysis/").status_code, 403)
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_export_marks_control_group(self):
         import csv
@@ -1242,6 +1254,8 @@ class BlindReviewTests(BaseTestCase):
         self.assertEqual((data["item"], data["remaining"]), (None, 0))
         self.assertEqual(self.review(self.grades[0].attempt_id, 50).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(BlindReview.objects.exists())
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 
     def test_agreement_visibility_and_export(self):
         import csv

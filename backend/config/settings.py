@@ -134,6 +134,8 @@ REST_FRAMEWORK = {
         "ai_generate": "6/min",
         # Testda javoblarni oraliq saqlash
         "quiz_save": "120/min",
+        # Tadqiqotga rozilik matnini ko'rish va qaror berish
+        "consent": "30/min",
     },
 }
 
@@ -225,6 +227,12 @@ LAB_AI_DAILY_LIMIT = env.int("LAB_AI_DAILY_LIMIT", default=40)
 LAB_INTERVIEW_QUESTION_LIMIT = env.int("LAB_INTERVIEW_QUESTION_LIMIT", default=40)
 # Bitta talabaning kuniga AI baholaydigan topshirishlari soni (undan keyin avtomatik baho qo'yiladi)
 LAB_AI_GRADES_DAILY_LIMIT = env.int("LAB_AI_GRADES_DAILY_LIMIT", default=20)
+
+# Ilmiy tadqiqot: True bo'lsa, tadqiqot eksporti va tadqiqot statistikasiga faqat ishtirok etishga rozi
+# bo'lgan talabalar kiradi (talabadan kirganda so'raladi). Batafsil: users/consent.py
+RESEARCH_CONSENT_REQUIRED = env.bool("RESEARCH_CONSENT_REQUIRED", default=True)
+# Rozilik oynasida ko'rsatiladigan tadqiqotchi bilan bog'lanish ma'lumoti (bo'sh bo'lsa ko'rsatilmaydi)
+RESEARCH_CONTACT = env("RESEARCH_CONTACT", default="")
 
 # Monitoring: Telegram bot shu manzil orqali backend, asosiy va laboratoriya bazalarini tekshiradi
 # va nosozlik bo'lsa Telegram'ni bog'lagan adminlarga xabar yuboradi. Bo'sh bo'lsa, HTTP tekshiruv o'chiq.

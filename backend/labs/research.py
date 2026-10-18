@@ -18,10 +18,12 @@ from collections import defaultdict
 from django.conf import settings
 from django.utils import timezone
 
+from users.consent import consent_required, participant_ids, research_participants
 from users.models import User
 
 from .checker import ERROR_TIPS
 from .models import AIOutputReview, BlindReview, LabAttempt, LabGrade, PeerReview
+from .psychometrics import MIN_STUDENTS as MIN_ANALYSIS_STUDENTS
 
 QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "delayed": "kechiktirilgan", "practice": "oddiy", "survey": "sorovnoma"}
 QUESTION_KINDS = {"single": "bitta", "multiple": "kop", "likert": "likert"}
@@ -204,6 +206,10 @@ laboratoriyalarni bitta talaba bo'yicha birlashtirish mumkin, lekin undan talaba
 aniqlab bo'lmaydi. Kirish/chiqish testi natijalarini bog'lash kerak bo'lsa, taxallus
 va ism ro'yxatini o'qituvchi alohida, maxfiy saqlaydi.
 
+Rozilik
+-------
+{consent}
+
 urinishlar.csv — har bir ishga tushirish
 -----------------------------------------
 talaba                      talaba taxallusi
@@ -293,6 +299,25 @@ turi                        hint (AI maslahati) yoki explanation (tushuntirish b
 daraja                      maslahat darajasi (1 dan); izohda 0
 baho                        helpful (foydali), unclear (tushunarsiz), wrong (noto'g'ri), revealed (javobni aytib qo'ydi)
 
+laboratoriyalar_tahlili.csv — har bir laboratoriyaning psixometrik tahlili (klassik test nazariyasi)
+------------------------------------------------------------------------------------------------------
+Har bir laboratoriya bitta "savol" sifatida: talaba bali = laboratoriya bahosi / 100 (topshirmagan — 0).
+Faqat laboratoriyani boshlagan talabalar olinadi; {min_students} tadan kam bo'lsa ko'rsatkichlar bo'sh.
+berilgan, boshlagan          laboratoriya berilgan va uni boshlagan talabalar soni
+qiyinlik_p                  o'rtacha ball ulushi (0-1): qancha katta bo'lsa, shuncha oson
+daraja, daraja_nomi         1 juda oson (p > 0.80), 2 oson (0.60-0.80), 3 o'rtacha (0.40-0.60),
+                            4 qiyin (0.20-0.40), 5 juda qiyin (p ≤ 0.20)
+ajratish_r                  tuzatilgan korrelyatsiya: laboratoriya bali va talabaning boshqa laboratoriyalardagi
+                            o'rtacha bali (Pirson). Ebel: ≥ 0.40 a'lo, 0.30 yaxshi, 0.20 qoniqarli, < 0.20 past
+ajratish_D                  yuqori va quyi 27% talabalar o'rtacha ballari farqi (har guruhda kamida 3 talaba)
+alfa_olib_tashlansa         shu laboratoriyasiz Cronbach α (faqat ishonchlilik hisobidagi laboratoriyalar)
+p_ai, p_nazorat             tajriba va nazorat guruhlarida qiyinlik (kamida 3 talaba)
+yechganlar_foiz, birinchi_urinishda_foiz, yechish_urinishlari, yechish_daqiqa (mediana),
+maslahat_olganlar_foiz      AI yoqilgan talabalardan maslahat olganlar ulushi
+xulosa                      yaxshi | qayta_korib_chiqing | tekshiring_almashtiring
+Oxirgi qator (laboratoriya_id = "alfa"): laboratoriyalar to'plamining Cronbach α si, unga kirgan
+laboratoriyalar va talabalar soni (barcha guruhlarga berilgan va hammasini boshlagan talabalar).
+
 kompetentlik.csv — har bir talaba, kesim va kompetentlik komponenti
 ---------------------------------------------------------------------
 talaba, guruh, ai_yoqilgan
@@ -324,7 +349,12 @@ def reviewer_pseudonym(user_id):
     return "O-" + digest.hexdigest()[:6].upper()
 
 
-def _review_rows(labs):
+def _included(allowed, *student_ids):
+    """Talaba(lar) tadqiqotga kiradimi: allowed None bo'lsa — hamma (rozilik talab qilinmaydi)."""
+    return allowed is None or all(student_id in allowed for student_id in student_ids)
+
+
+def _review_rows(labs, allowed=None):
     from .blind_review import band
 
     rows = []
@@ -336,6 +366,8 @@ def _review_rows(labs):
     for review in reviews:
         attempt = review.attempt
         student = attempt.student
+        if not _included(allowed, student.pk):
+            continue
         rows.append(
             [
                 pseudonym(student.pk),
@@ -452,7 +484,7 @@ def _summary_row(student_id, group, ai_enabled, lab, attempts, grade):
     return [row[column] for column in SUMMARY_COLUMNS]
 
 
-def _quiz_rows(quizzes):
+def _quiz_rows(quizzes, allowed=None):
     """testlar.csv va test_javoblari.csv qatorlari."""
     from quizzes.models import QuizAttempt
     from quizzes.services import attempt_status, finalize_if_expired, likert_value, percent
@@ -463,11 +495,12 @@ def _quiz_rows(quizzes):
             attempt.student_id: finalize_if_expired(attempt)
             for attempt in QuizAttempt.objects.filter(quiz=quiz).select_related("quiz", "student__group")
         }
-        members = User.objects.filter(
-            role=User.Role.STUDENT, is_active=True, group__in=quiz.groups.all()
+        members = research_participants(
+            User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=quiz.groups.all())
         ).select_related("group")
         students = {student.pk: student.group.name for student in members}
         ai_of = {student.pk: _group_ai(student) for student in members}
+        attempts = {student_id: attempt for student_id, attempt in attempts.items() if _included(allowed, student_id)}
         for student_id, attempt in attempts.items():
             students.setdefault(student_id, attempt.student.group.name if attempt.student.group else "")
             ai_of.setdefault(student_id, _group_ai(attempt.student))
@@ -537,13 +570,16 @@ PEER_REVIEW_COLUMNS = [
 ]
 
 
-def _peer_review_rows(labs):
+def _peer_review_rows(labs, allowed=None):
     """O'zaro baholashlar: ikkala tomon taxallus bilan; izoh matni kirmaydi (unda ism bo'lishi mumkin), faqat uzunligi."""
     from .peer_review import accuracy, structural_score
 
     rows = []
     reviews = PeerReview.objects.filter(attempt__lab__in=labs).select_related("attempt__lab", "reviewer__group").order_by("id")
     for review in reviews:
+        # Ikkala tomon ham rozi bo'lishi kerak
+        if not _included(allowed, review.reviewer_id, review.attempt.student_id):
+            continue
         group = review.reviewer.group
         rows.append(
             [
@@ -571,9 +607,10 @@ def _peer_review_rows(labs):
 AI_QUALITY_COLUMNS = ["baholovchi", "laboratoriya_id", "laboratoriya", "turi", "daraja", "baho", "vaqt"]
 
 
-def _ai_quality_rows(labs):
+def _ai_quality_rows(labs, allowed=None):
     """O'qituvchilarning AI matnlariga bergan baholari (baholovchi taxallus bilan)."""
     reviews = AIOutputReview.objects.filter(attempt__lab__in=labs).select_related("attempt__lab").order_by("id")
+    reviews = [review for review in reviews if _included(allowed, review.attempt.student_id)]
     return [
         [
             reviewer_pseudonym(review.reviewer_id),
@@ -593,7 +630,7 @@ COMPETENCE_STAGES = {"initial": "boshida", "final": "oxirida", "delayed": "keyin
 COMPETENCE_LEVELS = {"low": "past", "medium": "orta", "high": "yuqori"}
 
 
-def _competence_rows(groups):
+def _competence_rows(groups, allowed=None):
     """Kompetentlik modeli bo'yicha har bir talaba, kesim va komponent (hamda umumiy) bali va darajasi."""
     from competence.services import Data, group_students, load_model, student_profile
 
@@ -602,7 +639,7 @@ def _competence_rows(groups):
         return []
     rows = []
     for group in groups:
-        students = group_students(group)
+        students = [student for student in group_students(group) if _included(allowed, student.pk)]
         for stage, stage_label in COMPETENCE_STAGES.items():
             data = Data(components, students, stage)
             for student in students:
@@ -625,14 +662,90 @@ def _competence_rows(groups):
     return rows
 
 
+LAB_ANALYSIS_COLUMNS = [
+    "laboratoriya_id",
+    "laboratoriya",
+    "laboratoriya_turi",
+    "mavzu",
+    "berilgan",
+    "boshlagan",
+    "qiyinlik_p",
+    "daraja",
+    "daraja_nomi",
+    "ajratish_r",
+    "ajratish_D",
+    "alfa_olib_tashlansa",
+    "p_ai",
+    "p_nazorat",
+    "yechganlar_foiz",
+    "birinchi_urinishda_foiz",
+    "yechish_urinishlari",
+    "yechish_daqiqa",
+    "maslahat_olganlar_foiz",
+    "xulosa",
+]
+VERDICT_CODES = {"good": "yaxshi", "review": "qayta_korib_chiqing", "replace": "tekshiring_almashtiring"}
+
+
+def _blank(value):
+    return "" if value is None else value
+
+
+def _lab_analysis_rows(labs, groups):
+    from .psychometrics import analyse
+
+    result = analyse(labs, groups)
+    rows = []
+    for row in result["labs"]:
+        cohorts = row["cohorts"] or {}
+        rows.append(
+            [
+                row["id"],
+                row["title"],
+                row["kind"],
+                row["topic"],
+                row["assigned"],
+                row["started"],
+                _blank(row["p"]),
+                row["level"]["number"] if row["level"] else "",
+                row["level"]["label"] if row["level"] else "",
+                _blank(row["r"]),
+                _blank(row["d"]),
+                _blank(row["alpha_if_deleted"]),
+                _blank(cohorts.get("ai", {}).get("p")),
+                _blank(cohorts.get("control", {}).get("p")),
+                _blank(row["solved_rate"]),
+                _blank(row["first_try_rate"]),
+                _blank(row["attempts_to_solve"]),
+                _blank(row["minutes_to_solve"]),
+                _blank(row["hint_rate"]),
+                VERDICT_CODES[row["verdict"]["key"]] if row["verdict"] else "",
+            ]
+        )
+    reliability = result["reliability"]
+    alpha_row = [""] * len(LAB_ANALYSIS_COLUMNS)
+    alpha_row[0] = "alfa"
+    alpha_row[1] = f"Cronbach alfa: {reliability['labs']} ta laboratoriya, {reliability['students']} ta talaba"
+    alpha_row[6] = _blank(reliability["alpha"])
+    rows.append(alpha_row)
+    return rows
+
+
 def build_export(labs, quizzes=None, groups=None):
-    """Berilgan laboratoriyalar, testlar va guruhlar (kompetentlik) bo'yicha ZIP arxiv (bytes) qaytaradi."""
+    """Berilgan laboratoriyalar, testlar va guruhlar (kompetentlik) bo'yicha ZIP arxiv (bytes) qaytaradi.
+
+    Rozilik talab qilinsa (RESEARCH_CONSENT_REQUIRED), faqat tadqiqotga rozi bo'lgan talabalar kiradi.
+    """
+    labs_queryset = labs
     labs = list(labs.prefetch_related("groups"))
+    allowed = participant_ids()
     attempts = (
         LabAttempt.objects.filter(lab__in=labs)
         .select_related("student__group")
         .order_by("created_at", "id")
     )
+    if allowed is not None:
+        attempts = attempts.filter(student_id__in=allowed)
     by_pair = defaultdict(list)
     groups_of, ai_of = {}, {}
     for attempt in attempts:
@@ -645,8 +758,8 @@ def build_export(labs, quizzes=None, groups=None):
     summary_rows = []
     for lab in sorted(labs, key=lambda item: item.pk):
         # Laboratoriya berilgan guruhlarning faol talabalari (boshlamaganlari ham) va urinish qilganlar
-        members = User.objects.filter(
-            role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all()
+        members = research_participants(
+            User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all())
         ).select_related("group")
         students = {student.pk: student.group.name for student in members}
         for student in members:
@@ -687,7 +800,17 @@ def build_export(labs, quizzes=None, groups=None):
                 )
             )
 
+    if consent_required():
+        consent = (
+            "Eksportga faqat ilmiy tadqiqotda ishtirok etishga rozilik bergan talabalar kiradi\n"
+            f"(eksport paytida {len(allowed)} ta talaba). Rozilik bermagan yoki qaytarib olganlarning\n"
+            "ma'lumotlari hech bir faylda yo'q; o'zaro baholashda ikkala tomon ham rozi bo'lishi kerak."
+        )
+    else:
+        consent = "Rozilik talab qilinmagan (RESEARCH_CONSENT_REQUIRED=False): barcha talabalar kiradi."
     readme = README.format(
+        consent=consent,
+        min_students=MIN_ANALYSIS_STUDENTS,
         timezone=settings.TIME_ZONE,
         exported_at=_local(timezone.now()),
         error_categories="\n".join(f"  {name}" for name in dict.fromkeys(ERROR_CATEGORIES.values())),
@@ -699,14 +822,15 @@ def build_export(labs, quizzes=None, groups=None):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("urinishlar.csv", _csv(ATTEMPT_COLUMNS, attempt_rows))
         zip_file.writestr("xulosa.csv", _csv(SUMMARY_COLUMNS, summary_rows))
-        zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs)))
-        zip_file.writestr("ozaro_baholash.csv", _csv(PEER_REVIEW_COLUMNS, _peer_review_rows(labs)))
-        zip_file.writestr("ai_sifati.csv", _csv(AI_QUALITY_COLUMNS, _ai_quality_rows(labs)))
+        zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs, allowed)))
+        zip_file.writestr("ozaro_baholash.csv", _csv(PEER_REVIEW_COLUMNS, _peer_review_rows(labs, allowed)))
+        zip_file.writestr("ai_sifati.csv", _csv(AI_QUALITY_COLUMNS, _ai_quality_rows(labs, allowed)))
         if quizzes is not None:
-            quiz_rows, answer_rows = _quiz_rows(quizzes)
+            quiz_rows, answer_rows = _quiz_rows(quizzes, allowed)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))
             zip_file.writestr("test_javoblari.csv", _csv(ANSWER_COLUMNS, answer_rows))
         if groups is not None:
-            zip_file.writestr("kompetentlik.csv", _csv(COMPETENCE_COLUMNS, _competence_rows(groups)))
+            zip_file.writestr("kompetentlik.csv", _csv(COMPETENCE_COLUMNS, _competence_rows(groups, allowed)))
+            zip_file.writestr("laboratoriyalar_tahlili.csv", _csv(LAB_ANALYSIS_COLUMNS, _lab_analysis_rows(labs_queryset, groups)))
         zip_file.writestr("README.txt", readme)
     return archive.getvalue()

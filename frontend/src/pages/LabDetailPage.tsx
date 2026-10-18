@@ -5,6 +5,7 @@ import {
   Copy,
   Lightbulb,
   Loader2,
+  Lock,
   Pencil,
   ShieldCheck,
   Sparkles,
@@ -29,6 +30,7 @@ import { NormLabRunner, NormTaskView } from '@/components/NormLabRunner'
 import { PageHeader } from '@/components/PageHeader'
 import { VerdictBadge } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
+import { StudyAdviceCard } from '@/components/StudyAdviceCard'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -776,6 +778,8 @@ function StudentView({ lab }: { lab: Lab }) {
       },
     })
     void queryClient.invalidateQueries({ queryKey: ['labs'] })
+    // Yangi urinish: tavsiyani yangilash mumkinligi qayta tekshiriladi
+    void queryClient.invalidateQueries({ queryKey: ['study-advice', lab.id] })
     // Yechilgandan keyin o'zaro baholash ochiladi
     if (result.is_correct && lab.kind === 'er') void queryClient.invalidateQueries({ queryKey: ['peer-review', lab.id] })
     // Yechilgandan keyin buyurtmachi suhbatida aniqlanmagan talablar ham ko'rsatiladi
@@ -827,6 +831,7 @@ function StudentView({ lab }: { lab: Lab }) {
               <PeerReviewPanel labId={lab.id} />
             </CardContent>
           </Card>
+          <StudyAdviceCard labId={lab.id} solved={progress.solved} />
           <CoachCard labId={lab.id} getWork={getWork} />
         </div>
       </>
@@ -864,7 +869,8 @@ function StudentView({ lab }: { lab: Lab }) {
             </CardContent>
           </Card>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 grid gap-4">
+          <StudyAdviceCard labId={lab.id} solved={progress.solved} />
           <CoachCard labId={lab.id} getWork={getWork} />
         </div>
       </>
@@ -902,9 +908,35 @@ function StudentView({ lab }: { lab: Lab }) {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-4">
+      <div className="mt-4 grid gap-4">
+        <StudyAdviceCard labId={lab.id} solved={progress.solved} />
         <CoachCard labId={lab.id} getWork={getWork} />
       </div>
+    </>
+  )
+}
+
+/** Qulflangan laboratoriya: server 403 bilan qaysi laboratoriya qulflaganini qaytaradi */
+function lockedInfo(error: unknown): { id: number; title: string } | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null
+  const data = error.data as { locked?: boolean; blocked_by?: { id: number; title: string } } | null
+  return data?.locked && data.blocked_by ? data.blocked_by : null
+}
+
+function LockedView({ blockedBy }: { blockedBy: { id: number; title: string } }) {
+  return (
+    <>
+      <BackLink />
+      <EmptyState
+        icon={Lock}
+        title="Bu laboratoriya hali yopiq"
+        description={`Laboratoriyalar soddadan murakkabga ketma-ket ochiladi. Avval «${blockedBy.title}» laboratoriyasini yeching. Qiynalsangiz, o'sha laboratoriyada tavsiya so'rang.`}
+        action={
+          <Button asChild size="lg">
+            <Link to={`/labs/${blockedBy.id}`}>«{blockedBy.title}» ga o'tish</Link>
+          </Button>
+        }
+      />
     </>
   )
 }
@@ -925,6 +957,8 @@ export function LabDetailPage() {
   if (lab.isPending) return <ListSkeleton />
   if (lab.isError) {
     if (lab.error instanceof ApiError && lab.error.status === 404) return <NotFoundPage />
+    const locked = lockedInfo(lab.error)
+    if (locked) return <LockedView blockedBy={locked} />
     return <ErrorState error={lab.error} onRetry={() => void lab.refetch()} />
   }
 

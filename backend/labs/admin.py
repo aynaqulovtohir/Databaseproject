@@ -1,13 +1,32 @@
 from django.contrib import admin
 
-from .models import Lab, LabAttempt, LabGrade, PeerReview
+from .models import Lab, LabAttempt, LabGrade, LabModule, PeerReview
 
 
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
-    list_display = ["title", "author", "created_at"]
+    list_display = ["title", "module", "position", "level", "author", "created_at"]
+    list_filter = ["module"]
     search_fields = ["title"]
     filter_horizontal = ["groups"]
+
+
+class ModuleLabInline(admin.TabularInline):
+    model = Lab
+    fields = ["title", "position", "level"]
+    readonly_fields = ["title"]
+    extra = 0
+    can_delete = False
+    ordering = ["position", "id"]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LabModule)
+class LabModuleAdmin(admin.ModelAdmin):
+    list_display = ["title", "order", "sequential", "author"]
+    inlines = [ModuleLabInline]
 
 
 @admin.register(LabAttempt)
