@@ -220,3 +220,241 @@ def paired_t_test(before, after):
     t = mean / (sd / math.sqrt(len(diffs)))
     df = len(diffs) - 1
     return {"n": len(diffs), "mean_diff": mean, "t": t, "df": df, "p": t_two_sided_p(t, df), "d_z": mean / sd}
+
+
+# ---------- Shartlarni tekshirish, ANCOVA va statistik quvvat ----------
+
+
+def normal_cdf(z):
+    return 0.5 * math.erfc(-z / math.sqrt(2))
+
+
+_ACKLAM_A = (-3.969683028665376e01, 2.209460984245205e02, -2.759285104469687e02, 1.383577518672690e02, -3.066479806614716e01, 2.506628277459239e00)
+_ACKLAM_B = (-5.447609879822406e01, 1.615858368580409e02, -1.556989798598866e02, 6.680131188771972e01, -1.328068155288572e01)
+_ACKLAM_C = (-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e00, -2.549732539343734e00, 4.374664141464968e00, 2.938163982698783e00)
+_ACKLAM_D = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00)
+
+
+def normal_ppf(p):
+    """Standart normal taqsimot kvantili (Acklam yaqinlashishi + bitta Galley aniqlashtirishi)."""
+    if not 0 < p < 1:
+        raise ValueError("p 0 va 1 orasida bo'lishi kerak")
+    a, b, c, d = _ACKLAM_A, _ACKLAM_B, _ACKLAM_C, _ACKLAM_D
+    low = 0.02425
+    if p < low:
+        q = math.sqrt(-2 * math.log(p))
+        x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    elif p <= 1 - low:
+        q = p - 0.5
+        r = q * q
+        x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (
+            ((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1
+        )
+    else:
+        q = math.sqrt(-2 * math.log(1 - p))
+        x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    error = normal_cdf(x) - p
+    u = error * math.sqrt(2 * math.pi) * math.exp(x * x / 2)
+    return x - u / (1 + x * u / 2)
+
+
+def f_sf(f, df1, df2):
+    """F-taqsimotning o'ng dumi P(F > f)."""
+    if f <= 0:
+        return 1.0
+    return beta_i(df2 / 2, df1 / 2, df2 / (df2 + df1 * f))
+
+
+def shapiro_wilk(values):
+    """Shapiro–Uilk normallik testi (Royston, 1995, AS R94): 3 ≤ n ≤ 5000. p < 0.05 — taqsimot normal emas."""
+    x = sorted(values)
+    n = len(x)
+    if n < 3 or n > 5000 or x[-1] - x[0] <= 0:
+        return None
+    m = [normal_ppf((i - 0.375) / (n + 0.25)) for i in range(1, n + 1)]
+    mm = sum(value * value for value in m)
+    u = 1 / math.sqrt(n)
+    if n == 3:
+        a = [-math.sqrt(0.5), 0.0, math.sqrt(0.5)]
+    else:
+        c = [value / math.sqrt(mm) for value in m]
+        an = c[-1] + 0.221157 * u - 0.147981 * u**2 - 2.071190 * u**3 + 4.434685 * u**4 - 2.706056 * u**5
+        if n > 5:
+            an1 = c[-2] + 0.042981 * u - 0.293762 * u**2 - 1.752461 * u**3 + 5.682633 * u**4 - 3.582633 * u**5
+            phi = (mm - 2 * m[-1] ** 2 - 2 * m[-2] ** 2) / (1 - 2 * an**2 - 2 * an1**2)
+            a = [value / math.sqrt(phi) for value in m]
+            a[0], a[1], a[-2], a[-1] = -an, -an1, an1, an
+        else:
+            phi = (mm - 2 * m[-1] ** 2) / (1 - 2 * an**2)
+            a = [value / math.sqrt(phi) for value in m]
+            a[0], a[-1] = -an, an
+    mean = sum(x) / n
+    w = sum(ai * xi for ai, xi in zip(a, x)) ** 2 / sum((xi - mean) ** 2 for xi in x)
+    w = min(w, 1.0)
+    if n == 3:
+        p = max(0.0, min(1.0, 6 / math.pi * (math.asin(math.sqrt(w)) - math.asin(math.sqrt(0.75)))))
+        return {"w": w, "p": p}
+    if n <= 11:
+        gamma = -2.273 + 0.459 * n
+        mu = 0.5440 - 0.39978 * n + 0.025054 * n**2 - 0.0006714 * n**3
+        sigma = math.exp(1.3822 - 0.77857 * n + 0.062767 * n**2 - 0.0020322 * n**3)
+        if 1 - w <= 0 or gamma - math.log(1 - w) <= 0:
+            return {"w": w, "p": 1.0 if w >= 1 else 0.0}
+        z = (-math.log(gamma - math.log(1 - w)) - mu) / sigma
+    else:
+        ln = math.log(n)
+        mu = -1.5861 - 0.31082 * ln - 0.083751 * ln**2 + 0.0038915 * ln**3
+        sigma = math.exp(-0.4803 - 0.082676 * ln + 0.0030302 * ln**2)
+        if 1 - w <= 0:
+            return {"w": w, "p": 1.0}
+        z = (math.log(1 - w) - mu) / sigma
+    return {"w": w, "p": 1 - normal_cdf(z)}
+
+
+def levene(*samples):
+    """Levene testi Braun–Forsayt varianti (mediana atrofida): dispersiyalar tengligi. p < 0.05 — teng emas."""
+    samples = [list(sample) for sample in samples if len(sample) >= 2]
+    if len(samples) < 2:
+        return None
+    deviations = []
+    for sample in samples:
+        ordered = sorted(sample)
+        middle = len(ordered) // 2
+        median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+        deviations.append([abs(value - median) for value in sample])
+    n = sum(len(group) for group in deviations)
+    k = len(deviations)
+    grand = sum(map(sum, deviations)) / n
+    between = sum(len(group) * (_mean(group) - grand) ** 2 for group in deviations)
+    within = sum((value - _mean(group)) ** 2 for group in deviations for value in group)
+    if within == 0:
+        return None
+    f = (n - k) * between / ((k - 1) * within)
+    return {"f": f, "df1": k - 1, "df2": n - k, "p": f_sf(f, k - 1, n - k)}
+
+
+def student_t_test(a, b):
+    """Ikki mustaqil tanlanma: Styudent t-testi (dispersiyalar teng deb), Koen d va Xedjes g."""
+    if len(a) < 2 or len(b) < 2:
+        return None
+    df = len(a) + len(b) - 2
+    pooled_var = ((len(a) - 1) * _variance(a) + (len(b) - 1) * _variance(b)) / df
+    if pooled_var == 0:
+        return None
+    diff = _mean(a) - _mean(b)
+    t = diff / math.sqrt(pooled_var * (1 / len(a) + 1 / len(b)))
+    d = diff / math.sqrt(pooled_var)
+    correction = 1 - 3 / (4 * (len(a) + len(b)) - 9)
+    return {"t": t, "df": df, "p": t_two_sided_p(t, df), "cohens_d": d, "hedges_g": d * correction}
+
+
+def wilcoxon_signed_rank(before, after):
+    """Uilkokson ishorali ranglar testi (juftlangan, normal yaqinlashish, bir xil qiymatlar tuzatmasi bilan).
+
+    Nol farqlar tashlab yuboriladi. Effekt hajmi r = |z| / √n.
+    """
+    diffs = [y - x for x, y in zip(before, after) if y != x]
+    n = len(diffs)
+    if n < 2:
+        return None
+    ranks, ties = _ranks([abs(value) for value in diffs])
+    w_plus = sum(rank for rank, diff in zip(ranks, diffs) if diff > 0)
+    variance = n * (n + 1) * (2 * n + 1) / 24 - sum(t**3 - t for t in ties) / 48
+    if variance <= 0:
+        return None
+    z = (w_plus - n * (n + 1) / 4) / math.sqrt(variance)
+    return {"n": n, "w_plus": w_plus, "z": z, "p": normal_two_sided_p(z), "r": abs(z) / math.sqrt(n), "approximate": n < 10}
+
+
+def _solve(matrix, vector):
+    """Kichik chiziqli sistema (Gauss usuli, tanlab bosh element bilan). Yechim yo'q bo'lsa None."""
+    size = len(vector)
+    rows = [list(row) + [value] for row, value in zip(matrix, vector)]
+    for col in range(size):
+        pivot = max(range(col, size), key=lambda index: abs(rows[index][col]))
+        if abs(rows[pivot][col]) < 1e-12:
+            return None
+        rows[col], rows[pivot] = rows[pivot], rows[col]
+        for index in range(size):
+            if index != col:
+                factor = rows[index][col] / rows[col][col]
+                rows[index] = [x - factor * y for x, y in zip(rows[index], rows[col])]
+    return [rows[index][size] / rows[index][index] for index in range(size)]
+
+
+def _ols_sse(columns, y):
+    """Eng kichik kvadratlar: qoldiq kvadratlar yig'indisi va koeffitsiyentlar (birinchi ustun — 1 lar)."""
+    k = len(columns)
+    xtx = [[sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(k)] for i in range(k)]
+    xty = [sum(a * b for a, b in zip(columns[i], y)) for i in range(k)]
+    beta = _solve(xtx, xty)
+    if beta is None:
+        return None, None
+    fitted = [sum(beta[j] * columns[j][row] for j in range(k)) for row in range(len(y))]
+    return sum((value - fit) ** 2 for value, fit in zip(y, fitted)), beta
+
+
+def ancova(groups):
+    """Bir omilli kovariatsion tahlil (ANCOVA): chiqish natijasi ~ guruh + kirish natijasi.
+
+    groups — {nom: [(kirish, chiqish), ...]} (2 ta guruh). Kirish testidagi boshlang'ich farqni hisobga olib
+    guruhlarni solishtiradi: F, p, qisman η², tuzatilgan o'rtachalar va regressiya chiziqlari parallelligi
+    (guruh × kirish o'zaro ta'siri; p < 0.05 bo'lsa ANCOVA sharti buzilgan).
+    """
+    names = list(groups)
+    if len(names) != 2 or any(len(groups[name]) < 2 for name in names):
+        return None
+    pre = [x for name in names for x, _ in groups[name]]
+    post = [y for name in names for _, y in groups[name]]
+    group = [1.0 if index < len(groups[names[0]]) else 0.0 for index in range(len(pre))]
+    n = len(pre)
+    if n < 5:
+        return None
+    ones = [1.0] * n
+    sse_full, beta = _ols_sse([ones, group, pre], post)
+    sse_reduced, _ = _ols_sse([ones, pre], post)
+    interaction = [g * x for g, x in zip(group, pre)]
+    sse_interaction, _ = _ols_sse([ones, group, pre, interaction], post)
+    if sse_full is None or sse_reduced is None or sse_full <= 0:
+        return None
+    df_error = n - 3
+    ss_group = max(0.0, sse_reduced - sse_full)
+    f = ss_group / (sse_full / df_error)
+    slopes = None
+    if sse_interaction is not None and sse_interaction > 0 and n > 4:
+        f_slopes = max(0.0, sse_full - sse_interaction) / (sse_interaction / (n - 4))
+        slopes = {"f": f_slopes, "df1": 1, "df2": n - 4, "p": f_sf(f_slopes, 1, n - 4)}
+    grand_pre = _mean(pre)
+    adjusted = {
+        name: _mean([y for _, y in groups[name]]) - beta[2] * (_mean([x for x, _ in groups[name]]) - grand_pre)
+        for name in names
+    }
+    return {
+        "f": f,
+        "df1": 1,
+        "df2": df_error,
+        "p": f_sf(f, 1, df_error),
+        "partial_eta2": ss_group / (ss_group + sse_full),
+        "slope": beta[2],
+        "adjusted_means": adjusted,
+        "slopes_homogeneity": slopes,
+    }
+
+
+def required_n_per_group(d, alpha=ALPHA, power=0.8):
+    """Ikki mustaqil guruhni t-test bilan solishtirish uchun har bir guruhda kerakli talabalar soni
+    (normal yaqinlashish + Guenther tuzatmasi; G*Power natijasidan odatda 1 ta farq qiladi)."""
+    if not d:
+        return None
+    z_alpha = normal_ppf(1 - alpha / 2)
+    z_beta = normal_ppf(power)
+    return math.ceil(2 * ((z_alpha + z_beta) / abs(d)) ** 2 + z_alpha**2 / 4)
+
+
+def achieved_power(d, n1, n2, alpha=ALPHA):
+    """Berilgan effekt hajmi va guruh o'lchamlarida t-testning quvvati (normal yaqinlashish)."""
+    if not d or n1 < 2 or n2 < 2:
+        return None
+    z_alpha = normal_ppf(1 - alpha / 2)
+    shift = abs(d) * math.sqrt(n1 * n2 / (n1 + n2))
+    return normal_cdf(shift - z_alpha) + normal_cdf(-shift - z_alpha)

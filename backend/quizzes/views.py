@@ -1,12 +1,14 @@
 """Testlar API'lari."""
 from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 
 from learning.access import filter_visible
 from learning.permissions import IsStaffRoleOrReadOnly
@@ -184,6 +186,15 @@ class QuizViewSet(viewsets.ModelViewSet):
         return Response(survey_summary(quiz))
 
     @action(detail=True, methods=["get"])
+    def analysis(self, request, pk=None):
+        """Psixometrik tahlil: test — KR-20/α, savollar qiyinligi, ajrata olish va variantlar; so'rovnoma — α."""
+        from .psychometrics import analyse_quiz
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        return Response(analyse_quiz(self.get_object()))
+
+    @action(detail=True, methods=["get"])
     def results(self, request, pk=None):
         """Test berilgan guruhlardagi har bir talabaning natijasi."""
         if request.user.is_student:
@@ -217,3 +228,152 @@ class QuizViewSet(viewsets.ModelViewSet):
                 }
             )
         return Response(rows)
+
+
+class ExperimentView(APIView):
+    """Tajriba natijasining statistik tahlili (kirish/chiqish/kechiktirilgan testlar): ruxsat etilgan barcha guruhlar."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from labs.statistics import allowed_groups
+
+        from .experiment import analyse
+
+        if request.user.is_student:
+            raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
+        quizzes = Quiz.objects.all() if request.user.is_admin else Quiz.objects.filter(author=request.user)
+        return Response(analyse(quizzes, allowed_groups(request.user)))
+
+
+class ExpertPanelViewSet(viewsets.ModelViewSet):
+    """Ekspert baholashlari: admin — barchasi, o'qituvchi — o'zi yaratganlari. Ekspertlar havola orqali baholaydi."""
+
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if request.user.is_student:
+            raise PermissionDenied("Ekspert baholashi faqat admin va o'qituvchi uchun.")
+
+    def get_queryset(self):
+        from .expert import visible_panels
+
+        queryset = visible_panels(self.request.user)
+        quiz_id = self.request.query_params.get("quiz")
+        if quiz_id:
+            if not quiz_id.isdigit():
+                raise ValidationError({"quiz": "Test raqami butun son bo'lishi kerak."})
+            queryset = queryset.filter(quiz_id=quiz_id)
+        return queryset
+
+    def get_serializer_class(self):
+        from .serializers import ExpertPanelSerializer
+
+        return ExpertPanelSerializer
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "with_results": self.action != "list"}
+
+    @action(detail=True, methods=["post"])
+    def invites(self, request, pk=None):
+        """{"label"} — yangi ekspert havolasi. Javobdagi token faqat shu safar ko'rsatiladi."""
+        from .expert import create_invite
+
+        panel = self.get_object()
+        label = request.data.get("label")
+        if not isinstance(label, str) or not label.strip() or len(label) > 200:
+            raise ValidationError({"label": "Ekspert uchun belgi kiriting (200 belgigacha)."})
+        if panel.invites.count() >= 50:
+            raise ValidationError({"detail": "Bitta baholashga 50 tadan ortiq ekspert qo'shib bo'lmaydi."})
+        invite, token = create_invite(panel, label.strip())
+        return Response({"invite": invite_payload(invite), "token": token}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path=r"invites/(?P<invite_id>\d+)/(?P<operation>renew|revoke)")
+    def invite_action(self, request, pk=None, invite_id=None, operation=None):
+        """renew — yangi havola (eskisi ishlamaydi), revoke — havolani bekor qilish (baholar hisobdan chiqadi)."""
+        from .expert import renew_token
+
+        panel = self.get_object()
+        invite = get_object_or_404(panel.invites, pk=invite_id)
+        if operation == "revoke":
+            invite.revoked = True
+            invite.save(update_fields=["revoked", "updated_at"])
+            return Response({"invite": invite_payload(invite)})
+        if invite.submitted_at:
+            raise ValidationError({"detail": "Ekspert baholarini yuborgan: havolani yangilash shart emas."})
+        invite.revoked = False
+        token = renew_token(invite)
+        invite.save(update_fields=["revoked"])
+        return Response({"invite": invite_payload(invite), "token": token})
+
+
+def invite_payload(invite):
+    return {
+        "id": invite.pk,
+        "label": invite.label,
+        "revoked": invite.revoked,
+        "started": bool(invite.ratings),
+        "rated": len(invite.ratings),
+        "submitted_at": invite.submitted_at,
+        "created_at": invite.created_at,
+    }
+
+
+class ExpertRatingView(APIView):
+    """Ekspert sahifasi (login talab qilinmaydi, shaxsiy havola tokeni bilan).
+
+    GET — ko'rsatma va savollar (to'g'ri javoblar bilan: ekspert savol sifatini baholaydi), saqlangan baholar.
+    PUT {"expert", "ratings", "submit"} — oraliq saqlash yoki yakuniy yuborish (keyin o'zgartirilmaydi).
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "expert"
+
+    def invite(self, token):
+        from .expert import find_invite
+
+        invite = find_invite(token)
+        if invite is None:
+            raise NotFound("Havola noto'g'ri yoki bekor qilingan.")
+        return invite
+
+    def payload(self, invite):
+        from .expert import SCALES
+
+        panel = invite.panel
+        return {
+            "title": panel.title,
+            "quiz_title": panel.quiz_title,
+            "construct": panel.construct,
+            "instructions": panel.instructions,
+            "label": invite.label,
+            "open": panel.is_open(),
+            "closes_at": panel.closes_at,
+            "submitted_at": invite.submitted_at,
+            "items": panel.items,
+            "scales": {name: {"min": low, "max": high} for name, (low, high) in SCALES.items()},
+            "expert": invite.expert,
+            "ratings": invite.ratings,
+        }
+
+    def get(self, request, token):
+        return Response(self.payload(self.invite(token)))
+
+    def put(self, request, token):
+        from .expert import RatingsError, save_ratings
+
+        invite = self.invite(token)
+        if not invite.panel.is_open():
+            raise ValidationError({"detail": "Baholash muddati tugagan."})
+        submit = request.data.get("submit", False)
+        if not isinstance(submit, bool):
+            raise ValidationError({"submit": "Qiymat true yoki false bo'lishi kerak."})
+        try:
+            invite = save_ratings(invite, request.data.get("expert", {}), request.data.get("ratings", {}), submit)
+        except RatingsError as exc:
+            raise ValidationError({"detail": str(exc)})
+        return Response(self.payload(invite))

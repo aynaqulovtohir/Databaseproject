@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
+import { ExpertPanelsCard } from '@/components/ExpertPanelsCard'
+import { QuizAnalysisCard } from '@/components/QuizAnalysisCard'
 import { QuizDialog } from '@/components/QuizDialog'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
@@ -620,6 +622,8 @@ function StaffView({ quiz }: { quiz: Quiz }) {
       <div className="grid gap-4">
         {survey ? <SurveyCard quiz={quiz} /> : null}
         <ResultsCard quiz={quiz} />
+        <QuizAnalysisCard quiz={quiz} />
+        <ExpertPanelsCard quiz={quiz} />
         {survey ? null : (
           <Card>
             <CardHeader>

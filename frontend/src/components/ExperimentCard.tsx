@@ -1,0 +1,255 @@
+import { useQuery } from '@tanstack/react-query'
+import { ChevronDown, Info } from 'lucide-react'
+
+import { ErrorState, ListSkeleton } from '@/components/States'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { api } from '@/lib/api'
+import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, StatTest } from '@/lib/types'
+
+const COHORTS: ExperimentCohort[] = ['experimental', 'control']
+
+function num(value: number | null | undefined, digits = 2) {
+  return value === null || value === undefined ? '—' : value.toFixed(digits)
+}
+
+function pText(p: number) {
+  return p < 0.001 ? '< 0.001' : p.toFixed(3)
+}
+
+/** «M (SD), n» — dissertatsiya jadvallaridagi ko'rinishda */
+function describe(value: Descriptive) {
+  if (!value.n || value.mean === null) return '—'
+  return `${value.mean.toFixed(1)} (${value.sd === null ? '—' : value.sd.toFixed(1)}), n = ${value.n}`
+}
+
+function normalityText(value: Normality | null | undefined) {
+  if (!value) return 'tekshirilmadi'
+  return `W = ${value.w.toFixed(3)}, p = ${pText(value.p)} — ${value.normal ? 'normal' : 'normal emas'}`
+}
+
+function TestRow({ title, test }: { title: string; test: StatTest | null }) {
+  if (!test) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium">{title}</TableCell>
+        <TableCell colSpan={4} className="text-sm text-muted-foreground">
+          Ma'lumot kam (har bir guruhda kamida 3 talaba kerak)
+        </TableCell>
+      </TableRow>
+    )
+  }
+  const { statistic } = test
+  return (
+    <TableRow className="align-top">
+      <TableCell className="font-medium">{title}</TableCell>
+      <TableCell className="max-w-64 whitespace-normal">
+        <div>{test.label}</div>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
+            Nega shu mezon?
+          </summary>
+          <div className="mt-1 grid gap-0.5 text-xs text-muted-foreground">
+            <span>{test.reason}</span>
+            {test.assumptions ? (
+              <>
+                <span>Shapiro–Uilk, tajriba: {normalityText(test.assumptions.normality.experimental)}</span>
+                <span>Shapiro–Uilk, nazorat: {normalityText(test.assumptions.normality.control)}</span>
+                <span>
+                  Levene:{' '}
+                  {test.assumptions.levene
+                    ? `F = ${test.assumptions.levene.f.toFixed(2)}, p = ${pText(test.assumptions.levene.p)} — ${test.assumptions.levene.equal ? 'dispersiyalar teng' : 'teng emas'}`
+                    : 'tekshirilmadi'}
+                </span>
+              </>
+            ) : test.normality !== undefined ? (
+              <span>Farqlar normalligi: {normalityText(test.normality)}</span>
+            ) : null}
+          </div>
+        </details>
+      </TableCell>
+      <TableCell className="text-right tabular-nums whitespace-nowrap">
+        {statistic.name}
+        {statistic.df !== undefined && statistic.df !== null ? `(${statistic.df})` : ''} = {num(statistic.value)}
+        {statistic.z !== undefined && statistic.z !== null ? <span className="block text-xs text-muted-foreground">z = {num(statistic.z)}</span> : null}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {pText(test.p)}
+        <span className="block">
+          <Badge variant={test.significant ? 'default' : 'outline'}>{test.significant ? 'ahamiyatli' : 'ahamiyatsiz'}</Badge>
+        </span>
+      </TableCell>
+      <TableCell className="text-right tabular-nums whitespace-nowrap">
+        {test.effect.name} = {num(test.effect.value)}
+        {test.effect.label ? <span className="block text-xs text-muted-foreground">{test.effect.label}</span> : null}
+      </TableCell>
+    </TableRow>
+  )
+}
+
+/** Tajriba natijasining statistik tahlili: tavsifiy statistika, Hake o'sishi, mezonni avtomatik tanlash, ANCOVA, quvvat */
+export function ExperimentCard() {
+  const analysis = useQuery({ queryKey: ['experiment'], queryFn: () => api<ExperimentAnalysis>('/experiment/') })
+
+  let content
+  if (analysis.isPending) content = <ListSkeleton rows={3} />
+  else if (analysis.isError) content = <ErrorState error={analysis.error} onRetry={() => void analysis.refetch()} />
+  else {
+    const data = analysis.data
+    const { cohorts, ancova, power } = data
+    content = (
+      <div className="grid gap-5">
+        {data.consent_required ? (
+          <p className="flex items-start gap-2 text-sm text-muted-foreground">
+            <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              Tadqiqotga rozi bo'lgan {data.students} ta talaba
+              {data.excluded_no_consent ? ` (${data.excluded_no_consent} tasi rozilik bermagan)` : ''}. Hisobga kirish va
+              chiqish testining ikkalasini topshirganlar olinadi.
+            </span>
+          </p>
+        ) : null}
+        {!data.quizzes.pre || !data.quizzes.post ? (
+          <p className="text-sm text-muted-foreground">Tahlil uchun kirish va chiqish testlari kerak.</p>
+        ) : null}
+
+        <div className="grid gap-2 rounded-xl border bg-muted/30 p-4">
+          <h3 className="text-sm font-semibold">Xulosa</h3>
+          <ul className="grid list-disc gap-1 pl-5 text-sm">
+            {data.conclusions.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="grid gap-2">
+          <h3 className="text-sm font-semibold">Tavsifiy statistika — M (SD), foizda</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Guruh</TableHead>
+                <TableHead className="text-right">Kirish</TableHead>
+                <TableHead className="text-right">Chiqish</TableHead>
+                <TableHead className="text-right">Kechiktirilgan</TableHead>
+                <TableHead className="text-right" title="Guruh uchun Hake o'sishi: (M chiqish − M kirish) / (100 − M kirish)">
+                  ⟨g⟩
+                </TableHead>
+                <TableHead className="text-right">Kirish → chiqish</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {COHORTS.map((key) => {
+                const cohort = cohorts[key]
+                return (
+                  <TableRow key={key} className="align-top">
+                    <TableCell className="font-medium">
+                      {cohort.label}
+                      {cohort.dropped ? (
+                        <span className="block text-xs font-normal text-muted-foreground">{cohort.dropped} ta chiqish testini topshirmagan</span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{describe(cohort.pre)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{describe(cohort.post)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{describe(cohort.delayed)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {num(cohort.gain.class)}
+                      {cohort.gain.level ? <span className="block text-xs text-muted-foreground">{cohort.gain.level}</span> : null}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {cohort.pre_post ? (
+                        <>
+                          {cohort.pre_post.label}: p {cohort.pre_post.p < 0.001 ? '< 0.001' : `= ${cohort.pre_post.p.toFixed(3)}`}
+                          <span className="block text-xs text-muted-foreground">
+                            {cohort.pre_post.effect.name} = {num(cohort.pre_post.effect.value)} ({cohort.pre_post.effect.label})
+                          </span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="grid gap-2">
+          <h3 className="text-sm font-semibold">Tajriba va nazorat guruhlarini solishtirish (α = {data.alpha})</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nima solishtiriladi</TableHead>
+                <TableHead>Mezon (avtomatik tanlangan)</TableHead>
+                <TableHead className="text-right">Statistika</TableHead>
+                <TableHead className="text-right">p</TableHead>
+                <TableHead className="text-right">Effekt</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TestRow title="Boshlang'ich tenglik (kirish testi)" test={data.baseline} />
+              <TestRow title="Chiqish testi" test={data.comparisons.post} />
+              <TestRow title="Hake o'sishi (g)" test={data.comparisons.gain} />
+              {data.quizzes.delayed ? <TestRow title="Kechiktirilgan test" test={data.comparisons.delayed} /> : null}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-xl border bg-card p-4">
+            <h3 className="text-sm font-semibold">ANCOVA: chiqish ~ guruh + kirish</h3>
+            {ancova ? (
+              <div className="mt-2 grid gap-1 text-sm">
+                <div className="tabular-nums">
+                  F({ancova.df1}, {ancova.df2}) = {num(ancova.f)}, p {ancova.p < 0.001 ? '< 0.001' : `= ${ancova.p.toFixed(3)}`}, qisman η² ={' '}
+                  {num(ancova.partial_eta2, 3)} ({ancova.effect_label})
+                </div>
+                <div className="text-muted-foreground tabular-nums">
+                  Tuzatilgan o'rtachalar: tajriba {num(ancova.adjusted_means.experimental, 1)}%, nazorat {num(ancova.adjusted_means.control, 1)}%
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Regressiya chiziqlari parallelligi:{' '}
+                  {ancova.slopes
+                    ? `F = ${num(ancova.slopes.f)}, p = ${pText(ancova.slopes.p)} — ${ancova.slopes.parallel ? 'shart bajarilgan' : "shart buzilgan, ehtiyot bo'ling"}`
+                    : 'tekshirilmadi'}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Ma'lumot kam: ikkala guruhda kirish va chiqish natijalari kerak.</p>
+            )}
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <h3 className="text-sm font-semibold">Statistik quvvat (α = {power.alpha}, maqsad {Math.round(100 * power.target)}%)</h3>
+            <div className="mt-2 grid gap-1 text-sm">
+              <div className="tabular-nums">
+                Kuzatilgan effekt d = {num(power.observed_d)} · erishilgan quvvat{' '}
+                {power.achieved === null ? '—' : `${Math.round(100 * power.achieved)}%`}
+              </div>
+              <div className="text-muted-foreground tabular-nums">
+                Har bir guruhda kerakli talabalar: kuzatilgan effekt uchun {power.required_per_group_observed ?? '—'}, o'rta effekt (d =
+                0.5) uchun {power.required_per_group_medium}
+              </div>
+              {power.approximate ? <div className="text-xs text-muted-foreground">Normal yaqinlashish: aniq qiymatdan ±3% farq qilishi mumkin.</div> : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tajriba natijasi: statistik tahlil</CardTitle>
+        <CardDescription>
+          Barcha ruxsat etilgan guruhlar bo'yicha (guruh tanlovi bu yerga ta'sir qilmaydi). Mezon shartlarga qarab tanlanadi:
+          ikkala guruhda taqsimot normal va dispersiyalar teng bo'lsa — Styudent t, teng bo'lmasa — Uelch t, normal bo'lmasa —
+          Mann–Uitni U.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  )
+}

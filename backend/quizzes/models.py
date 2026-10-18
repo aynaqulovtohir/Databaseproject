@@ -135,3 +135,63 @@ class QuizAttempt(models.Model):
         deadline = self.deadline
         now = now or timezone.now()
         return deadline is not None and now > deadline + timedelta(seconds=GRACE_SECONDS)
+
+
+class ExpertPanel(models.Model):
+    """Test yoki so'rovnomani ekspertlar baholashi (mazmun validligi: Lawshe CVR, CVI).
+
+    Yaratilganda savollar nusxasi (items) saqlanadi: ekspertlar aniq bir versiyani baholaydi, test keyin
+    tahrirlansa ham natija o'zgarmaydi (tuzatilgan versiya uchun yangi bosqich ochiladi). Hisob — quizzes/expert.py.
+    """
+
+    quiz = models.ForeignKey(
+        Quiz, verbose_name="test", null=True, blank=True, on_delete=models.SET_NULL, related_name="expert_panels"
+    )
+    quiz_title = models.CharField("test nomi", max_length=200)
+    title = models.CharField("nomi", max_length=200)
+    # Ekspertga: vosita nimani o'lchaydi (masalan, "ma'lumotlar bazasini loyihalash bo'yicha bilim")
+    construct = models.TextField("o'lchanadigan tushuncha", max_length=2000)
+    instructions = models.TextField("ekspertga ko'rsatma", blank=True, max_length=3000)
+    # [{"key": "1", "order": 1, "text": ..., "kind": ..., "choices": [{"text", "is_correct"}]}]
+    items = models.JSONField("savollar nusxasi")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="muallif", on_delete=models.PROTECT, related_name="expert_panels"
+    )
+    closes_at = models.DateTimeField("baholash tugash vaqti", null=True, blank=True)
+    created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ekspert baholashi"
+        verbose_name_plural = "ekspert baholashlari"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.title
+
+    def is_open(self, now=None):
+        return self.closes_at is None or (now or timezone.now()) < self.closes_at
+
+
+class ExpertInvite(models.Model):
+    """Bitta ekspertning shaxsiy havolasi va baholari. Havola tokeni bazada faqat xesh (SHA-256) ko'rinishida."""
+
+    panel = models.ForeignKey(ExpertPanel, verbose_name="ekspert baholashi", on_delete=models.CASCADE, related_name="invites")
+    # O'qituvchi uchun belgi (masalan, "1-ekspert, TATU"): ekspertning o'zi kiritgan ma'lumotdan alohida
+    label = models.CharField("belgi", max_length=200)
+    token_hash = models.CharField("havola xeshi", max_length=64, unique=True)
+    revoked = models.BooleanField("bekor qilingan", default=False)
+    # {"full_name", "degree", "position", "workplace", "experience_years"}
+    expert = models.JSONField("ekspert haqida", default=dict, blank=True)
+    # {"<item key>": {"essential": 1-3, "relevance": 1-4, "clarity": 1-4, "comment": str}}
+    ratings = models.JSONField("baholar", default=dict, blank=True)
+    created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
+    updated_at = models.DateTimeField("o'zgartirilgan vaqti", auto_now=True)
+    submitted_at = models.DateTimeField("yuborilgan vaqti", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "ekspert havolasi"
+        verbose_name_plural = "ekspert havolalari"
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.panel} / {self.label}"

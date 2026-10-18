@@ -4,7 +4,7 @@ from rest_framework import serializers
 from learning.serializers import AuthorSerializer, GroupsValidationMixin
 from users.models import StudentGroup
 
-from .models import LIKERT_SCALE, Choice, Question, Quiz
+from .models import LIKERT_SCALE, Choice, ExpertPanel, Question, Quiz
 from .services import attempt_status, percent
 
 MAX_QUESTIONS = 100
@@ -185,3 +185,57 @@ class StudentQuizSerializer(serializers.ModelSerializer):
         elif attempt:
             data["deadline"] = attempt.deadline
         return data
+
+
+class ExpertPanelSerializer(serializers.ModelSerializer):
+    """Ekspert baholashi. Yaratishda test tanlanadi va savollar nusxasi olinadi; keyin test o'zgarmaydi."""
+
+    author = AuthorSerializer(read_only=True)
+    quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
+    items_count = serializers.SerializerMethodField()
+    invites = serializers.SerializerMethodField()
+    results = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExpertPanel
+        fields = [
+            "id", "quiz", "quiz_title", "title", "construct", "instructions", "closes_at",
+            "author", "created_at", "items_count", "invites", "results",
+        ]
+        read_only_fields = ["id", "quiz_title", "author", "created_at"]
+        extra_kwargs = {"construct": {"max_length": 2000}, "instructions": {"max_length": 3000}}
+
+    def validate_quiz(self, quiz):
+        from .views import visible_quizzes
+
+        if not visible_quizzes(self.context["request"].user).filter(pk=quiz.pk).exists():
+            raise serializers.ValidationError("Faqat o'zingizning testingizni tanlashingiz mumkin.")
+        if not quiz.questions.exists():
+            raise serializers.ValidationError("Testda hali savol yo'q.")
+        return quiz
+
+    def get_items_count(self, panel):
+        return len(panel.items)
+
+    def get_invites(self, panel):
+        from .views import invite_payload
+
+        return [invite_payload(invite) for invite in panel.invites.all()]
+
+    def get_results(self, panel):
+        from .expert import results
+
+        return results(panel) if self.context.get("with_results") else None
+
+    def create(self, validated_data):
+        from .expert import snapshot
+
+        quiz = validated_data["quiz"]
+        return ExpertPanel.objects.create(
+            **validated_data, quiz_title=quiz.title, items=snapshot(quiz), author=self.context["request"].user
+        )
+
+    def update(self, instance, validated_data):
+        # Test va savollar nusxasi yaratilgandan keyin o'zgarmaydi (tuzatilgan versiya — yangi baholash)
+        validated_data.pop("quiz", None)
+        return super().update(instance, validated_data)

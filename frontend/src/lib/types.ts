@@ -1184,3 +1184,252 @@ export interface LabAnalysis {
   }
   labs: LabAnalysisRow[]
 }
+
+// ---------- Test psixometrikasi ----------
+
+export interface QuizChoiceAnalysis {
+  id: number
+  text: string
+  is_correct: boolean
+  /** Tanlaganlar ulushi (0-1): hammasi, yuqori va quyi 27% */
+  share: number | null
+  upper: number | null
+  lower: number | null
+  flag: string | null
+}
+
+export interface QuizQuestionAnalysis {
+  id: number
+  order: number
+  text: string
+  kind: 'single' | 'multiple'
+  points: number
+  p: number | null
+  r: number | null
+  discrimination: ScaleLabel | null
+  d: number | null
+  alpha_if_deleted: number | null
+  skipped: number | null
+  choices: QuizChoiceAnalysis[]
+  verdict: { key: 'good' | 'review' | 'replace'; label: string }
+  advice: string[]
+}
+
+export interface SurveyScaleAnalysis {
+  label: string
+  students: number
+  alpha: number | null
+  interpretation: ScaleLabel | null
+  items: { id: number; order: number; text: string; mean: number | null; r: number | null; alpha_if_deleted: number | null; advice: string[] }[]
+}
+
+interface QuizAnalysisBase {
+  consent_required: boolean
+  students: number
+  excluded_no_consent: number
+  min_students: number
+  reliable_students: number
+  enough: boolean
+}
+
+export type QuizAnalysis =
+  | (QuizAnalysisBase & {
+      kind: 'test'
+      reliability: {
+        coefficient: string
+        alpha: number | null
+        interpretation: ScaleLabel | null
+        questions: number
+        mean: number | null
+        sd: number | null
+        max: number
+        sem: number | null
+      } | null
+      extreme_groups?: number
+      questions: QuizQuestionAnalysis[]
+    })
+  | (QuizAnalysisBase & { kind: 'survey'; scales: SurveyScaleAnalysis[] })
+
+// ---------- Tajriba natijasining statistik tahlili ----------
+
+export type ExperimentCohort = 'experimental' | 'control'
+
+export interface Descriptive {
+  n: number
+  mean: number | null
+  sd: number | null
+}
+
+export interface Normality {
+  w: number
+  p: number
+  normal: boolean
+}
+
+export interface StatTest {
+  test: 'student' | 'welch' | 'mann_whitney' | 'paired_t' | 'wilcoxon'
+  label: string
+  reason: string
+  statistic: { name: string; value: number | null; df?: number | null; z?: number | null }
+  p: number
+  significant: boolean
+  effect: { name: string; value: number | null; label: string | null }
+  cohens_d?: number | null
+  assumptions?: {
+    normality: Record<ExperimentCohort, Normality | null>
+    levene: { f: number; p: number; equal: boolean } | null
+  }
+  normality?: Normality | null
+}
+
+export interface ExperimentAnalysis {
+  consent_required: boolean
+  students: number
+  excluded_no_consent: number
+  quizzes: { pre: number; post: number; delayed: number }
+  alpha: number
+  cohorts: Record<
+    ExperimentCohort,
+    {
+      label: string
+      students: number
+      dropped: number
+      pre: Descriptive
+      post: Descriptive
+      delayed: Descriptive
+      gain: { class: number | null; level: string | null; individual: Descriptive }
+      pre_post: StatTest | null
+      post_delayed: StatTest | null
+    }
+  >
+  baseline: StatTest | null
+  comparisons: { post: StatTest | null; gain: StatTest | null; delayed: StatTest | null }
+  ancova: {
+    f: number
+    df1: number
+    df2: number
+    p: number
+    significant: boolean
+    partial_eta2: number
+    effect_label: string
+    adjusted_means: Record<ExperimentCohort, number>
+    slopes: { f: number; p: number; parallel: boolean } | null
+  } | null
+  power: {
+    observed_d: number | null
+    achieved: number | null
+    required_per_group_observed: number | null
+    required_per_group_medium: number
+    target: number
+    alpha: number
+    approximate: boolean
+  }
+  conclusions: string[]
+}
+
+// ---------- Ekspert baholashi (mazmun validligi) ----------
+
+export interface ExpertItem {
+  key: string
+  order: number
+  text: string
+  kind: 'single' | 'multiple' | 'likert'
+  choices: { text: string; is_correct: boolean }[]
+}
+
+export interface ExpertRating {
+  /** Lawshe: 3 — zarur, 2 — foydali, lekin zarur emas, 1 — keraksiz */
+  essential?: number
+  /** Mosligi 1-4 */
+  relevance?: number
+  /** Aniqligi 1-4 */
+  clarity?: number
+  comment?: string
+}
+
+export interface ExpertInfo {
+  full_name?: string
+  degree?: string
+  position?: string
+  workplace?: string
+  experience_years?: number | null
+}
+
+/** Ekspert sahifasi (login yo'q, shaxsiy havola) */
+export interface ExpertPage {
+  title: string
+  quiz_title: string
+  construct: string
+  instructions: string
+  label: string
+  open: boolean
+  closes_at: string | null
+  submitted_at: string | null
+  items: ExpertItem[]
+  expert: ExpertInfo
+  ratings: Record<string, ExpertRating>
+}
+
+export interface ExpertInvite {
+  id: number
+  label: string
+  revoked: boolean
+  started: boolean
+  rated: number
+  submitted_at: string | null
+  created_at: string
+}
+
+export interface ExpertResults {
+  experts: number
+  invited: number
+  min_experts: number
+  recommended_experts: number
+  cvr_critical: number | null
+  cvr_testable: boolean
+  i_cvi_target: number | null
+  summary: {
+    cvi: number | null
+    s_cvi_ave: number | null
+    s_cvi_ave_ok: boolean
+    s_cvi_ua: number | null
+    s_cvi_ua_ok: boolean
+    s_cvi_ave_target: number
+    s_cvi_ua_target: number
+    keep: number
+    revise: number
+    remove: number
+  }
+  items: {
+    key: string
+    order: number
+    text: string
+    essential: number
+    cvr: number | null
+    cvr_ok: boolean
+    relevant: number
+    i_cvi: number | null
+    i_cvi_ok: boolean
+    kappa: number | null
+    kappa_label: string | null
+    clarity: number | null
+    verdict: { key: 'keep' | 'revise' | 'remove'; label: string } | null
+    comments: string[]
+  }[]
+  panel_experts: (ExpertInfo & { label: string; submitted_at: string })[]
+}
+
+export interface ExpertPanel {
+  id: number
+  quiz: number | null
+  quiz_title: string
+  title: string
+  construct: string
+  instructions: string
+  closes_at: string | null
+  author: PersonShort
+  created_at: string
+  items_count: number
+  invites: ExpertInvite[]
+  results: ExpertResults | null
+}
