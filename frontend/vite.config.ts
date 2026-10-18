@@ -22,4 +22,9 @@ export default defineConfig({
       },
     },
   },
+  // vite preview faqat brauzer testlarida (docker-compose.e2e.yml): Playwright konteyneri shu nom bilan murojaat qiladi.
+  // Ishchi serverda frontend'ni Caddy beradi, preview ishlatilmaydi
+  preview: {
+    allowedHosts: ['e2e_frontend'],
+  },
 })
