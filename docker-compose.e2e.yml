@@ -1,0 +1,68 @@
+# Brauzer testlari (Playwright). Asosiy fayl bilan birga ishga tushiriladi:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml run --rm e2e
+# Alohida baza (dbproject_e2e) har safar noldan yaratiladi: ishlab chiqish bazasiga tegilmaydi.
+# Frontend ishchi serverdagidek yig'iladi (vite build) va vite preview orqali beriladi.
+# Batafsil: frontend/e2e/README.md
+services:
+  e2e_backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      E2E: "1"
+      POSTGRES_DB: dbproject_e2e
+      # Frontend proksi so'rovlari Host: e2e_frontend bilan keladi
+      ALLOWED_HOSTS: e2e_frontend,localhost,127.0.0.1
+      LAB_DB_HOST: lab_db
+      LAB_DB_PORT: "5432"
+      LAB_DB_USER: ${LAB_DB_USER:-lab_admin}
+      LAB_DB_PASSWORD: ${LAB_DB_PASSWORD:?LAB_DB_PASSWORD .env faylida ko'rsatilishi kerak}
+    command: sh -c "python manage.py seed_e2e && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+    networks:
+      - default
+      - lab
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/')"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    depends_on:
+      db:
+        condition: service_healthy
+      lab_db:
+        condition: service_healthy
+
+  e2e_frontend:
+    image: docker.io/library/node:24
+    working_dir: /app
+    environment:
+      VITE_API_PROXY_TARGET: http://e2e_backend:8000
+    # dist/ ga tegmaslik uchun yig'ma konteyner ichida qoladi
+    command: sh -c "npx vite build --outDir /tmp/e2e-dist && npx vite preview --outDir /tmp/e2e-dist --host 0.0.0.0 --port 4173 --strictPort"
+    volumes:
+      - ./frontend:/app
+    # Testlarni konteynersiz ishga tushirish uchun (frontend/e2e/README.md): faqat shu kompyuterdan
+    ports:
+      - "127.0.0.1:4173:4173"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    depends_on:
+      e2e_backend:
+        condition: service_healthy
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.63.0-noble
+    working_dir: /app
+    environment:
+      BASE_URL: http://e2e_frontend:4173
+    command: npx playwright test
+    volumes:
+      - ./frontend:/app
+    shm_size: 1gb
+    depends_on:
+      e2e_frontend:
+        condition: service_healthy
