@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart3 } from 'lucide-react'
 import { useState } from 'react'
 
+import { ExperimentCard } from '@/components/ExperimentCard'
 import { LabAnalysisCard } from '@/components/LabAnalysisCard'
 import { GroupMasteryCard } from '@/components/LearningPath'
 import { PageHeader } from '@/components/PageHeader'
@@ -492,6 +493,7 @@ export function StatisticsPage() {
           <StatTile label="O'rtacha baho" value={data.overview.average_grade === null ? '—' : String(data.overview.average_grade)} hint="100 ballik" />
         </div>
         <GroupsCard groups={data.groups} />
+        <ExperimentCard />
         <LearningCurveCard points={data.learning_curve} />
         <div className="grid items-start gap-4 xl:grid-cols-2">
           <ErrorsCard errors={data.top_errors} />

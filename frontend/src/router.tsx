@@ -10,6 +10,7 @@ import { GroupsPage } from '@/pages/admin/GroupsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
+import { ExpertPage } from '@/pages/ExpertPage'
 import { BlindReviewPage } from '@/pages/BlindReviewPage'
 import { CompetencePage } from '@/pages/CompetencePage'
 import { HomePage } from '@/pages/HomePage'
@@ -58,6 +59,8 @@ function LoginRoute() {
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginRoute /> },
+  // Ekspert baholashi: login yo'q, shaxsiy havola tokeni bilan
+  { path: '/expert/:token', element: <ExpertPage /> },
   {
     element: <RequireAuth />,
     children: [

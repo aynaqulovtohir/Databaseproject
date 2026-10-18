@@ -318,6 +318,28 @@ xulosa                      yaxshi | qayta_korib_chiqing | tekshiring_almashtiri
 Oxirgi qator (laboratoriya_id = "alfa"): laboratoriyalar to'plamining Cronbach α si, unga kirgan
 laboratoriyalar va talabalar soni (barcha guruhlarga berilgan va hammasini boshlagan talabalar).
 
+testlar_tahlili.csv — test va so'rovnoma savollarining psixometrik tahlili
+--------------------------------------------------------------------------
+Faqat topshirgan va rozi bo'lgan talabalar; kamida 5 ta topshirish bo'lmasa ko'rsatkichlar bo'sh.
+qiyinlik_p                  savol bo'yicha o'rtacha ball ulushi (0-1)
+ajratish_r                  tuzatilgan korrelyatsiya: savol bali va qolgan savollar yig'indisi (Pirson)
+ajratish_D                  yuqori va quyi 27% talabalar o'rtacha ball ulushlari farqi
+alfa_olib_tashlansa         shu savolsiz KR-20 / Cronbach α
+ortacha_likert              so'rovnoma: fikrga o'rtacha qo'shilish (1-5)
+otkazib_yuborilgan          savolga javob bermaganlar ulushi
+xulosa                      test: yaxshi | qayta_korib_chiqing | tekshiring_almashtiring; so'rovnoma: shkala nomi
+Har bir testdan keyingi "alfa" qatori: koeffitsiyent nomi (KR-20 yoki Cronbach α), qiymati va talabalar soni.
+
+ekspert_baholash.csv — test va so'rovnomalarning mazmun validligi (ekspertlar ismi kirmaydi)
+--------------------------------------------------------------------------------------------
+ekspertlar                  baholarini yuborgan ekspertlar soni (N)
+zarur_deganlar, cvr         Lawshe: "zarur" deganlar soni va CVR = (n_e − N/2) / (N/2)
+cvr_kritik                  binomial taqsimot bo'yicha kritik qiymat (α = 0.05, Ayre & Scally, 2014); N < 5 da bo'sh
+mos_deganlar, i_cvi         mosligini 3 yoki 4 deb baholaganlar soni va ulushi (talab: N ≤ 5 da 1.00, N ≥ 6 da 0.78)
+kappa                       modifikatsiyalangan kappa (Polit, 2007): > 0.74 a'lo, 0.60-0.74 yaxshi, 0.40-0.59 qoniqarli
+aniqlik                     savol aniqligining o'rtacha bahosi (1-4)
+xulosa                      qoldirish | qayta_korib_chiqish | olib_tashlash (kamida 3 ekspert bo'lganda)
+
 kompetentlik.csv — har bir talaba, kesim va kompetentlik komponenti
 ---------------------------------------------------------------------
 talaba, guruh, ai_yoqilgan
@@ -731,6 +753,95 @@ def _lab_analysis_rows(labs, groups):
     return rows
 
 
+QUIZ_ANALYSIS_COLUMNS = [
+    "test_id",
+    "test",
+    "test_turi",
+    "savol_raqami",
+    "qiyinlik_p",
+    "ajratish_r",
+    "ajratish_D",
+    "alfa_olib_tashlansa",
+    "ortacha_likert",
+    "otkazib_yuborilgan",
+    "xulosa",
+    "alfa",
+    "talabalar",
+]
+
+
+def _quiz_analysis_rows(quizzes):
+    """Har bir test savolining psixometrik ko'rsatkichlari va testning ishonchliligi (alfa qatori)."""
+    from quizzes.psychometrics import analyse_quiz
+
+    rows = []
+    for quiz in sorted(quizzes, key=lambda item: item.pk):
+        result = analyse_quiz(quiz)
+        kind = QUIZ_KINDS.get(quiz.kind, quiz.kind)
+        blank = lambda: [""] * len(QUIZ_ANALYSIS_COLUMNS)  # noqa: E731
+        if result["kind"] == "test":
+            for question in result["questions"]:
+                rows.append(
+                    [quiz.pk, quiz.title, kind, question["order"], _blank(question["p"]), _blank(question["r"]), _blank(question["d"]),
+                     _blank(question["alpha_if_deleted"]), "", _blank(question["skipped"]),
+                     VERDICT_CODES[question["verdict"]["key"]], "", result["students"]]
+                )
+            row = blank()
+            row[:4] = [quiz.pk, quiz.title, kind, "alfa"]
+            reliability = result["reliability"] or {}
+            row[10] = reliability.get("coefficient", "")
+            row[11] = _blank(reliability.get("alpha"))
+            row[12] = result["students"]
+            rows.append(row)
+            continue
+        for scale in result["scales"]:
+            for item in scale["items"]:
+                rows.append(
+                    [quiz.pk, quiz.title, kind, item["order"], "", _blank(item["r"]), "", _blank(item["alpha_if_deleted"]),
+                     _blank(item["mean"]), "", scale["label"], "", scale["students"]]
+                )
+            row = blank()
+            row[:4] = [quiz.pk, quiz.title, kind, "alfa"]
+            row[10], row[11], row[12] = scale["label"], _blank(scale["alpha"]), scale["students"]
+            rows.append(row)
+    return rows
+
+
+EXPERT_COLUMNS = [
+    "baholash_id",
+    "baholash",
+    "test",
+    "savol_raqami",
+    "ekspertlar",
+    "zarur_deganlar",
+    "cvr",
+    "cvr_kritik",
+    "mos_deganlar",
+    "i_cvi",
+    "kappa",
+    "aniqlik",
+    "xulosa",
+]
+EXPERT_VERDICTS = {"keep": "qoldirish", "revise": "qayta_korib_chiqish", "remove": "olib_tashlash"}
+
+
+def _expert_rows(quizzes):
+    """Ekspert baholashlari natijasi (ekspertlarning ismi kirmaydi, faqat soni)."""
+    from quizzes.expert import results
+    from quizzes.models import ExpertPanel
+
+    rows = []
+    for panel in ExpertPanel.objects.filter(quiz__in=quizzes).prefetch_related("invites").order_by("id"):
+        result = results(panel)
+        for item in result["items"]:
+            rows.append(
+                [panel.pk, panel.title, panel.quiz_title, item["order"], result["experts"], item["essential"], _blank(item["cvr"]),
+                 _blank(result["cvr_critical"]), item["relevant"], _blank(item["i_cvi"]), _blank(item["kappa"]),
+                 _blank(item["clarity"]), EXPERT_VERDICTS[item["verdict"]["key"]] if item["verdict"] else ""]
+            )
+    return rows
+
+
 def build_export(labs, quizzes=None, groups=None):
     """Berilgan laboratoriyalar, testlar va guruhlar (kompetentlik) bo'yicha ZIP arxiv (bytes) qaytaradi.
 
@@ -829,6 +940,8 @@ def build_export(labs, quizzes=None, groups=None):
             quiz_rows, answer_rows = _quiz_rows(quizzes, allowed)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))
             zip_file.writestr("test_javoblari.csv", _csv(ANSWER_COLUMNS, answer_rows))
+            zip_file.writestr("testlar_tahlili.csv", _csv(QUIZ_ANALYSIS_COLUMNS, _quiz_analysis_rows(quizzes)))
+            zip_file.writestr("ekspert_baholash.csv", _csv(EXPERT_COLUMNS, _expert_rows(quizzes)))
         if groups is not None:
             zip_file.writestr("kompetentlik.csv", _csv(COMPETENCE_COLUMNS, _competence_rows(groups, allowed)))
             zip_file.writestr("laboratoriyalar_tahlili.csv", _csv(LAB_ANALYSIS_COLUMNS, _lab_analysis_rows(labs_queryset, groups)))

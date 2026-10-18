@@ -136,6 +136,8 @@ REST_FRAMEWORK = {
         "quiz_save": "120/min",
         # Tadqiqotga rozilik matnini ko'rish va qaror berish
         "consent": "30/min",
+        # Ekspert sahifasi (login yo'q): bitta IP manzildan
+        "expert": "60/min",
     },
 }
 
