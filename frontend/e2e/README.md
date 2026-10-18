@@ -21,7 +21,7 @@ Hisobot: `frontend/playwright-report/index.html`, yiqilgan testlarning skrinshot
 ### Konteynersiz (Node va Google Chrome o'rnatilgan bo'lsa)
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --wait --force-recreate e2e_backend e2e_frontend
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --wait --force-recreate e2e-backend e2e-frontend
 cd frontend && BASE_URL=http://127.0.0.1:4173 PW_CHANNEL=chrome npx playwright test
 ```
 

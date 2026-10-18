@@ -10,10 +10,10 @@ compose() { docker compose -f docker-compose.yml -f docker-compose.e2e.yml "$@";
 
 compose up -d --wait db lab_db
 # Qayta yaratish: seed_e2e bazani noldan tayyorlaydi, login cheklovi hisoblagichi ham tozalanadi
-compose up -d --wait --force-recreate --no-deps e2e_backend e2e_frontend
+compose up -d --wait --force-recreate --no-deps e2e-backend e2e-frontend
 
 status=0
 compose run --rm --no-deps e2e npx playwright test "$@" || status=$?
 
-compose rm -sf e2e_backend e2e_frontend >/dev/null
+compose rm -sf e2e-backend e2e-frontend >/dev/null
 exit $status
