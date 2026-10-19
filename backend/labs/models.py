@@ -37,6 +37,7 @@ class Lab(models.Model):
         # Kurs tartibida: moslashuvchan o'quv yo'li avval oldingi mavzuni o'zlashtirishni tavsiya qiladi
         ER = "er", "ER-model"
         DESIGN = "design", "Jadvallarni loyihalash"
+        INTEGRITY = "integrity", "Yaxlitlik cheklovlari"
         NORM = "norm", "Normallashtirish"
         ER_SQL = "er_sql", "ER-modeldan jadvallarga"
         SELECT = "select", "SELECT so'rovlari"
@@ -83,6 +84,10 @@ class Lab(models.Model):
     # Tranzaksiya laboratoriyasi: talaba kodi (BEGIN ... COMMIT) ikki sessiyada bir vaqtda bajariladi va natija
     # ketma-ket bajarilgandagiga teng bo'lishi kerak (yo'qolgan yangilanish, "tekshir-keyin-bajar" poygasi)
     concurrent = models.BooleanField("ikki sessiyada bir vaqtda tekshiriladi", default=False)
+    # Yaxlitlik cheklovlari laboratoriyasi (labs/probes.py): talaba kodidan keyin har bir sinov alohida tranzaksiyada
+    # bajariladi. "attack" — noto'g'ri ma'lumot, cheklov uni rad etishi kerak; "valid" — to'g'ri ma'lumot, qabul
+    # qilinishi kerak. [{"id", "title", "kind", "sql", "hidden"}]; yashirin sinovning nomi va SQL'i talabaga ko'rinmaydi
+    probes = models.JSONField("cheklov sinovlari", default=list, blank=True)
     # Bo'sh bo'lsa, laboratoriya turidan aniqlanadi (effective_topic)
     topic = models.CharField("mavzu", max_length=20, choices=Topic.choices, blank=True)
     author = models.ForeignKey(
@@ -134,6 +139,8 @@ class Lab(models.Model):
             return self.Topic.ER
         if self.kind == self.Kind.NORM:
             return self.Topic.NORM
+        if self.probes:
+            return self.Topic.INTEGRITY
         if self.concurrent:
             return self.Topic.TRANSACTION
         if self.plan_query.strip():

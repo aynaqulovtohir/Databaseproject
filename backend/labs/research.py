@@ -151,6 +151,10 @@ ERROR_CATEGORIES = {
 
 # Namunadan farq matni -> toifa. Birinchi mos kelgani olinadi, shuning uchun aniqrog'i oldinda turadi.
 DIFFERENCE_CATEGORIES = [
+    # Yaxlitlik cheklovlari laboratoriyasi (labs/probes.py)
+    ("» — o'tib ketdi", "cheklov_hujum_otdi"),
+    ("rad etildi, lekin u to'g'ri ma'lumot", "cheklov_togri_rad_etildi"),
+    ("Yashirin sinovlardan", "cheklov_yashirin_sinov"),
     # ER-diagramma laboratoriyasi
     ("obyekt yetishmaydi", "er_obyekt_yetishmaydi"),
     ("Ortiqcha obyekt", "er_ortiqcha_obyekt"),

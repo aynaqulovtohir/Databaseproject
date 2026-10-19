@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { CheckList } from '@/components/CheckList'
 import { ErEditor } from '@/components/ErEditor'
 import { FormField } from '@/components/FormField'
+import { ProbesEditor } from '@/components/Probes'
 import { LEVEL_LABELS } from '@/components/LabLevel'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,9 +17,9 @@ import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
 import { applyFormError } from '@/lib/forms'
 import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
-import type { ErDiagram, Lab, LabKind } from '@/lib/types'
+import type { ErDiagram, Lab, LabKind, LabProbe } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'topic', 'level', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'probes', 'topic', 'level', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -37,6 +38,7 @@ const TOPIC_OPTIONS = [
   ['', "Avtomatik (laboratoriya turidan)"],
   ['er', 'ER-model'],
   ['design', 'Jadvallarni loyihalash'],
+  ['integrity', 'Yaxlitlik cheklovlari'],
   ['norm', 'Normallashtirish'],
   ['er_sql', 'ER-modeldan jadvallarga'],
   ['select', "SELECT so'rovlari"],
@@ -68,6 +70,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planQuery, setPlanQuery] = useState(lab?.plan_query ?? '')
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
+  const [probes, setProbes] = useState<LabProbe[]>(lab?.probes ?? [])
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
   const [topic, setTopic] = useState(lab?.topic ?? '')
   const [level, setLevel] = useState(lab?.level ? String(lab.level) : '')
@@ -96,6 +99,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               plan_query: planQuery,
               plan_forbidden: planForbidden,
               concurrent,
+              probes,
             }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
@@ -364,6 +368,20 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 {errors.concurrent ? (
                   <p className="text-xs text-destructive" role="alert">
                     {errors.concurrent}
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-1.5">
+                <span className="text-sm font-medium">Cheklov sinovlari (yaxlitlik cheklovlari laboratoriyasi, ixtiyoriy)</span>
+                <p className="text-xs text-muted-foreground">
+                  Talaba kodidan keyin har biri alohida bajariladi va orqaga qaytariladi. Hujumni cheklov rad etishi, to'g'ri
+                  ma'lumotni qabul qilishi kerak. Saqlashda tekshiriladi: hujum cheklovsiz o'tadi, namunaviy yechim esa
+                  barcha sinovdan o'tadi. Yashirin sinovlarning faqat soni talabaga ko'rinadi.
+                </p>
+                <ProbesEditor value={probes} onChange={setProbes} />
+                {errors.probes ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {errors.probes}
                   </p>
                 ) : null}
               </div>

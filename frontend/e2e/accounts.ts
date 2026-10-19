@@ -17,3 +17,4 @@ export const storageState = (role: SavedRole) => `e2e/.auth/${role}.json`
 export const QUIZ_TITLE = 'E2E: normallashtirish'
 
 export const ER_LAB_TITLE = 'E2E: ER-diagramma'
+export const INTEGRITY_LAB_TITLE = 'Cheklovlar 1. Kutubxona: NOT NULL, UNIQUE va CHECK'
