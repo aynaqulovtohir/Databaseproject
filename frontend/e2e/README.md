@@ -41,3 +41,9 @@ Refresh token har yangilanishda almashtiriladi va eski nusxa qayta ishlatilsa se
 yopadi. Shuning uchun saqlangan sessiya bilan ishlaydigan testlar `test` va `expect` ni `@playwright/test`
 dan emas, `./fixtures.ts` dan oladi: test tugagach yangi cookie `e2e/.auth/` ga qayta yoziladi.
 Saqlangan sessiyada "Chiqish" bosilmasin, aks holda keyingi testlar shu rol uchun kira olmaydi.
+
+## Playwright'ni yangilash
+
+Dependabot `@playwright/test` ni yangilamaydi: paket versiyasi (`package.json`, aniq versiya) va
+`docker-compose.e2e.yml` dagi `mcr.microsoft.com/playwright:vX.Y.Z-noble` obrazi bir xil bo'lishi kerak.
+Ikkalasini bitta PR'da birga o'zgartiring.
