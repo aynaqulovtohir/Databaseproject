@@ -62,7 +62,7 @@ class ConsentTests(APITestCase):
     def test_new_text_version_asks_again_but_keeps_previous_decision(self):
         self.client.force_authenticate(self.student)
         self.client.post(URL, {"agreed": True}, format="json")
-        with patch("users.consent.CONSENT_VERSION", "2"):
+        with patch("users.consent.CONSENT_VERSION", "yangi"):
             self.assertTrue(self.me()["consent_needed"])
             self.assertEqual(participant_ids(), {self.student.pk})
 

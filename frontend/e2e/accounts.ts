@@ -15,3 +15,5 @@ export type SavedRole = 'admin' | 'teacher' | 'student'
 export const storageState = (role: SavedRole) => `e2e/.auth/${role}.json`
 
 export const QUIZ_TITLE = 'E2E: normallashtirish'
+
+export const ER_LAB_TITLE = 'E2E: ER-diagramma'

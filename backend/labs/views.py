@@ -38,6 +38,7 @@ from .models import (
     AIAction,
     AIOutputReview,
     BlindReview,
+    ErSnapshot,
     InterviewMessage,
     Lab,
     LabAttempt,
@@ -366,6 +367,52 @@ class LabViewSet(viewsets.ModelViewSet):
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
         return Response(result)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="er-snapshot",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="er_snapshot",
+    )
+    def er_snapshot(self, request, pk=None):
+        """ER muharriri chizish jarayonidagi oraliq holatni yuboradi (labs/process.py). Javob tanasiz (204)."""
+        from .process import MAX_SNAPSHOTS
+
+        if not request.user.is_student:
+            raise PermissionDenied("Chizish jarayoni faqat talaba uchun yoziladi.")
+        lab = self.get_object()
+        if lab.kind != Lab.Kind.ER:
+            raise ValidationError({"detail": "Bu laboratoriyada ER-diagramma chizilmaydi."})
+        serializer = DiagramRunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        diagram = serializer.validated_data["diagram"]
+        snapshots = ErSnapshot.objects.filter(lab=lab, student=request.user)
+        last = snapshots.order_by("-created_at", "-id").values_list("diagram", flat=True).first()
+        if diagram != last and snapshots.count() < MAX_SNAPSHOTS:
+            ErSnapshot.objects.create(lab=lab, student=request.user, diagram=diagram)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def process(self, request, pk=None):
+        """O'qituvchi uchun: talabaning ER-diagramma chizish jarayoni (?student=<id>) — qadamlar va ko'rsatkichlar."""
+        from .process import process_payload
+
+        if request.user.is_student:
+            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+        lab = self.get_object()
+        if lab.kind != Lab.Kind.ER:
+            raise ValidationError({"detail": "Jarayon tahlili faqat ER-diagramma laboratoriyasida bor."})
+        student_id = request.query_params.get("student", "")
+        if not student_id.isdigit():
+            raise ValidationError({"student": "Talaba raqami butun son bo'lishi kerak."})
+        student = get_object_or_404(
+            User.objects.filter(role=User.Role.STUDENT, group__in=lab.groups.all()), pk=student_id
+        )
+        snapshots = ErSnapshot.objects.filter(lab=lab, student=student).order_by("created_at", "id")
+        attempts = LabAttempt.objects.filter(lab=lab, student=student).order_by("created_at", "id")
+        return Response(process_payload(lab, snapshots, attempts))
 
     @action(detail=False, methods=["get"], url_path="research-export")
     def research_export(self, request):

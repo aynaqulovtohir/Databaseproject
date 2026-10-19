@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
+import { ErProcessView } from '@/components/ErProcessView'
 import { InterviewPanel, RequirementList } from '@/components/InterviewPanel'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { PeerReviewPanel } from '@/components/PeerReviewPanel'
@@ -276,6 +277,7 @@ function MistakesCard({ lab }: { lab: Lab }) {
 
 function ProgressCard({ lab }: { lab: Lab }) {
   const [viewing, setViewing] = useState<LabStudentProgress | null>(null)
+  const [processOf, setProcessOf] = useState<LabStudentProgress | null>(null)
   const progress = useQuery({
     queryKey: ['lab-progress', lab.id],
     queryFn: () => api<LabStudentProgress[]>(`/labs/${lab.id}/progress/`),
@@ -326,11 +328,18 @@ function ProgressCard({ lab }: { lab: Lab }) {
               </TableCell>
               <TableCell>{formatDateTime(student.last_attempt_at)}</TableCell>
               <TableCell className="text-right">
-                {student.code || student.diagram ? (
-                  <Button variant="outline" size="lg" onClick={() => setViewing(student)}>
-                    {lab.kind === 'er' ? "Diagrammani ko'rish" : "Kodni ko'rish"}
-                  </Button>
-                ) : null}
+                <span className="inline-flex flex-wrap justify-end gap-2">
+                  {student.code || student.diagram ? (
+                    <Button variant="outline" size="lg" onClick={() => setViewing(student)}>
+                      {lab.kind === 'er' ? "Diagrammani ko'rish" : "Kodni ko'rish"}
+                    </Button>
+                  ) : null}
+                  {lab.kind === 'er' ? (
+                    <Button variant="outline" size="lg" onClick={() => setProcessOf(student)}>
+                      Jarayon
+                    </Button>
+                  ) : null}
+                </span>
               </TableCell>
             </TableRow>
           ))}
@@ -381,6 +390,18 @@ function ProgressCard({ lab }: { lab: Lab }) {
               <p className="text-xs whitespace-pre-wrap text-muted-foreground">AI: {viewing.explanation.feedback}</p>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(processOf)} onOpenChange={(open) => (!open ? setProcessOf(null) : undefined)}>
+        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{processOf ? `${fullName(processOf)}: chizish jarayoni` : ''}</DialogTitle>
+            <DialogDescription>
+              Diagramma qanday tartibda chizilgani va namunaga qanday yaqinlashgani. Slayder yoki grafikdagi nuqta bilan
+              istalgan qadamni ko'ring.
+            </DialogDescription>
+          </DialogHeader>
+          {processOf ? <ErProcessView labId={lab.id} studentId={processOf.id} /> : null}
         </DialogContent>
       </Dialog>
     </Card>
@@ -814,6 +835,7 @@ function StudentView({ lab }: { lab: Lab }) {
                 initialDiagram={progress.last_diagram}
                 initialFix={progress.last_fix}
                 gradable
+                record
                 onResult={(result, diagram) => handleResult(result, { diagram })}
                 onDiagramChange={(diagram) => (work.current = { diagram })}
               />

@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { CircleCheck, CircleX, Loader2, Search, Send, Sparkles, Wrench } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ConfidencePicker } from '@/components/ConfidencePicker'
@@ -8,9 +8,9 @@ import { ErEditor, ErFixLegend } from '@/components/ErEditor'
 import { AiAdvice, GradeCard } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
-import { api, errorMessage, fieldErrors } from '@/lib/api'
+import { api, apiFetch, errorMessage, fieldErrors } from '@/lib/api'
 import { useConfidence } from '@/lib/confidence'
-import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
+import { cleanDiagram, EMPTY_DIAGRAM, snapshotDiagram } from '@/lib/er'
 import type { ErDiagram, ErFix, LabRunResult } from '@/lib/types'
 
 function ErVerdict({ result }: { result: LabRunResult }) {
@@ -96,6 +96,46 @@ interface ErLabRunnerProps {
   onResult?: (result: LabRunResult, diagram: ErDiagram) => void
   /** Diagramma o'zgarganda (murabbiyga hozirgi ishni yuborish uchun) */
   onDiagramChange?: (diagram: ErDiagram) => void
+  /** true bo'lsa, chizish jarayoni yoziladi (talaba uchun; o'qituvchi uni «Jarayon» oynasida ko'radi) */
+  record?: boolean
+}
+
+const SNAPSHOT_INTERVAL_MS = 10_000
+
+/**
+ * Chizish jarayonini yozish: diagramma o'zgargan bo'lsa, har 10 soniyada, sahifa yashirilganda va muharrir
+ * yopilganda oraliq holat serverga yuboriladi. Xato talabaga ko'rsatilmaydi: keyingi o'zgarishda qayta yuboriladi.
+ */
+function useErRecorder(labId: number, diagram: ErDiagram, enabled: boolean) {
+  const latest = useRef(diagram)
+  const sent = useRef(JSON.stringify(snapshotDiagram(diagram)))
+
+  useEffect(() => {
+    latest.current = diagram
+  }, [diagram])
+
+  useEffect(() => {
+    if (!enabled) return
+    function flush(keepalive = false) {
+      const snapshot = snapshotDiagram(latest.current)
+      const text = JSON.stringify(snapshot)
+      if (text === sent.current) return
+      sent.current = text
+      apiFetch(`/labs/${labId}/er-snapshot/`, { method: 'POST', body: { diagram: snapshot }, keepalive }).catch(
+        () => undefined,
+      )
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === 'hidden') flush(true)
+    }
+    const timer = window.setInterval(flush, SNAPSHOT_INTERVAL_MS)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      flush(true)
+    }
+  }, [labId, enabled])
 }
 
 /** ER-diagramma muharriri, tekshirish va baholashga topshirish. */
@@ -106,8 +146,10 @@ export function ErLabRunner({
   gradable = false,
   onResult,
   onDiagramChange,
+  record = false,
 }: ErLabRunnerProps) {
   const [diagram, setDiagram] = useState<ErDiagram>(initialDiagram ?? EMPTY_DIAGRAM)
+  useErRecorder(labId, diagram, record)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const confidence = useConfidence()
 

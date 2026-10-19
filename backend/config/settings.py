@@ -124,6 +124,8 @@ REST_FRAMEWORK = {
         "lab_try": "30/min",
         # Bitta talaba laboratoriyani baholashga topshirish soni
         "lab_submit": "6/min",
+        # ER muharriri chizish jarayonidagi oraliq holatlar (har 10 soniyada va sahifadan chiqishda)
+        "er_snapshot": "20/min",
         "blind_review": "60/min",
         # O'zaro baholash: talaba guruhdoshi ishini baholashi va izohni "foydali" deb belgilashi
         "peer_review": "20/min",
