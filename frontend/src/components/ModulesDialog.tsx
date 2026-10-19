@@ -21,7 +21,21 @@ interface Draft {
   description: string
   order: string
   sequential: boolean
+  examStart: string
+  examEnd: string
   labs: number[]
+}
+
+/** ISO vaqt -> <input type="datetime-local"> qiymati (brauzerning mahalliy vaqtida) */
+function toLocalInput(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function fromLocalInput(value: string) {
+  return value ? new Date(value).toISOString() : null
 }
 
 function draftOf(module: LabModule | null, nextOrder: number): Draft {
@@ -31,9 +45,11 @@ function draftOf(module: LabModule | null, nextOrder: number): Draft {
         description: module.description,
         order: String(module.order),
         sequential: module.sequential,
+        examStart: toLocalInput(module.exam_starts_at),
+        examEnd: toLocalInput(module.exam_ends_at),
         labs: module.labs.map((lab) => lab.id),
       }
-    : { title: '', description: '', order: String(nextOrder), sequential: true, labs: [] }
+    : { title: '', description: '', order: String(nextOrder), sequential: true, examStart: '', examEnd: '', labs: [] }
 }
 
 function ModuleEditor({
@@ -67,6 +83,8 @@ function ModuleEditor({
         description: draft.description,
         order: Number(draft.order) || 0,
         sequential: draft.sequential,
+        exam_starts_at: fromLocalInput(draft.examStart),
+        exam_ends_at: fromLocalInput(draft.examEnd),
       }
       const saved = module
         ? await api<LabModule>(`/lab-modules/${module.id}/`, { method: 'PATCH', body })
@@ -143,6 +161,39 @@ function ModuleEditor({
           Ketma-ket: oldingi laboratoriya yechilmaguncha keyingisi yopiq
         </label>
       </div>
+
+      <fieldset className="grid gap-2">
+        <legend className="mb-1 text-sm font-medium">Imtihon rejimi (ixtiyoriy)</legend>
+        <div className="flex flex-wrap items-end gap-4">
+          <FormField id="module_exam_start" label="Boshlanishi">
+            <Input
+              id="module_exam_start"
+              type="datetime-local"
+              className="h-10"
+              value={draft.examStart}
+              onChange={(event) => setDraft({ ...draft, examStart: event.target.value })}
+            />
+          </FormField>
+          <FormField id="module_exam_end" label="Tugashi">
+            <Input
+              id="module_exam_end"
+              type="datetime-local"
+              className="h-10"
+              value={draft.examEnd}
+              onChange={(event) => setDraft({ ...draft, examEnd: event.target.value })}
+            />
+          </FormField>
+          {draft.examStart || draft.examEnd ? (
+            <Button type="button" variant="ghost" size="lg" onClick={() => setDraft({ ...draft, examStart: '', examEnd: '' })}>
+              Imtihonni bekor qilish
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Boshlanishidan oldin laboratoriyalar talabalarga yopiq; imtihon paytida AI yordami, murabbiy va o'zaro baholash
+          o'chiriladi, ball avtomatik qo'yiladi; tugagach yechimni faqat ko'rish mumkin.
+        </p>
+      </fieldset>
 
       <div className="grid gap-2">
         <div className="text-sm font-medium">Laboratoriyalar (soddadan murakkabga)</div>

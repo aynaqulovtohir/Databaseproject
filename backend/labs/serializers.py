@@ -38,8 +38,21 @@ class LabModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabModule
-        fields = ["id", "title", "description", "order", "sequential", "author", "labs", "created_at"]
+        fields = [
+            "id", "title", "description", "order", "sequential", "exam_starts_at", "exam_ends_at", "author", "labs",
+            "created_at",
+        ]
         read_only_fields = ["id", "author", "labs", "created_at"]
+
+    def validate(self, attrs):
+        current = self.instance
+        starts = attrs.get("exam_starts_at", current.exam_starts_at if current else None)
+        ends = attrs.get("exam_ends_at", current.exam_ends_at if current else None)
+        if (starts is None) != (ends is None):
+            raise serializers.ValidationError({"exam_ends_at": "Imtihonning boshlanishi va tugashi birga belgilanadi."})
+        if starts is not None and ends <= starts:
+            raise serializers.ValidationError({"exam_ends_at": "Imtihon boshlanishidan keyin tugashi kerak."})
+        return attrs
 
     def get_labs(self, module):
         labs = sorted(module.labs.all(), key=lambda lab: (lab.position, lab.pk))
@@ -49,7 +62,16 @@ class LabModuleSerializer(serializers.ModelSerializer):
 def module_short(module):
     if module is None:
         return None
-    return {"id": module.pk, "title": module.title, "description": module.description, "order": module.order, "sequential": module.sequential}
+    from .exam import exam_info
+
+    return {
+        "id": module.pk,
+        "title": module.title,
+        "description": module.description,
+        "order": module.order,
+        "sequential": module.sequential,
+        "exam": exam_info(module),
+    }
 
 
 def validate_level(value):
@@ -366,8 +388,10 @@ class StudentLabSerializer(serializers.ModelSerializer):
         return {"id": blocker.pk, "title": blocker.title} if blocker else None
 
     def to_representation(self, lab):
+        from .exam import UPCOMING, lab_exam_state
+
         data = super().to_representation(lab)
-        if data["locked"]:
+        if data["locked"] or lab_exam_state(lab) == UPCOMING:
             # Qulflangan laboratoriyaning shartlari ko'rsatilmaydi (ro'yxatda faqat nomi va qaysi biri qulflagani)
             for field in ("description", "theory", "setup_sql", "starter_sql", "given_diagram", "norm_task", "plan_query"):
                 data[field] = "" if isinstance(data[field], str) else None
@@ -410,7 +434,10 @@ class StudentLabSerializer(serializers.ModelSerializer):
                 progress["last_diagram"] = attempts[0].diagram if attempts else None
                 # Oxirgi topshirilgan noto'g'ri diagrammaning tuzatilgan varianti
                 submitted = next((attempt for attempt in attempts if attempt.is_submission), None)
-                progress["last_fix"] = fix_payload(submitted) if submitted else None
+                # Imtihon paytida tuzatilgan diagramma ko'rsatilmaydi: u to'g'ri javobni ochadi
+                from .exam import exam_active
+
+                progress["last_fix"] = fix_payload(submitted) if submitted and not exam_active(lab) else None
         return progress
 
 

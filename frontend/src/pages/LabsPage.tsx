@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { ExamBadge } from '@/components/ExamInfo'
 import { LabDialog } from '@/components/LabDialog'
 import { LabLevelBadge } from '@/components/LabLevel'
 import { ModulesDialog } from '@/components/ModulesDialog'
@@ -197,6 +198,7 @@ export function LabsPage() {
                   <h2 id={`module-${section.module?.id ?? 'free'}`} className="flex flex-wrap items-center gap-2 text-base font-semibold">
                     {section.module ? section.module.title : 'Boshqa laboratoriyalar'}
                     {section.module?.sequential ? <Badge variant="secondary">Ketma-ket</Badge> : null}
+                    {section.module?.exam ? <ExamBadge exam={section.module.exam} /> : null}
                     {!isStaff && section.module ? (
                       <span className="text-sm font-normal text-muted-foreground tabular-nums">
                         {solved} / {section.labs.length} bajarilgan

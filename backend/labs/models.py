@@ -18,6 +18,9 @@ class LabModule(models.Model):
     description = models.TextField("izoh", blank=True, max_length=2000)
     order = models.PositiveSmallIntegerField("tartib raqami", default=0)
     sequential = models.BooleanField("ketma-ket ochiladi", default=True)
+    # Imtihon rejimi (labs/exam.py): ikkalasi ham berilsa, modul shu vaqt oralig'ida imtihon sifatida ishlaydi
+    exam_starts_at = models.DateTimeField("imtihon boshlanishi", null=True, blank=True)
+    exam_ends_at = models.DateTimeField("imtihon tugashi", null=True, blank=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="muallif", on_delete=models.PROTECT, related_name="lab_modules"
     )

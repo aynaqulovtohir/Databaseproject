@@ -359,9 +359,20 @@ export interface LabModuleShort {
   order: number
   /** Ichidagi laboratoriyalar oldingisi yechilgandan keyin ochiladi */
   sequential: boolean
+  /** Imtihon rejimi (belgilanmagan bo'lsa null) */
+  exam?: LabExamInfo | null
+}
+
+/** Imtihon: oldin — yopiq, paytida — AI'siz, keyin — faqat ko'rish */
+export interface LabExamInfo {
+  starts_at: string
+  ends_at: string
+  state: 'upcoming' | 'active' | 'finished'
 }
 
 export interface LabModule extends LabModuleShort {
+  exam_starts_at: string | null
+  exam_ends_at: string | null
   author: PersonShort
   labs: { id: number; title: string; kind: LabKind; level: number | null; position: number }[]
   created_at: string
