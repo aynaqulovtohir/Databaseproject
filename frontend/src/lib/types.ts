@@ -1474,3 +1474,54 @@ export interface ErProcess {
   metrics: ErProcessMetrics | null
   strategy_label: string | null
 }
+
+export type ErStrategy = ErProcessMetrics['strategy']
+
+/** Pirson χ² (labs/process_stats.py) */
+export interface ErChiTest {
+  chi2: number
+  df: number
+  p: number
+  significant: boolean
+  cramers_v: number
+  effect_label: string | null
+  reliable: boolean
+}
+
+/** ER-diagramma chizish jarayoni statistikasi (GET /statistics/er-process/) */
+export interface ErProcessStatistics {
+  labs: { id: number; title: string }[]
+  works: number
+  students: number
+  cohorts: Record<ExperimentCohort, string>
+  strategies: {
+    items: {
+      strategy: ErStrategy
+      label: string
+      count: number
+      share: number | null
+      mean_grade: number | null
+      solved_rate: number | null
+      by_cohort: Record<ExperimentCohort, number>
+    }[]
+    solved_test: ErChiTest | null
+    grade_test: { h: number; df: number; p: number; significant: boolean; epsilon2: number; effect_label: string | null } | null
+    cohort_test: ErChiTest | null
+  }
+  cohort_comparison: {
+    curves: Record<ExperimentCohort, { n: number; points: number[] }>
+    comparisons: {
+      metric: string
+      label: string
+      experimental: { n: number; mean: number | null }
+      control: { n: number; mean: number | null }
+      test: StatTest | null
+    }[]
+  }
+  transitions: {
+    strategies: { strategy: ErStrategy; label: string }[]
+    students: number
+    matrix: number[][]
+  }
+  conclusions: string[]
+}

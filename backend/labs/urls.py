@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from .views import (
     AIQualityView,
+    ErProcessStatisticsView,
     LabAttemptAdviceView,
     LabAttemptExplainView,
     LabAnalysisView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path("labs/<int:pk>/peer-review/", LabPeerReviewView.as_view(), name="lab-peer-review"),
     path("labs/peer-reviews/<int:pk>/helpful/", PeerReviewHelpfulView.as_view(), name="peer-review-helpful"),
     path("statistics/", StatisticsView.as_view(), name="statistics"),
+    path("statistics/er-process/", ErProcessStatisticsView.as_view(), name="er-process-statistics"),
     path("statistics/labs-analysis/", LabAnalysisView.as_view(), name="labs-analysis"),
     path("risk/", RiskView.as_view(), name="risk"),
     path("ai-quality/", AIQualityView.as_view(), name="ai-quality"),

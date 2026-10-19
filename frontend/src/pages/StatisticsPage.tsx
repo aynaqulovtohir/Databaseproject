@@ -3,6 +3,7 @@ import { BarChart3 } from 'lucide-react'
 import { useState } from 'react'
 
 import { ExperimentCard } from '@/components/ExperimentCard'
+import { ErProcessStatisticsCard } from '@/components/ErProcessStatisticsCard'
 import { LabAnalysisCard } from '@/components/LabAnalysisCard'
 import { GroupMasteryCard } from '@/components/LearningPath'
 import { PageHeader } from '@/components/PageHeader'
@@ -501,6 +502,7 @@ export function StatisticsPage() {
         </div>
         <LabsCard labs={data.labs} />
         <LabAnalysisCard groupId={groupId} />
+        <ErProcessStatisticsCard groupId={groupId} />
         {groupId ? <GroupMasteryCard groupId={groupId} /> : null}
       </div>
     )
