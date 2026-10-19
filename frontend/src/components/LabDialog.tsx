@@ -42,6 +42,7 @@ const TOPIC_OPTIONS = [
   ['integrity', 'Yaxlitlik cheklovlari'],
   ['evolution', 'Sxemani rivojlantirish (migratsiya)'],
   ['programmability', 'View, funksiya va trigger'],
+  ['security', 'Xavfsizlik (qatorlar darajasida himoya)'],
   ['norm', 'Normallashtirish'],
   ['er_sql', 'ER-modeldan jadvallarga'],
   ['select', "SELECT so'rovlari"],

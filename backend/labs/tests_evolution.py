@@ -125,10 +125,15 @@ class EvolutionLabTests(BaseTestCase):
         response = self.client.post("/api/labs/", data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
-        same_before = QUERIES + [{"id": "soni", "title": "Mijozlar soni", "sql": "SELECT count(*) FROM mijoz"}]
-        response = self.client.post("/api/labs/", {**data, "check_queries": same_before}, format="json")
+        # Ma'lumot saqlanganini tekshiradigan so'rov (yechimsiz ham bir xil) boshqalari bilan birga mumkin
+        preserved = QUERIES + [{"id": "soni", "title": "Mijozlar soni", "sql": "SELECT count(*) FROM mijoz"}]
+        response = self.client.post("/api/labs/", {**data, "check_queries": preserved}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Lekin hech biri yechimni tekshirmasa — rad etiladi
+        nothing = [{"id": "soni", "title": "Mijozlar soni", "sql": "SELECT count(*) FROM mijoz"}]
+        response = self.client.post("/api/labs/", {**data, "check_queries": nothing}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("migratsiyani tekshirmaydi", str(response.data["check_queries"]))
+        self.assertIn("yechimni tekshirmaydi", str(response.data["check_queries"]))
 
         broken = [{"id": "x", "title": "Yo'q ustun", "sql": "SELECT telefon FROM mijoz"}]
         response = self.client.post("/api/labs/", {**data, "check_queries": broken}, format="json")
