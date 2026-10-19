@@ -324,6 +324,8 @@ export interface Lab {
   probes?: LabProbe[]
   /** Talaba uchun: ko'rinadigan sinovlar va yashirinlari soni */
   probe_info?: { visible: LabProbe[]; hidden: number } | null
+  /** Sxemani rivojlantirish laboratoriyasi: migratsiyadan keyin bajariladigan ilovaning yangi so'rovlari */
+  check_queries?: LabCheckQuery[]
   /** Talablarni aniqlash: yashirin talablar va buyurtmachi roli. Faqat admin va o'qituvchiga */
   requirements?: InterviewRequirement[]
   client_persona?: string
@@ -468,6 +470,22 @@ export interface LabRunResult {
   probes?: LabProbeResult[]
   hidden_probes?: { total: number; passed: number } | null
   ratio?: number
+  /** Migratsiya laboratoriyasi: har bir yangi so'rov natijasi */
+  queries?: LabCheckQueryResult[]
+}
+
+export interface LabCheckQuery {
+  id: string
+  title: string
+  sql: string
+}
+
+export interface LabCheckQueryResult {
+  id: string
+  title: string
+  passed: boolean
+  /** Xato yoki natija farqi (bo'sh — o'tdi) */
+  message: string
 }
 
 /** Yaxlitlik cheklovlari laboratoriyasi sinovi: attack — rad etilishi kerak, valid — qabul qilinishi kerak */

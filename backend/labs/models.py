@@ -38,6 +38,7 @@ class Lab(models.Model):
         ER = "er", "ER-model"
         DESIGN = "design", "Jadvallarni loyihalash"
         INTEGRITY = "integrity", "Yaxlitlik cheklovlari"
+        EVOLUTION = "evolution", "Sxemani rivojlantirish (migratsiya)"
         NORM = "norm", "Normallashtirish"
         ER_SQL = "er_sql", "ER-modeldan jadvallarga"
         SELECT = "select", "SELECT so'rovlari"
@@ -88,6 +89,10 @@ class Lab(models.Model):
     # bajariladi. "attack" — noto'g'ri ma'lumot, cheklov uni rad etishi kerak; "valid" — to'g'ri ma'lumot, qabul
     # qilinishi kerak. [{"id", "title", "kind", "sql", "hidden"}]; yashirin sinovning nomi va SQL'i talabaga ko'rinmaydi
     probes = models.JSONField("cheklov sinovlari", default=list, blank=True)
+    # Sxemani rivojlantirish laboratoriyasi (labs/evolution.py): talaba migratsiyasidan keyin ilovaning yangi so'rovlari
+    # bajariladi, natijasi namunaviy migratsiyadagi bilan solishtiriladi (yashirin ma'lumotlarda ham). Talabaga ko'rinadi.
+    # [{"id", "title", "sql"}]
+    check_queries = models.JSONField("migratsiyadan keyingi so'rovlar", default=list, blank=True)
     # Bo'sh bo'lsa, laboratoriya turidan aniqlanadi (effective_topic)
     topic = models.CharField("mavzu", max_length=20, choices=Topic.choices, blank=True)
     author = models.ForeignKey(
@@ -141,6 +146,8 @@ class Lab(models.Model):
             return self.Topic.NORM
         if self.probes:
             return self.Topic.INTEGRITY
+        if self.check_queries:
+            return self.Topic.EVOLUTION
         if self.concurrent:
             return self.Topic.TRANSACTION
         if self.plan_query.strip():

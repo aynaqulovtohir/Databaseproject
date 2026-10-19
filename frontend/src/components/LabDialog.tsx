@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { CheckList } from '@/components/CheckList'
 import { ErEditor } from '@/components/ErEditor'
+import { CheckQueriesEditor } from '@/components/CheckQueries'
 import { FormField } from '@/components/FormField'
 import { ProbesEditor } from '@/components/Probes'
 import { LEVEL_LABELS } from '@/components/LabLevel'
@@ -17,9 +18,9 @@ import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
 import { applyFormError } from '@/lib/forms'
 import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
-import type { ErDiagram, Lab, LabKind, LabProbe } from '@/lib/types'
+import type { ErDiagram, Lab, LabCheckQuery, LabKind, LabProbe } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'probes', 'topic', 'level', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -39,6 +40,7 @@ const TOPIC_OPTIONS = [
   ['er', 'ER-model'],
   ['design', 'Jadvallarni loyihalash'],
   ['integrity', 'Yaxlitlik cheklovlari'],
+  ['evolution', 'Sxemani rivojlantirish (migratsiya)'],
   ['norm', 'Normallashtirish'],
   ['er_sql', 'ER-modeldan jadvallarga'],
   ['select', "SELECT so'rovlari"],
@@ -71,6 +73,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
   const [probes, setProbes] = useState<LabProbe[]>(lab?.probes ?? [])
+  const [checkQueries, setCheckQueries] = useState<LabCheckQuery[]>(lab?.check_queries ?? [])
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
   const [topic, setTopic] = useState(lab?.topic ?? '')
   const [level, setLevel] = useState(lab?.level ? String(lab.level) : '')
@@ -106,6 +109,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               plan_forbidden: planForbidden,
               concurrent,
               probes,
+              check_queries: checkQueries,
             }
       return lab
         ? api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body })
@@ -395,6 +399,21 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 {errors.concurrent ? (
                   <p className="text-xs text-destructive" role="alert">
                     {errors.concurrent}
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-1.5">
+                <span className="text-sm font-medium">Migratsiyadan keyingi so'rovlar (sxemani rivojlantirish laboratoriyasi, ixtiyoriy)</span>
+                <p className="text-xs text-muted-foreground">
+                  Boshlang'ich jadvallar — eski sxema va ma'lumotlar, namunaviy yechim — migratsiya. Talaba migratsiyasidan keyin
+                  jadvallar va shu so'rovlar natijasi namunaviy migratsiyadagi bilan solishtiriladi; yashirin ma'lumotlar berilsa,
+                  ularda ham. Saqlashda tekshiriladi: so'rov migratsiyadan keyin ishlaydi va migratsiyasiz boshqacha natija beradi.
+                  Talabaga ko'rinadi.
+                </p>
+                <CheckQueriesEditor value={checkQueries} onChange={setCheckQueries} />
+                {errors.check_queries ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {errors.check_queries}
                   </p>
                 ) : null}
               </div>

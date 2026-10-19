@@ -577,6 +577,13 @@ def run_probes(script, setup_sql, probes):
     Qaytaradi: (RunOutcome — talaba kodi natijasi, [SqlError | None] — har bir sinov xatosi; None — bajarildi).
     Talaba kodi xato bersa, sinovlar bajarilmaydi (ro'yxat bo'sh).
     """
+    outcome, results = run_followups(script, setup_sql, probes)
+    return outcome, [error for error, _ in results]
+
+
+def run_followups(script, setup_sql, followups):
+    """run_probes kabi, lekin har bir buyruq uchun (xato, oxirgi natija) qaytaradi: migratsiyadan keyingi so'rovlar
+    natijasini solishtirish uchun (labs/evolution.py)."""
     _ensure_database()
     outcome, errors = RunOutcome(), []
 
@@ -594,12 +601,12 @@ def run_probes(script, setup_sql, probes):
                 outcome.error, outcome.result, outcome.status_message = _execute_script(runner, script, admin)
                 if outcome.error is None:
                     deadline = time.monotonic() + PROBES_TIME_BUDGET_SECONDS
-                    for sql in probes:
+                    for sql in followups:
                         if runner.closed or time.monotonic() > deadline:
-                            errors.append(PROBE_TIMEOUT_ERROR)
+                            errors.append((PROBE_TIMEOUT_ERROR, None))
                             continue
-                        error, _, _ = _execute_script(runner, f"BEGIN;\n{sql}\n;", admin)
-                        errors.append(error)
+                        error, result, _ = _execute_script(runner, f"BEGIN;\n{sql}\n;", admin)
+                        errors.append((error, result))
                         if not runner.closed:
                             # Xato bo'lsa tranzaksiya ochiq qoladi; muvaffaqiyatli bo'lsa o'zgarish bekor qilinadi
                             _execute_script(runner, "ROLLBACK", admin)

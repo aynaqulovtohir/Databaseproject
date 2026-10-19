@@ -18,6 +18,7 @@ from ...er import DiagramError, validate_diagram
 from ...interview import RequirementsError, validate_requirements
 from ...models import Lab
 from ...norm import NormError, parse_task
+from ...evolution import QueriesError, validate_lab_queries, validate_queries
 from ...probes import ProbesError, validate_lab_probes, validate_probes
 from ...reverse import ReverseError, diagram_from_sql
 
@@ -64,6 +65,13 @@ class Command(BaseCommand):
                         validate_diagram(lab_data["given_diagram"])
                     if lab_data.get("probes"):
                         validate_lab_probes(lab_data["setup_sql"], lab_data["solution_sql"], validate_probes(lab_data["probes"]))
+                    if lab_data.get("check_queries"):
+                        validate_lab_queries(
+                            lab_data["setup_sql"],
+                            lab_data["solution_sql"],
+                            lab_data.get("hidden_setup_sql", ""),
+                            validate_queries(lab_data["check_queries"]),
+                        )
                     if lab_data.get("concurrent"):
                         validate_concurrent(lab_data["setup_sql"], lab_data["solution_sql"])
                     if lab_data.get("plan_query"):
@@ -81,6 +89,8 @@ class Command(BaseCommand):
                 raise CommandError(f"«{lab_data['title']}» diagrammasida xato: {exc}")
             except RequirementsError as exc:
                 raise CommandError(f"«{lab_data['title']}» talablarida xato: {exc}")
+            except QueriesError as exc:
+                raise CommandError(f"«{lab_data['title']}» so'rovlarida xato: {exc}")
             except ProbesError as exc:
                 raise CommandError(f"«{lab_data['title']}» sinovlarida xato: {exc}")
             except ReverseError as exc:

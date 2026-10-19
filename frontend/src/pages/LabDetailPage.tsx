@@ -17,6 +17,7 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { CheckQueryList } from '@/components/CheckQueries'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
@@ -135,6 +136,12 @@ function ConditionCard({ lab }: { lab: Lab }) {
               Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.
             </p>
             <SqlCode code={lab.plan_query.trim()} />
+          </div>
+        ) : null}
+        {lab.check_queries?.length ? (
+          <div>
+            <h3 className="mb-1 text-sm font-medium">Ilovaning yangi so'rovlari</h3>
+            <CheckQueryList queries={lab.check_queries} />
           </div>
         ) : null}
         {probes ? (

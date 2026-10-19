@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from psycopg import sql
 
+from labs.evolution_labs import EVOLUTION_LABS
 from labs.integrity_labs import INTEGRITY_LABS
 from labs.models import Lab
 from labs.probes import validate_probes
@@ -128,4 +129,7 @@ class Command(BaseCommand):
         lab = Lab.objects.create(
             **reverse, reference_diagram=diagram_from_sql(reverse["setup_sql"]), author=users["e2e_teacher"]
         )
+        lab.groups.add(group)
+
+        lab = Lab.objects.create(**EVOLUTION_LABS[0], author=users["e2e_teacher"])
         lab.groups.add(group)

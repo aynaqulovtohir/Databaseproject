@@ -3,6 +3,7 @@ import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Se
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
+import { CheckQueryResults } from '@/components/CheckQueries'
 import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { PlanAssistant } from '@/components/PlanAssistant'
 import { ProbeResults } from '@/components/Probes'
@@ -231,9 +232,11 @@ function Verdict({ result }: { result: LabRunResult }) {
         <p className="mt-1 text-sm">
           {result.probes
             ? "Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi."
-            : result.checked_against_solution
-              ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
-              : 'Kod xatosiz ishladi.'}
+            : result.queries?.length
+              ? "Migratsiya ma'lumotlarni saqladi va ilovaning yangi so'rovlari to'g'ri ishladi."
+              : result.checked_against_solution
+                ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
+                : 'Kod xatosiz ishladi.'}
         </p>
         {result.ai_explain && result.attempt_id ? (
           <div className="mt-3">
@@ -257,7 +260,9 @@ function Verdict({ result }: { result: LabRunResult }) {
         <p className="text-sm">
           {result.probes
             ? "Kod xatosiz ishladi, lekin ba'zi sinovlar o'tmadi:"
-            : 'Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:'}
+            : result.queries?.length
+              ? "Migratsiya xatosiz bajarildi, lekin natija kutilganidan farq qiladi:"
+              : 'Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:'}
         </p>
       )}
       {result.differences.length ? (
@@ -530,6 +535,7 @@ export function LabRunner({
           {result.grade ? <GradeCard grade={result.grade} best={result.best_grade} /> : null}
           <Verdict result={result} />
           <ProbeResults result={result} />
+          <CheckQueryResults result={result} />
           <PlanView plan={result.plan} />
           <ConcurrencyTimeline steps={result.steps} />
           {result.result ? <ResultTable table={result.result} /> : null}
