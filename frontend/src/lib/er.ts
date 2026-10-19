@@ -24,3 +24,41 @@ export function cleanDiagram(diagram: ErDiagram): ErDiagram {
     })),
   }
 }
+
+/** Serverdagi nom solishtirish bilan bir xil (labs/er.py normalize) */
+function normalizeName(name: string) {
+  return name.replace(/[ʻʼ‘’`´]/g, "'").trim().toLowerCase().replace(/[\s_-]+/g, '_')
+}
+
+/**
+ * Chizish jarayonini yozish uchun oraliq holat: chizilayotgan diagramma hali to'liq bo'lmasligi mumkin, shuning uchun
+ * nomsiz obyektlar va takrorlangan nomlar tashlab yuboriladi (server faqat to'g'ri tuzilgan diagrammani qabul qiladi).
+ */
+export function snapshotDiagram(diagram: ErDiagram): ErDiagram {
+  const clean = cleanDiagram(diagram)
+  const names = new Set<string>()
+  const entities = clean.entities.filter((entity) => {
+    const name = normalizeName(entity.name)
+    if (!name || names.has(name)) return false
+    names.add(name)
+    return true
+  })
+  const ids = new Set(entities.map((entity) => entity.id))
+  return {
+    entities: entities.map((entity) => {
+      const attributes = new Set<string>()
+      return {
+        ...entity,
+        attributes: entity.attributes.filter((attribute) => {
+          const name = normalizeName(attribute.name)
+          if (attributes.has(name)) return false
+          attributes.add(name)
+          return true
+        }),
+      }
+    }),
+    relationships: clean.relationships.filter(
+      (relationship) => ids.has(relationship.source) && ids.has(relationship.target),
+    ),
+  }
+}

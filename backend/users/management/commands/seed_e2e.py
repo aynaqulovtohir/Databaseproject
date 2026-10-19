@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from psycopg import sql
 
+from labs.models import Lab
 from quizzes.models import Quiz
 from quizzes.serializers import QuizSerializer
 from users.consent import CONSENT_VERSION
@@ -30,6 +31,11 @@ ACCOUNTS = [
     ("e2e_newcomer", User.Role.STUDENT, "Yangi", "Talaba", None),
 ]
 GROUP = "E2E-guruh"
+ER_LAB_TITLE = "E2E: ER-diagramma"
+ER_REFERENCE = {
+    "entities": [{"id": "t", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
+    "relationships": [],
+}
 QUIZ_TITLE = "E2E: normallashtirish"
 QUESTIONS = [
     {
@@ -98,3 +104,12 @@ class Command(BaseCommand):
         )
         QuizSerializer.write_questions(quiz, [{**q, "choices": list(q["choices"])} for q in QUESTIONS])
         quiz.groups.add(group)
+
+        lab = Lab.objects.create(
+            kind=Lab.Kind.ER,
+            title=ER_LAB_TITLE,
+            description="Talaba obyektini chizing.",
+            reference_diagram=ER_REFERENCE,
+            author=users["e2e_teacher"],
+        )
+        lab.groups.add(group)

@@ -1433,3 +1433,44 @@ export interface ExpertPanel {
   invites: ExpertInvite[]
   results: ExpertResults | null
 }
+
+/** ER-diagramma chizish jarayonidagi bitta qadam (backend: labs/process.py) */
+export interface ErProcessStep {
+  at: string
+  /** Birinchi qadamdan beri o'tgan daqiqa */
+  minutes: number
+  session: number
+  /** edit — oraliq holat, run — tekshirish, submit — baholashga topshirish */
+  source: 'edit' | 'run' | 'submit'
+  events: { activity: string; label: string; detail: string }[]
+  /** Namunaga moslik (0-1) */
+  ratio: number | null
+  diagram: ErDiagram
+}
+
+export interface ErProcessMetrics {
+  steps: number
+  sessions: number
+  total_minutes: number
+  active_minutes: number
+  design_events: number
+  added: number
+  removed: number
+  churn: number | null
+  edits: number
+  cardinality_changes: number
+  first_relationship_minutes: number | null
+  entities_first_share: number | null
+  checks: number
+  check_gap_minutes: number | null
+  first_check_ratio: number | null
+  final_ratio: number | null
+  max_ratio: number | null
+  strategy: 'avval_obyektlar' | 'aralash' | 'sinab_korish' | 'aniqlanmadi'
+}
+
+export interface ErProcess {
+  steps: ErProcessStep[]
+  metrics: ErProcessMetrics | null
+  strategy_label: string | null
+}

@@ -11,15 +11,16 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-CONSENT_VERSION = "1"
+CONSENT_VERSION = "2"
 
 CONSENT_TITLE = "Ilmiy tadqiqotda ishtirok etishga rozilik"
 
 CONSENT_TEXT = [
     "Bu platforma «Ma'lumotlar bazasini loyihalash» fanini o'qitishda virtual laboratoriya va sun'iy intellekt "
     "yordamchisi samaradorligini o'rganuvchi ilmiy tadqiqotda qo'llanmoqda.",
-    "Tadqiqotda quyidagi ma'lumotlar ishlatiladi: laboratoriyalardagi urinishlar va baholar, kirish/chiqish "
-    "testlari va so'rovnoma javoblari, AI maslahatlaridan foydalanish. Ismingiz, loginingiz va yozgan kodingiz "
+    "Tadqiqotda quyidagi ma'lumotlar ishlatiladi: laboratoriyalardagi urinishlar va baholar, ER-diagramma chizish "
+    "jarayoni (qaysi qadamni qachon qilganingiz), kirish/chiqish testlari va so'rovnoma javoblari, AI "
+    "maslahatlaridan foydalanish. Ismingiz, loginingiz va yozgan kodingiz "
     "tadqiqotchiga berilmaydi: siz faqat taxallus (masalan, T-1A2B3C4D) bilan ko'rsatilasiz. Natijalar faqat "
     "umumlashgan holda (guruhlar bo'yicha) e'lon qilinadi.",
     "Ishtirok ixtiyoriy. Rozi bo'lmasangiz ham platformadan to'liq foydalanasiz, bahoyingizga hech qanday ta'sir "

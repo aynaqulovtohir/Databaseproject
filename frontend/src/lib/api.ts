@@ -58,6 +58,8 @@ interface RequestOptions {
   /** false bo'lsa, 401 da tokenni yangilashga urinilmaydi (login so'rovi uchun) */
   auth?: boolean
   signal?: AbortSignal
+  /** So'rov sahifa yopilgandan keyin ham yetkaziladi (tanasi 64 KB gacha) */
+  keepalive?: boolean
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
@@ -78,6 +80,7 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     body,
     credentials: 'same-origin',
     signal: options.signal,
+    keepalive: options.keepalive,
   })
 }
 

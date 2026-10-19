@@ -22,7 +22,8 @@ from users.consent import consent_required, participant_ids, research_participan
 from users.models import User
 
 from .checker import ERROR_TIPS
-from .models import AIOutputReview, BlindReview, LabAttempt, LabGrade, PeerReview
+from .models import AIOutputReview, BlindReview, ErSnapshot, Lab, LabAttempt, LabGrade, PeerReview
+from .process import analyse, build_points, metrics, to_xes
 from .psychometrics import MIN_STUDENTS as MIN_ANALYSIS_STUDENTS
 
 QUIZ_KINDS = {"pre": "kirish", "post": "chiqish", "delayed": "kechiktirilgan", "practice": "oddiy", "survey": "sorovnoma"}
@@ -73,6 +74,47 @@ REVIEW_COLUMNS = [
     "tizim_baho",
     "oqituvchi_baho",
     "baholangan",
+]
+
+PROCESS_EVENT_COLUMNS = [
+    "case_id",
+    "talaba",
+    "guruh",
+    "ai_yoqilgan",
+    "laboratoriya_id",
+    "sessiya",
+    "qadam",
+    "vaqt",
+    "daqiqa",
+    "hodisa",
+    "moslik",
+]
+
+PROCESS_COLUMNS = [
+    "talaba",
+    "guruh",
+    "ai_yoqilgan",
+    "laboratoriya_id",
+    "laboratoriya",
+    "holatlar",
+    "sessiyalar",
+    "umumiy_daqiqa",
+    "faol_daqiqa",
+    "loyihalash_hodisalari",
+    "qoshishlar",
+    "ochirishlar",
+    "qaytarish_ulushi",
+    "tahrirlar",
+    "kardinallik_ozgarishlari",
+    "birinchi_boglanish_daqiqa",
+    "obyektlar_oldin_ulush",
+    "tekshiruvlar",
+    "tekshiruvlar_orasi_daqiqa",
+    "birinchi_tekshiruv_moslik",
+    "yakuniy_moslik",
+    "eng_yuqori_moslik",
+    "strategiya",
+    "eng_yuqori_baho",
 ]
 
 # O'zbekiston va MDH hududidagi Excel CSV faylni nuqtali vergul bilan to'g'ri ochadi
@@ -299,6 +341,43 @@ turi                        hint (AI maslahati) yoki explanation (tushuntirish b
 daraja                      maslahat darajasi (1 dan); izohda 0
 baho                        helpful (foydali), unclear (tushunarsiz), wrong (noto'g'ri), revealed (javobni aytib qo'ydi)
 
+er_jarayon_hodisalari.csv — ER-diagramma chizish jarayonining hodisalar jurnali (process mining)
+---------------------------------------------------------------------------------------------
+Muharrir diagramma o'zgarganda har 10 soniyada oraliq holatni saqlaydi; tekshirish va topshirish
+holatlari ham qo'shiladi. Ketma-ket holatlar solishtirilib, hodisalar server tomonida aniqlanadi.
+Shu jadval va er_jarayon.xes (IEEE XES) ProM yoki pm4py dasturlariga to'g'ridan-to'g'ri yuklanadi:
+  pm4py.format_dataframe(df, case_id="case_id", activity_key="hodisa", timestamp_key="vaqt")
+case_id                     talaba-laboratoriya-sessiya (masalan, T-1A2B3C4D-L5-S1); 30 daqiqadan uzoq
+                            tanaffus yangi sessiya boshlaydi
+sessiya, qadam              sessiya raqami va holat tartib raqami (bitta qadamda bir nechta hodisa bo'lishi mumkin)
+daqiqa                      shu laboratoriyadagi birinchi holatdan beri
+hodisa                      obyekt_qoshildi | obyekt_ochirildi | obyekt_nomi_ozgardi | atribut_qoshildi |
+                            atribut_ochirildi | atribut_nomi_ozgardi | kalit_ozgardi | boglanish_qoshildi |
+                            boglanish_ochirildi | boglanish_nomi_ozgardi | boglanish_qayta_ulandi |
+                            kardinallik_ozgardi | joylashuv_ozgardi (faqat joy surilgan) | tekshirish | topshirish
+moslik                      shu qadamdagi diagrammaning namunaga mosligi (0-1, baholashdagi bilan bir xil)
+Obyekt va atribut nomlari eksportga kirmaydi.
+
+er_jarayon.csv — har bir talaba va ER laboratoriyasi bo'yicha jarayon ko'rsatkichlari
+--------------------------------------------------------------------------------------
+holatlar, sessiyalar        saqlangan holatlar va sessiyalar soni
+umumiy_daqiqa, faol_daqiqa  birinchi holatdan oxirgisigacha; faol — 5 daqiqadan uzoq tanaffuslar 5 daqiqa hisoblanadi
+loyihalash_hodisalari       joylashuv, tekshirish va topshirishdan boshqa hodisalar
+qoshishlar, ochirishlar     qo'shilgan va o'chirilgan obyekt, atribut va bog'lanishlar
+qaytarish_ulushi            ochirishlar / qoshishlar (churn): qancha katta bo'lsa, shuncha ko'p qayta qurgan
+tahrirlar                   nom, kalit belgisi o'zgartirishlari va bog'lanishni boshqa obyektga ulash
+birinchi_boglanish_daqiqa   birinchi bog'lanish chizilgunga qadar
+obyektlar_oldin_ulush       obyektlarning qancha qismi birinchi bog'lanishdan oldin chizilgan (0-1)
+tekshiruvlar                tekshirish va topshirishlar soni
+tekshiruvlar_orasi_daqiqa   ketma-ket tekshiruvlar orasidagi vaqt (mediana)
+birinchi_tekshiruv_moslik, yakuniy_moslik, eng_yuqori_moslik   namunaga moslik (0-1)
+strategiya                  evristik tasnif (birinchi mos kelgani):
+                              aniqlanmadi — loyihalash hodisalari 5 tadan kam;
+                              sinab_korish — qaytarish_ulushi ≥ 0.35 yoki kamida 5 tekshiruv va ular orasi < 1 daqiqa;
+                              avval_obyektlar — obyektlar_oldin_ulush ≥ 0.8;
+                              aralash — qolganlari (obyekt va bog'lanishlarni navbatma-navbat chizgan)
+eng_yuqori_baho             0-100 (topshirmagan bo'lsa bo'sh)
+
 laboratoriyalar_tahlili.csv — har bir laboratoriyaning psixometrik tahlili (klassik test nazariyasi)
 ------------------------------------------------------------------------------------------------------
 Har bir laboratoriya bitta "savol" sifatida: talaba bali = laboratoriya bahosi / 100 (topshirmagan — 0).
@@ -465,6 +544,52 @@ def _csv(columns, rows):
     writer.writerows(rows)
     # BOM: Excel o'zbekcha harflarni to'g'ri ko'rsatishi uchun
     return "﻿" + buffer.getvalue()
+
+
+def _ratio(value):
+    return "" if value is None else value
+
+
+def _process_rows(labs, allowed=None):
+    """ER laboratoriyalari: hodisalar jurnali qatorlari, ko'rsatkichlar qatorlari va XES izlari."""
+    er_labs = {lab.pk: lab for lab in labs if lab.kind == Lab.Kind.ER and lab.reference_diagram}
+    snapshots, attempts = defaultdict(list), defaultdict(list)
+    for item in ErSnapshot.objects.filter(lab_id__in=er_labs).order_by("created_at", "id"):
+        snapshots[(item.lab_id, item.student_id)].append(item)
+    for item in LabAttempt.objects.filter(lab_id__in=er_labs).order_by("created_at", "id"):
+        attempts[(item.lab_id, item.student_id)].append(item)
+    pairs = {pair for pair in snapshots.keys() | attempts.keys() if _included(allowed, pair[1])}
+    students = User.objects.select_related("group").in_bulk({student_id for _, student_id in pairs})
+    grades = {(grade.lab_id, grade.student_id): grade.score for grade in LabGrade.objects.filter(lab_id__in=er_labs)}
+
+    event_rows, metric_rows, traces = [], [], []
+    for lab_id, student_id in sorted(pairs, key=lambda pair: (pair[0], pseudonym(pair[1]))):
+        lab, student = er_labs[lab_id], students[student_id]
+        steps = analyse(build_points(snapshots[(lab_id, student_id)], attempts[(lab_id, student_id)]), lab.reference_diagram)
+        if not steps:
+            continue
+        name, group, ai = pseudonym(student_id), student.group.name if student.group else "", _group_ai(student)
+        sessions = defaultdict(list)
+        for number, step in enumerate(steps, start=1):
+            case_id = f"{name}-L{lab_id}-S{step['session']}"
+            for activity, _ in step["events"]:
+                event_rows.append(
+                    [case_id, name, group, ai, lab_id, step["session"], number, _local(step["at"]), step["minutes"],
+                     activity, _ratio(step["ratio"])]
+                )
+                sessions[case_id].append((activity, step["at"]))
+        for case_id, events in sessions.items():
+            traces.append((case_id, {"talaba": name, "guruh": group, "ai_yoqilgan": ai, "laboratoriya_id": lab_id}, events))
+        result = metrics(steps)
+        metric_rows.append(
+            [name, group, ai, lab_id, lab.title, result["steps"], result["sessions"], result["total_minutes"],
+             result["active_minutes"], result["design_events"], result["added"], result["removed"],
+             _ratio(result["churn"]), result["edits"], result["cardinality_changes"],
+             _ratio(result["first_relationship_minutes"]), _ratio(result["entities_first_share"]), result["checks"],
+             _ratio(result["check_gap_minutes"]), _ratio(result["first_check_ratio"]), _ratio(result["final_ratio"]),
+             _ratio(result["max_ratio"]), result["strategy"], _ratio(grades.get((lab_id, student_id)))]
+        )
+    return event_rows, metric_rows, traces
 
 
 def _group_ai(student):
@@ -936,6 +1061,10 @@ def build_export(labs, quizzes=None, groups=None):
         zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs, allowed)))
         zip_file.writestr("ozaro_baholash.csv", _csv(PEER_REVIEW_COLUMNS, _peer_review_rows(labs, allowed)))
         zip_file.writestr("ai_sifati.csv", _csv(AI_QUALITY_COLUMNS, _ai_quality_rows(labs, allowed)))
+        event_rows, process_rows, traces = _process_rows(labs, allowed)
+        zip_file.writestr("er_jarayon_hodisalari.csv", _csv(PROCESS_EVENT_COLUMNS, event_rows))
+        zip_file.writestr("er_jarayon.csv", _csv(PROCESS_COLUMNS, process_rows))
+        zip_file.writestr("er_jarayon.xes", to_xes(traces))
         if quizzes is not None:
             quiz_rows, answer_rows = _quiz_rows(quizzes, allowed)
             zip_file.writestr("testlar.csv", _csv(QUIZ_COLUMNS, quiz_rows))

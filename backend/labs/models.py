@@ -427,3 +427,24 @@ class StudyAdvice(models.Model):
         verbose_name = "laboratoriya bo'yicha tavsiya"
         verbose_name_plural = "laboratoriya bo'yicha tavsiyalar"
         ordering = ["-created_at", "-id"]
+
+
+class ErSnapshot(models.Model):
+    """ER-diagramma chizish jarayonidagi oraliq holat: muharrir diagramma o'zgarganda vaqti-vaqti bilan yuboradi.
+
+    Tekshirish va topshirishdagi holatlar LabAttempt da saqlanadi; ikkalasi birgalikda talabaning loyihalash
+    jarayonini tiklaydi (labs/process.py): qanday tartibda chizgan, nimani qayta ko'rgan, namunaga qanday yaqinlashgan.
+    """
+
+    lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="er_snapshots")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="er_snapshots"
+    )
+    diagram = models.JSONField("ER-diagramma")
+    created_at = models.DateTimeField("vaqti", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ER-diagramma oraliq holati"
+        verbose_name_plural = "ER-diagramma oraliq holatlari"
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["lab", "student", "created_at"])]
