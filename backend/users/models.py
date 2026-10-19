@@ -1,6 +1,7 @@
 """Foydalanuvchi va guruh modellari."""
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.db import models
+from django.utils import timezone
 
 
 class UserManager(DjangoUserManager):
@@ -39,6 +40,18 @@ class User(AbstractUser):
         verbose_name = "foydalanuvchi"
         verbose_name_plural = "foydalanuvchilar"
         ordering = ["id"]
+
+    def set_password(self, raw_password):
+        super().set_password(raw_password)
+        self._revoke_refresh_tokens = True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Parol almashtirilsa yoki foydalanuvchi bloklansa, barcha qurilmalardagi sessiyalar yopiladi.
+        # (Django parol xeshini kuchaytirganda ham set_password chaqiriladi: bunda ham sessiyalar bir marta yopiladi)
+        if getattr(self, "_revoke_refresh_tokens", False) or not self.is_active:
+            self._revoke_refresh_tokens = False
+            IssuedRefreshToken.objects.revoke_all(self)
 
     @property
     def is_admin(self):
@@ -101,3 +114,31 @@ class ResearchConsent(models.Model):
 
     def __str__(self):
         return f"{self.user} / {'rozi' if self.agreed else 'rozi emas'} / {self.created_at:%Y-%m-%d}"
+
+
+class IssuedRefreshTokenQuerySet(models.QuerySet):
+    def revoke_all(self, user):
+        return self.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+
+
+class IssuedRefreshToken(models.Model):
+    """Berilgan refresh tokenlar (faqat jti, tokenning o'zi saqlanmaydi): users/tokens.py ga qarang."""
+
+    jti = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="refresh_tokens")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    # Yangisiga almashtirilgan vaqti: shundan keyin token qayta kelsa — nusxasi boshqa joyda ishlatilmoqda
+    used_at = models.DateTimeField(null=True, blank=True)
+    # Chiqish, parol almashtirish, bloklash yoki o'g'irlik belgisi: token endi hech qachon ishlamaydi
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    objects = IssuedRefreshTokenQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "refresh token"
+        verbose_name_plural = "refresh tokenlar"
+        indexes = [models.Index(fields=["user", "expires_at"])]
+
+    def __str__(self):
+        return f"{self.user} / {self.created_at:%Y-%m-%d %H:%M}"
