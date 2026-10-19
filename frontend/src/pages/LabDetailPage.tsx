@@ -140,7 +140,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
         ) : null}
         {lab.check_queries?.length ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Ilovaning yangi so'rovlari</h3>
+            <h3 className="mb-1 text-sm font-medium">Tekshiruv so'rovlari</h3>
             <CheckQueryList queries={lab.check_queries} />
           </div>
         ) : null}

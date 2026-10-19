@@ -27,13 +27,18 @@ QUERIES = [
 
 
 class QueryStructureTests(SimpleTestCase):
+    def test_multi_statement_query_ends_with_select(self):
+        clean = validate_queries([{"id": "t", "title": "Trigger", "sql": "UPDATE mijoz SET fio = 'x' WHERE id = 1;\nSELECT 1;"}])
+        self.assertEqual(clean[0]["sql"], "UPDATE mijoz SET fio = 'x' WHERE id = 1;\nSELECT 1")
+
     def test_validation(self):
         self.assertEqual(validate_queries([{**QUERIES[0], "title": " Mijozlar  ro'yxati ", "sql": QUERIES[0]["sql"] + ";"}]), [QUERIES[0]])
         for bad in (
             "x",
             [{**QUERIES[0], "id": "a b"}],
             [QUERIES[0], QUERIES[0]],
-            [{**QUERIES[0], "sql": "SELECT 1; SELECT 2"}],
+            [{**QUERIES[0], "sql": "UPDATE mijoz SET fio = 'x'"}],
+            [{**QUERIES[0], "sql": "BEGIN; SELECT 1"}],
             [{**QUERIES[0], "sql": "COMMIT"}],
             [{**QUERIES[0], "title": ""}],
         ):

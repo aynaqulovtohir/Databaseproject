@@ -11,8 +11,9 @@ export function CheckQueryList({ queries }: { queries: LabCheckQuery[] }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        Migratsiyangizdan keyin ilova shu so'rovlarni bajaradi: ular xatosiz ishlashi va to'g'ri natija berishi kerak.
-        Mavjud ma'lumotlar yo'qolmasin — tekshiruv boshqa (yashirin) ma'lumotlarda ham takrorlanadi.
+        Kodingizdan keyin shu so'rovlar bajariladi (har biri alohida, keyin orqaga qaytariladi): ular xatosiz ishlashi va
+        to'g'ri natija berishi kerak. Mavjud ma'lumotlar yo'qolmasin — tekshiruv boshqa (yashirin) ma'lumotlarda ham
+        takrorlanadi.
       </p>
       <ul className="grid gap-3">
         {queries.map((query) => (
@@ -33,7 +34,7 @@ export function CheckQueryResults({ result }: { result: LabRunResult }) {
   return (
     <div className="grid gap-2 rounded-lg border p-3">
       <div className="text-sm font-medium">
-        Yangi so'rovlar: {items.filter((item) => item.passed).length} / {items.length} ishladi
+        Tekshiruv so'rovlari: {items.filter((item) => item.passed).length} / {items.length} ishladi
       </div>
       <ul className="grid gap-1.5">
         {items.map((item) => (
