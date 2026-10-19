@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { ACCOUNTS, storageState } from './accounts.ts'
+import { ACCOUNTS } from './accounts.ts'
 import { login } from './helpers.ts'
 
 test('noto\'g\'ri parol bilan kirib bo\'lmaydi', async ({ page }) => {
@@ -15,7 +15,8 @@ test('kirmagan foydalanuvchi login sahifasiga yuboriladi', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Kirish' })).toBeVisible()
 })
 
-test('yangi talabadan tadqiqotga rozilik so\'raladi va qaror saqlanadi', async ({ page }) => {
+test('yangi talabadan tadqiqotga rozilik so\'raladi, chiqqandan keyin sessiya tiklanmaydi', async ({ page, context }) => {
+  // Login minutiga 5 marta bilan cheklangan: rozilik va chiqish bitta login bilan tekshiriladi
   await login(page, ACCOUNTS.newcomer.username)
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
@@ -26,17 +27,15 @@ test('yangi talabadan tadqiqotga rozilik so\'raladi va qaror saqlanadi', async (
   await page.reload()
   await expect(page.getByRole('heading', { name: `Xush kelibsiz, ${ACCOUNTS.newcomer.name}` })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
-})
 
-test.describe('kirgan talaba', () => {
-  test.use({ storageState: storageState('student') })
+  const session = await context.cookies()
+  await page.getByRole('button', { name: 'Chiqish' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.goto('/quizzes')
+  await expect(page).toHaveURL(/\/login$/)
 
-  test('chiqqandan keyin sahifalar yopiladi', async ({ page }) => {
-    await page.goto('/')
-    await page.getByRole('button', { name: 'Chiqish' }).click()
-    await expect(page).toHaveURL(/\/login$/)
-
-    await page.goto('/quizzes')
-    await expect(page).toHaveURL(/\/login$/)
-  })
+  // Chiqishdan oldin nusxalab olingan cookie ham ishlamaydi: refresh token serverda bekor qilingan
+  await context.addCookies(session)
+  await page.goto('/quizzes')
+  await expect(page).toHaveURL(/\/login$/)
 })

@@ -1,17 +1,18 @@
 """Foydalanuvchilar, guruhlar va shaxsiy kabinet API'lari."""
+from datetime import UTC, datetime
+
 from django.conf import settings
 from django.db.models import ProtectedError
 from rest_framework import status, viewsets
-from rest_framework.exceptions import AuthenticationFailed, ValidationError
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from . import consent
+from . import consent, tokens
 from .models import StudentGroup, User
 from .permissions import IsAdmin
 from .serializers import (
@@ -26,8 +27,9 @@ def set_refresh_cookie(response, refresh_token):
     """Refresh tokenni httpOnly cookie'ga yozadi: JavaScript uni o'qiy olmaydi."""
     response.set_cookie(
         settings.REFRESH_COOKIE_NAME,
-        refresh_token,
-        max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        str(refresh_token),
+        # Cookie token bilan bir vaqtda tugaydi (yangilanganda ham login vaqtidan hisoblanadi)
+        expires=datetime.fromtimestamp(refresh_token["exp"], tz=UTC),
         httponly=True,
         secure=settings.REFRESH_COOKIE_SECURE,
         samesite="Strict",
@@ -41,25 +43,35 @@ def clear_refresh_cookie(response):
     )
 
 
+class LoginSerializer(TokenObtainSerializer):
+    def validate(self, attrs):
+        # Parol va bloklanganlik tekshiruvi; muvaffaqiyatli bo'lsa self.user o'rnatiladi
+        super().validate(attrs)
+        # Berilgan token ro'yxatga olinadi: keyin uni bekor qilish mumkin bo'lsin
+        self.refresh_token = tokens.issue(self.user)
+        return {"access": str(self.refresh_token.access_token)}
+
+
 class LoginView(TokenObtainPairView):
     """Login. Javobda faqat access token qaytadi; refresh token cookie'ga yoziladi.
 
     Parolni ketma-ket sinab topishdan himoya: urinishlar soni cheklangan.
     """
 
+    serializer_class = LoginSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        refresh_token = response.data.pop("refresh", None)
-        if refresh_token:
-            set_refresh_cookie(response, refresh_token)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response = Response(serializer.validated_data)
+        set_refresh_cookie(response, serializer.refresh_token)
         return response
 
 
 class RefreshView(APIView):
-    """Cookie'dagi refresh token orqali yangi access token beradi."""
+    """Cookie'dagi refresh token orqali yangi access token beradi; refresh token har safar almashtiriladi."""
 
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -67,15 +79,17 @@ class RefreshView(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         if refresh_token:
-            serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
             try:
-                serializer.is_valid(raise_exception=True)
-            except (TokenError, InvalidToken, AuthenticationFailed):
+                access, new_refresh = tokens.rotate(refresh_token)
+            except tokens.RefreshFailed:
                 pass
             else:
-                return Response({"access": serializer.validated_data["access"]})
+                response = Response({"access": access})
+                if new_refresh is not None:
+                    set_refresh_cookie(response, new_refresh)
+                return response
 
-        # Token yo'q, muddati o'tgan yoki foydalanuvchi bloklangan: qayta login kerak
+        # Token yo'q, muddati o'tgan, bekor qilingan yoki foydalanuvchi bloklangan: qayta login kerak
         response = Response(
             {"detail": "Sessiya tugagan. Qayta kiring."}, status=status.HTTP_401_UNAUTHORIZED
         )
@@ -84,12 +98,15 @@ class RefreshView(APIView):
 
 
 class LogoutView(APIView):
-    """Chiqish: refresh cookie o'chiriladi."""
+    """Chiqish: refresh token bekor qilinadi va cookie o'chiriladi."""
 
     authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
+        refresh_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
+        if refresh_token:
+            tokens.revoke(refresh_token)
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_refresh_cookie(response)
         return response
@@ -137,8 +154,11 @@ class ChangePasswordView(APIView):
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"detail": "Parol o'zgartirildi."}, status=status.HTTP_200_OK)
+        user = serializer.save()
+        response = Response({"detail": "Parol o'zgartirildi."}, status=status.HTTP_200_OK)
+        # Parol almashtirilganda barcha sessiyalar yopiladi (models.User.save); shu qurilma esa kirgan holda qoladi
+        set_refresh_cookie(response, tokens.issue(user))
+        return response
 
 
 class ConsentView(APIView):

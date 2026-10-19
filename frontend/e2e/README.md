@@ -37,6 +37,11 @@ Login minutiga 5 marta bilan cheklangan, shuning uchun har bir rol uchun bir mar
 (`auth.setup.ts`) va sessiya `e2e/.auth/` da saqlanib boshqa testlarda qayta ishlatiladi.
 Yangi test login qilsa, jami loginlar soni 5 dan oshmasligini kuzating.
 
+Refresh token har yangilanishda almashtiriladi va eski nusxa qayta ishlatilsa server barcha sessiyalarni
+yopadi. Shuning uchun saqlangan sessiya bilan ishlaydigan testlar `test` va `expect` ni `@playwright/test`
+dan emas, `./fixtures.ts` dan oladi: test tugagach yangi cookie `e2e/.auth/` ga qayta yoziladi.
+Saqlangan sessiyada "Chiqish" bosilmasin, aks holda keyingi testlar shu rol uchun kira olmaydi.
+
 ## Playwright'ni yangilash
 
 Dependabot `@playwright/test` ni yangilamaydi: paket versiyasi (`package.json`, aniq versiya) va
