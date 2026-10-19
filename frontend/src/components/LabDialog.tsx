@@ -85,7 +85,13 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
       const common = { title: title.trim(), description, theory, topic, level: level ? Number(level) : null, groups: groupIds }
       const body =
         kind === 'er'
-          ? { ...common, kind, reference_diagram: cleanDiagram(referenceDiagram) }
+          ? {
+            ...common,
+            kind,
+            setup_sql: setupSql,
+            // Berilgan baza bo'lsa, namunani server shu bazadan hosil qiladi
+            ...(setupSql.trim() ? {} : { reference_diagram: cleanDiagram(referenceDiagram) }),
+          }
           : kind === 'norm'
             ? { ...common, kind, norm_task: { attributes: normAttributes, fds: normFds, target: normTarget } }
             : {
@@ -118,7 +124,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
     event.preventDefault()
     const problems: Record<string, string> = {}
     if (!groupIds.length) problems.groups = 'Kamida bitta guruh tanlang.'
-    if (kind === 'er' && !referenceDiagram.entities.length) {
+    if (kind === 'er' && !setupSql.trim() && !referenceDiagram.entities.length) {
       problems.reference_diagram = 'Namunaviy diagrammada kamida bitta obyekt chizing.'
     }
     setErrors(problems)
@@ -201,19 +207,40 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             />
           </FormField>
           {kind === 'er' ? (
-            <div className="grid gap-1.5">
-              <span className="text-sm font-medium">Namunaviy ER-diagramma</span>
-              <p className="text-xs text-muted-foreground">
-                Talabaga ko'rinmaydi. Talaba diagrammasi shu bilan solishtiriladi: obyektlar, atributlar, PK va
-                bog'lanishlar kardinalligi. FK atributlari solishtirilmaydi.
-              </p>
-              <ErEditor value={referenceDiagram} onChange={setReferenceDiagram} />
-              {errors.reference_diagram ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {errors.reference_diagram}
-                </p>
-              ) : null}
-            </div>
+            <>
+              <FormField
+                id="lab_er_setup_sql"
+                label="Berilgan baza (teskari loyihalash, ixtiyoriy)"
+                error={errors.setup_sql}
+                hint="Jadvallar va kalitlar (CREATE TABLE). To'ldirilsa, talaba shu bazaning ER-diagrammasini tiklaydi; namuna saqlashda bazadan avtomatik hosil qilinadi: jadval — obyekt, FOREIGN KEY — N:1 (UNIQUE bo'lsa 1:1), faqat ikki kalitdan iborat oraliq jadval — M:N. Talabaga ko'rinadi."
+              >
+                <Textarea
+                  id="lab_er_setup_sql"
+                  className="max-h-72 min-h-24 font-mono text-sm md:text-xs"
+                  placeholder="CREATE TABLE guruh (id INTEGER PRIMARY KEY, nomi VARCHAR(50));"
+                  maxLength={50_000}
+                  aria-invalid={Boolean(errors.setup_sql)}
+                  value={setupSql}
+                  onChange={(event) => setSetupSql(event.target.value)}
+                  {...SQL_PROPS}
+                />
+              </FormField>
+              {setupSql.trim() ? null : (
+                <div className="grid gap-1.5">
+                  <span className="text-sm font-medium">Namunaviy ER-diagramma</span>
+                  <p className="text-xs text-muted-foreground">
+                    Talabaga ko'rinmaydi. Talaba diagrammasi shu bilan solishtiriladi: obyektlar, atributlar, PK va
+                    bog'lanishlar kardinalligi. FK atributlari solishtirilmaydi.
+                  </p>
+                  <ErEditor value={referenceDiagram} onChange={setReferenceDiagram} />
+                  {errors.reference_diagram ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {errors.reference_diagram}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </>
           ) : kind === 'norm' ? (
             <>
               <FormField

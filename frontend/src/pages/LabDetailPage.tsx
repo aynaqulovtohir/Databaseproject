@@ -154,6 +154,16 @@ function ConditionCard({ lab }: { lab: Lab }) {
             </div>
           </details>
         ) : null}
+        {lab.kind === 'er' && lab.setup_sql.trim() ? (
+          <div>
+            <h3 className="mb-1 text-sm font-medium">Berilgan baza</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Shu jadvallar va kalitlar bo'yicha ER-diagrammani tiklang: jadval — obyekt, tashqi kalit (FOREIGN KEY) —
+              bog'lanish. Faqat ikkita tashqi kalitdan iborat oraliq jadvalni ko'p-ko'p (M:N) bog'lanish sifatida chizing.
+            </p>
+            <SqlCode code={lab.setup_sql.trim()} />
+          </div>
+        ) : null}
         {lab.kind !== 'sql' ? null : lab.setup_sql.trim() ? (
           <div>
             <h3 className="mb-1 text-sm font-medium">Tayyor jadvallar</h3>
@@ -629,7 +639,10 @@ function ErStaffCards({ lab }: { lab: Lab }) {
       <Card>
         <CardHeader>
           <CardTitle>Namunaviy ER-diagramma</CardTitle>
-          <CardDescription>Talabaga ko'rinmaydi. Talaba diagrammasi shu diagramma bilan solishtiriladi.</CardDescription>
+          <CardDescription>
+            Talabaga ko'rinmaydi. Talaba diagrammasi shu diagramma bilan solishtiriladi.
+            {lab.setup_sql.trim() ? ' Berilgan bazadan avtomatik hosil qilingan.' : ''}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ErEditor value={reference} />

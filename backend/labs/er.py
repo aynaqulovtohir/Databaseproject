@@ -305,7 +305,9 @@ def compare(student, reference):
     total += len(reference_relationships)
     for mine, wanted in pairs:
         my_cards = _cards_from(mine, wanted["a"])
-        if my_cards == (wanted["ca"], wanted["cb"]):
+        # O'z-o'ziga bog'lanishda (xodim — rahbari) uchlarni ajratib bo'lmaydi: ikkala yo'nalish ham to'g'ri
+        flipped = wanted["a"] == wanted["b"] and my_cards[::-1] == (wanted["ca"], wanted["cb"])
+        if my_cards == (wanted["ca"], wanted["cb"]) or flipped:
             matched += 1
             continue
         differences.append(

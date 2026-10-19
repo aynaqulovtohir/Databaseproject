@@ -683,7 +683,11 @@ class DesignLabsTests(BaseTestCase):
         all_labs = Lab.objects.filter(author=self.teacher_a, title__in=[item["title"] for item in ALL_LABS])
         self.assertEqual(all_labs.count(), len(ALL_LABS))
         self.assertEqual(all_labs.order_by("-created_at", "-id").first().title, ALL_LABS[0]["title"])
-        self.assertEqual(all_labs.filter(kind="er").count(), len(ER_LABS) + len(INTERVIEW_LABS))
+        from .reverse_labs import REVERSE_LABS
+
+        self.assertEqual(all_labs.filter(kind="er").count(), len(ER_LABS) + len(INTERVIEW_LABS) + len(REVERSE_LABS))
+        for lab in all_labs.filter(title__in=[item["title"] for item in REVERSE_LABS]):
+            self.assertTrue(lab.reference_diagram["entities"], lab.title)
         self.assertEqual(sum(lab.is_interview for lab in all_labs.filter(kind="er")), len(INTERVIEW_LABS))
 
         with self.assertRaises(CommandError):

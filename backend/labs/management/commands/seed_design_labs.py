@@ -19,6 +19,7 @@ from ...interview import RequirementsError, validate_requirements
 from ...models import Lab
 from ...norm import NormError, parse_task
 from ...probes import ProbesError, validate_lab_probes, validate_probes
+from ...reverse import ReverseError, diagram_from_sql
 
 
 class Command(BaseCommand):
@@ -42,9 +43,13 @@ class Command(BaseCommand):
         if missing:
             raise CommandError(f"Bunday guruh yo'q: {', '.join(sorted(missing))}")
 
+        # Teskari loyihalash: namunaviy diagramma berilgan bazadan hosil qilinadi
+        derived = {}
         for lab_data in ALL_LABS:
             try:
-                if lab_data.get("kind") == Lab.Kind.ER:
+                if lab_data.get("kind") == Lab.Kind.ER and lab_data.get("setup_sql"):
+                    derived[lab_data["title"]] = diagram_from_sql(lab_data["setup_sql"])
+                elif lab_data.get("kind") == Lab.Kind.ER:
                     validate_diagram(lab_data["reference_diagram"])
                     validate_requirements(lab_data.get("requirements", []))
                 elif lab_data.get("kind") == Lab.Kind.NORM:
@@ -78,6 +83,8 @@ class Command(BaseCommand):
                 raise CommandError(f"«{lab_data['title']}» talablarida xato: {exc}")
             except ProbesError as exc:
                 raise CommandError(f"«{lab_data['title']}» sinovlarida xato: {exc}")
+            except ReverseError as exc:
+                raise CommandError(f"«{lab_data['title']}» bazasidan diagramma hosil qilib bo'lmadi: {exc}")
 
         created = updated = 0
         with transaction.atomic():
@@ -85,6 +92,8 @@ class Command(BaseCommand):
             for lab_data in reversed(ALL_LABS):
                 if lab_data.get("probes"):
                     lab_data = {**lab_data, "probes": validate_probes(lab_data["probes"])}
+                if lab_data["title"] in derived:
+                    lab_data = {**lab_data, "reference_diagram": derived[lab_data["title"]]}
                 lab = Lab.objects.filter(title=lab_data["title"], author=author).first()
                 if lab is None:
                     lab = Lab.objects.create(author=author, **lab_data)
