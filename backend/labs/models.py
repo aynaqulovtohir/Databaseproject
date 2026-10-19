@@ -41,6 +41,8 @@ class Lab(models.Model):
         EVOLUTION = "evolution", "Sxemani rivojlantirish (migratsiya)"
         PROGRAMMABILITY = "programmability", "View, funksiya va trigger"
         SECURITY = "security", "Xavfsizlik (qatorlar darajasida himoya)"
+        WAREHOUSE = "warehouse", "Ma'lumotlar ombori (OLAP)"
+        JSON = "json", "Yarim tuzilmali ma'lumot (JSONB)"
         NORM = "norm", "Normallashtirish"
         ER_SQL = "er_sql", "ER-modeldan jadvallarga"
         SELECT = "select", "SELECT so'rovlari"

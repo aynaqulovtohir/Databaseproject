@@ -21,6 +21,7 @@ from .security_labs import SECURITY_LABS
 from .theory import THEORY
 from .transaction_labs import TRANSACTION_LABS
 from .vector_labs import VECTOR_LABS
+from .warehouse_labs import WAREHOUSE_LABS
 
 FK_NOTE = "Tashqi kalitlarga ON DELETE / ON UPDATE amallarini qo'shmang."
 NO_SELECT_NOTE = "Kod oxirida SELECT yozish shart emas: tekshiruv yaratilgan jadvallarni solishtiradi."
@@ -488,4 +489,4 @@ for _lab in ER_LABS + DESIGN_LABS:
 
 # Kurs tartibida: ER-model → talablarni aniqlash → teskari loyihalash → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar →
 # tranzaksiyalar → vektorli qidiruv
-ALL_LABS = ER_LABS + INTERVIEW_LABS + REVERSE_LABS + DESIGN_LABS + INTEGRITY_LABS + EVOLUTION_LABS + PROGRAMMABILITY_LABS + SECURITY_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS + VECTOR_LABS
+ALL_LABS = ER_LABS + INTERVIEW_LABS + REVERSE_LABS + DESIGN_LABS + INTEGRITY_LABS + EVOLUTION_LABS + PROGRAMMABILITY_LABS + SECURITY_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS + WAREHOUSE_LABS + VECTOR_LABS
