@@ -20,6 +20,7 @@ from learning.permissions import IsStaffRoleOrReadOnly
 from users.models import User
 
 from .access import visible_labs
+from .exam import AI, VIEW, WORK, ensure_exam, exam_active
 from .sequence import ensure_unlocked, lock_map
 from .advice import (
     MAX_HINT_LEVEL,
@@ -70,8 +71,8 @@ logger = logging.getLogger(__name__)
 
 
 def grade_attempt(attempt):
-    """Topshirilgan urinishni baholaydi: AI ishlasa AI, aks holda avtomatik. Qaytaradi: (ball, izoh, manba)."""
-    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
+    """Topshirilgan urinishni baholaydi: AI ishlasa AI, aks holda (va imtihon paytida) avtomatik. Qaytaradi: (ball, izoh, manba)."""
+    if not exam_active(attempt.lab) and ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment = ai_grade(attempt)
             return score, comment, LabGrade.Source.AI
@@ -88,7 +89,7 @@ def grade_diagram_attempt(attempt, ratio):
     fixed = None if attempt.is_correct else build_fixed(attempt.diagram, attempt.lab.reference_diagram)
     changes = fixed["changes"] if fixed else []
     result = None
-    if ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
+    if not exam_active(attempt.lab) and ai_usable(attempt.student) and ai_grades_left(attempt.student) > 0:
         try:
             score, comment, explanation = ai_grade_diagram(attempt, ratio, changes)
             result = score, comment, LabGrade.Source.AI
@@ -145,10 +146,17 @@ class LabViewSet(viewsets.ModelViewSet):
             context["locks"] = lock_map(user, visible_labs(user).select_related("module"))
         return context
 
+    # Imtihon rejimi (labs/exam.py): qaysi amal ishlash, qaysi biri AI yordami hisoblanadi
+    WORK_ACTIONS = {"run", "submit", "try_run", "er_snapshot"}
+    AI_ACTIONS = {"explain_plan"}
+
     def get_object(self):
-        """Talaba uchun: ketma-ket moduldagi laboratoriya oldingisi yechilmaguncha ochilmaydi (barcha amallar)."""
+        """Talaba uchun: ketma-ket moduldagi laboratoriya oldingisi yechilmaguncha ochilmaydi (barcha amallar);
+        imtihon modulida imtihon vaqti qoidalari qo'llanadi."""
         lab = super().get_object()
         ensure_unlocked(self.request.user, lab)
+        kind = WORK if self.action in self.WORK_ACTIONS else AI if self.action in self.AI_ACTIONS else VIEW
+        ensure_exam(self.request.user, lab, kind)
         return lab
 
     def perform_create(self, serializer):
@@ -260,7 +268,7 @@ class LabViewSet(viewsets.ModelViewSet):
         if request.user.is_student:
             attempt = self.save_attempt(lab, request.user, payload, result, confidence=confidence)
             result["attempt_id"] = attempt.pk
-            ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+            ai_left = not exam_active(lab) and ai_usable(request.user) and ai_advice_left(request.user) > 0
             result["ai_available"] = not result["is_correct"] and ai_left
             result["ai_explain"] = result["is_correct"] and ai_left
         return Response(result)
@@ -372,9 +380,12 @@ class LabViewSet(viewsets.ModelViewSet):
                 best.save()
 
         result["attempt_id"] = attempt.pk
-        ai_left = ai_usable(request.user) and ai_advice_left(request.user) > 0
+        ai_left = not exam_active(lab) and ai_usable(request.user) and ai_advice_left(request.user) > 0
         result["ai_available"] = not result["is_correct"] and ai_left
         result["ai_explain"] = result["is_correct"] and ai_left
+        if exam_active(lab) and "fix" in result:
+            # Tuzatilgan diagramma imtihon tugagach ko'rsatiladi (saqlanadi, o'qituvchi ko'radi)
+            result["fix"] = None
         result["grade"] = {"score": score, "comment": comment, "source": source, "graded_at": attempt.created_at}
         result["best_grade"] = grade_payload(best)
         return Response(result)
@@ -809,6 +820,7 @@ class LabAttemptAdviceView(APIView):
     def post(self, request, pk):
         attempt = get_object_or_404(LabAttempt.objects.select_related("lab__module"), pk=pk, student=request.user)
         ensure_unlocked(request.user, attempt.lab)
+        ensure_exam(request.user, attempt.lab, AI)
         if attempt.is_correct:
             raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
         if not request.user.ai_allowed:
@@ -873,6 +885,7 @@ class LabAttemptExplainView(APIView):
 
         attempt = get_object_or_404(LabAttempt.objects.select_related("lab__module"), pk=pk, student=request.user)
         ensure_unlocked(request.user, attempt.lab)
+        ensure_exam(request.user, attempt.lab, AI)
         if not attempt.is_correct:
             raise ValidationError({"detail": "Tushuntirish to'g'ri yechimdan keyin yoziladi."})
         text = request.data.get("text")
@@ -916,6 +929,7 @@ class LabChatView(APIView):
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
+        ensure_exam(request.user, self.lab, AI)
 
     def own_messages(self):
         return LabChatMessage.objects.filter(lab=self.lab, student=self.request.user)
@@ -1004,6 +1018,7 @@ class LabInterviewView(APIView):
             raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shartida berilgan.")
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
+        ensure_exam(request.user, self.lab, WORK if request.method == "POST" else VIEW)
         if not self.lab.is_interview:
             raise PermissionDenied("Bu laboratoriyada buyurtmachi bilan suhbat yo'q.")
 
@@ -1085,6 +1100,7 @@ class LabPeerReviewView(APIView):
             raise PermissionDenied("O'zaro baholash faqat talaba uchun.")
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
+        ensure_exam(request.user, self.lab, AI)
         if self.lab.kind != Lab.Kind.ER:
             raise PermissionDenied("O'zaro baholash faqat ER-diagramma laboratoriyalarida.")
 
@@ -1283,6 +1299,7 @@ class LabStudyAdviceView(APIView):
             raise PermissionDenied("Tavsiya faqat talaba uchun.")
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
+        ensure_exam(request.user, self.lab, AI)
 
     def get(self, request, pk):
         from .study_advice import status_payload

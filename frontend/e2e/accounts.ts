@@ -20,3 +20,4 @@ export const ER_LAB_TITLE = 'E2E: ER-diagramma'
 export const INTEGRITY_LAB_TITLE = 'Cheklovlar 1. Kutubxona: NOT NULL, UNIQUE va CHECK'
 export const REVERSE_LAB_TITLE = 'Teskari loyihalash 1. Kafedra bazasi'
 export const EVOLUTION_LAB_TITLE = "Migratsiya 1. Do'kon: to'liq ismni ism va familiyaga ajratish"
+export const EXAM_LAB_TITLE = 'E2E: imtihon laboratoriyasi'

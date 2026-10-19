@@ -8,17 +8,19 @@ ishchi yoki ishlab chiqish bazasida tasodifan ishga tushib qolmaydi. Baza har sa
 Loginlar va parollar frontend/e2e/accounts.ts dagi bilan bir xil bo'lishi kerak.
 """
 import os
+from datetime import timedelta
 
 import psycopg
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 from django.db import connection
 from psycopg import sql
 
 from labs.evolution_labs import EVOLUTION_LABS
 from labs.integrity_labs import INTEGRITY_LABS
-from labs.models import Lab
+from labs.models import Lab, LabModule
 from labs.probes import validate_probes
 from labs.reverse import diagram_from_sql
 from labs.reverse_labs import REVERSE_LABS
@@ -36,6 +38,8 @@ ACCOUNTS = [
     ("e2e_newcomer", User.Role.STUDENT, "Yangi", "Talaba", None),
 ]
 GROUP = "E2E-guruh"
+EXAM_MODULE_TITLE = "E2E: imtihon moduli"
+EXAM_LAB_TITLE = "E2E: imtihon laboratoriyasi"
 ER_LAB_TITLE = "E2E: ER-diagramma"
 ER_REFERENCE = {
     "entities": [{"id": "t", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
@@ -132,4 +136,20 @@ class Command(BaseCommand):
         lab.groups.add(group)
 
         lab = Lab.objects.create(**EVOLUTION_LABS[0], author=users["e2e_teacher"])
+        lab.groups.add(group)
+
+        # Davom etayotgan imtihon: AI yordami o'chirilgan modul
+        now = timezone.now()
+        exam = LabModule.objects.create(
+            title=EXAM_MODULE_TITLE, sequential=False, author=users["e2e_teacher"],
+            exam_starts_at=now - timedelta(hours=1), exam_ends_at=now + timedelta(hours=2),
+        )
+        lab = Lab.objects.create(
+            title=EXAM_LAB_TITLE,
+            description="Barcha kitoblar nomini chiqaring.",
+            setup_sql="CREATE TABLE kitob (id INT PRIMARY KEY, nomi TEXT); INSERT INTO kitob VALUES (1, 'Alifbo');",
+            solution_sql="SELECT nomi FROM kitob;",
+            author=users["e2e_teacher"],
+            module=exam,
+        )
         lab.groups.add(group)

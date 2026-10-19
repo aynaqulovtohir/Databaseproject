@@ -22,6 +22,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErEditor } from '@/components/ErEditor'
 import { ErLabRunner } from '@/components/ErLabRunner'
 import { ErProcessView } from '@/components/ErProcessView'
+import { ExamBanner } from '@/components/ExamInfo'
 import { InterviewPanel, RequirementList } from '@/components/InterviewPanel'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { PeerReviewPanel } from '@/components/PeerReviewPanel'
@@ -127,6 +128,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
         <CardTitle>Laboratoriya sharti</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
+        {lab.module_detail?.exam ? <ExamBanner exam={lab.module_detail.exam} /> : null}
         <p className="text-sm whitespace-pre-wrap">{lab.description}</p>
         {lab.kind === 'norm' && lab.norm_task ? <NormTaskView task={lab.norm_task} /> : null}
         {lab.kind === 'sql' && lab.plan_query?.trim() ? (
@@ -828,6 +830,8 @@ function StudentView({ lab }: { lab: Lab }) {
   const user = useUser()
   const queryClient = useQueryClient()
   const progress = lab.my_progress ?? { attempts: 0, solved: false }
+  // Imtihon paytida AI yordami va o'zaro baholash serverda o'chirilgan: kartalar ko'rsatilmaydi
+  const examActive = lab.module_detail?.exam?.state === 'active'
   // Murabbiyga savol bilan yuboriladigan hozirgi ish: holat emas, ref — har bir harfda qayta chizilmasin
   const work = useRef<LabWork>({
     code: progress.last_code || lab.starter_sql || '',
@@ -892,6 +896,7 @@ function StudentView({ lab }: { lab: Lab }) {
               />
             </CardContent>
           </Card>
+          {examActive ? null : (
           <Card>
             <CardHeader>
               <CardTitle>O'zaro baholash</CardTitle>
@@ -904,8 +909,9 @@ function StudentView({ lab }: { lab: Lab }) {
               <PeerReviewPanel labId={lab.id} />
             </CardContent>
           </Card>
-          <StudyAdviceCard labId={lab.id} solved={progress.solved} />
-          <CoachCard labId={lab.id} getWork={getWork} />
+          )}
+          {examActive ? null : <StudyAdviceCard labId={lab.id} solved={progress.solved} />}
+          {examActive ? null : <CoachCard labId={lab.id} getWork={getWork} />}
         </div>
       </>
     )
@@ -943,8 +949,8 @@ function StudentView({ lab }: { lab: Lab }) {
           </Card>
         </div>
         <div className="mt-4 grid gap-4">
-          <StudyAdviceCard labId={lab.id} solved={progress.solved} />
-          <CoachCard labId={lab.id} getWork={getWork} />
+          {examActive ? null : <StudyAdviceCard labId={lab.id} solved={progress.solved} />}
+          {examActive ? null : <CoachCard labId={lab.id} getWork={getWork} />}
         </div>
       </>
     )
@@ -982,8 +988,8 @@ function StudentView({ lab }: { lab: Lab }) {
         </Card>
       </div>
       <div className="mt-4 grid gap-4">
-        <StudyAdviceCard labId={lab.id} solved={progress.solved} />
-        <CoachCard labId={lab.id} getWork={getWork} />
+        {examActive ? null : <StudyAdviceCard labId={lab.id} solved={progress.solved} />}
+        {examActive ? null : <CoachCard labId={lab.id} getWork={getWork} />}
       </div>
     </>
   )
