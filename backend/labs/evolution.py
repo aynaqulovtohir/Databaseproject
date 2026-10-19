@@ -83,8 +83,8 @@ def _query_differences(query, student, expected):
 
 
 def validate_lab_queries(setup_sql, solution_sql, hidden_setup_sql, queries):
-    """Saqlashdan oldin: namunaviy migratsiyadan keyin har bir so'rov ishlaydi (yashirin ma'lumotlarda ham); migratsiyasiz
-    esa xato beradi yoki boshqa natija qaytaradi — aks holda so'rov migratsiyani tekshirmaydi."""
+    """Saqlashdan oldin: namunaviy yechimdan keyin har bir so'rov ishlaydi (yashirin ma'lumotlarda ham); yechimsiz esa
+    kamida bittasi xato beradi yoki boshqa natija qaytaradi — aks holda so'rovlar yechimni tekshirmaydi."""
     if not solution_sql.strip():
         raise LabSetupError("solution_sql", SqlError("Migratsiya laboratoriyasida namunaviy migratsiya bo'lishi kerak."))
     setups = [("setup_sql", setup_sql)] + ([("hidden", hidden_setup_sql)] if hidden_setup_sql.strip() else [])
@@ -95,14 +95,15 @@ def validate_lab_queries(setup_sql, solution_sql, hidden_setup_sql, queries):
         for query, (error, _) in zip(queries, after):
             if error is not None:
                 raise LabSetupError("check_queries", SqlError(f"«{query['title']}» namunaviy migratsiyadan keyin xato berdi: {message(error)}"))
+    # Hech bo'lmaganda bitta so'rov yechimsiz boshqacha natija berishi kerak. Ayrim so'rovlar o'zgarmaslikni tekshiradi
+    # (ma'lumot saqlangan, bosh shifokor hammasini ko'radi) — ular yechimsiz ham bir xil bo'lishi tabiiy
     _, before = _run("SELECT 1", setup_sql, queries)
     _, after = _run(solution_sql, setup_sql, queries)
-    for query, old, new in zip(queries, before, after):
-        if old[0] is None and not _compare_results(old[1], new[1], True):
-            raise LabSetupError(
-                "check_queries",
-                SqlError(f"«{query['title']}» migratsiyasiz ham xuddi shu natijani beradi — u migratsiyani tekshirmaydi."),
-            )
+    if all(old[0] is None and not _compare_results(old[1], new[1], True) for old, new in zip(before, after)):
+        raise LabSetupError(
+            "check_queries",
+            SqlError("Barcha so'rovlar namunaviy yechimsiz ham xuddi shu natijani beradi — ular yechimni tekshirmaydi."),
+        )
 
 
 def check_evolution(lab, sql_code):
