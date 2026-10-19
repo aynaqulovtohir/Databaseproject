@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 import { ACCOUNTS, ER_LAB_TITLE, storageState } from './accounts.ts'
 
