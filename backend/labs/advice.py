@@ -320,6 +320,19 @@ def auto_grade_diagram(attempt, ratio):
     )
 
 
+def auto_grade_probes(attempt, ratio):
+    """Cheklovlar laboratoriyasi: hamma sinovdan o'tsa 100, aks holda o'tgan sinovlar ulushiga qarab 0-60.
+
+    AI ishlatilmaydi: ball sinovlar natijasidan aniq kelib chiqadi.
+    """
+    if attempt.is_correct:
+        return MAX_SCORE, "Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi."
+    return round(INCORRECT_MAX_SCORE * ratio), (
+        f"Sinovlarning {round(ratio * 100)}% idan o'tdi. O'tmagan sinovlarni ko'rib chiqing: cheklov qoidaning "
+        "o'ziga mos bo'lsin, to'g'ri ma'lumotni esa rad etmasin."
+    )
+
+
 def ai_grade_diagram(attempt, ratio, changes):
     """ER-diagrammani AI bilan baholaydi. Qaytaradi: (ball, izoh, tuzatishlar tushuntirishi)."""
     if attempt.is_correct:

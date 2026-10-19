@@ -1217,8 +1217,10 @@ class BlindReviewTests(BaseTestCase):
         data = self.client.get(self.review_url).data
         self.assertEqual((data["remaining"], data["reviewed"]), (2, 0))
         text = str(data)
-        for secret in ("MAXFIY-AI-IZOH", "Zuhriddin", "student_a", "'score'", "source", str(self.student_a1.pk) + ","):
+        for secret in ("MAXFIY-AI-IZOH", "Zuhriddin", "student_a", "'score'", "source"):
             self.assertNotIn(secret, text)
+        # Talaba id'si ham yo'q (matnda raqam qidirilmaydi: attempt_id tasodifan unga teng bo'lishi mumkin)
+        self.assertFalse({"student", "student_id", "author"} & data["item"].keys())
         self.assertIn(data["item"]["code"], {"SELECT 90;", "SELECT 40;"})
         self.assertEqual(data["item"]["check"]["differences"], ["Natijadagi qatorlar soni farq qiladi"])
 

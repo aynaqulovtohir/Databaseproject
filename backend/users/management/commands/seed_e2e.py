@@ -16,7 +16,9 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from psycopg import sql
 
+from labs.integrity_labs import INTEGRITY_LABS
 from labs.models import Lab
+from labs.probes import validate_probes
 from quizzes.models import Quiz
 from quizzes.serializers import QuizSerializer
 from users.consent import CONSENT_VERSION
@@ -111,5 +113,11 @@ class Command(BaseCommand):
             description="Talaba obyektini chizing.",
             reference_diagram=ER_REFERENCE,
             author=users["e2e_teacher"],
+        )
+        lab.groups.add(group)
+
+        integrity = INTEGRITY_LABS[0]
+        lab = Lab.objects.create(
+            **{**integrity, "probes": validate_probes(integrity["probes"])}, author=users["e2e_teacher"]
         )
         lab.groups.add(group)

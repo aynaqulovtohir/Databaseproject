@@ -320,6 +320,10 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** Yaxlitlik cheklovlari laboratoriyasi: barcha sinovlar. Faqat admin va o'qituvchiga */
+  probes?: LabProbe[]
+  /** Talaba uchun: ko'rinadigan sinovlar va yashirinlari soni */
+  probe_info?: { visible: LabProbe[]; hidden: number } | null
   /** Talablarni aniqlash: yashirin talablar va buyurtmachi roli. Faqat admin va o'qituvchiga */
   requirements?: InterviewRequirement[]
   client_persona?: string
@@ -460,6 +464,29 @@ export interface LabRunResult {
   best_grade?: LabGrade
   /** ER laboratoriyasi, baholashga topshirilganda: noto'g'ri bo'lsa tuzatilgan diagramma, aks holda null */
   fix?: ErFix | null
+  /** Cheklovlar laboratoriyasi: ko'rinadigan sinovlar natijasi, yashirinlari soni va o'tganlar ulushi */
+  probes?: LabProbeResult[]
+  hidden_probes?: { total: number; passed: number } | null
+  ratio?: number
+}
+
+/** Yaxlitlik cheklovlari laboratoriyasi sinovi: attack — rad etilishi kerak, valid — qabul qilinishi kerak */
+export interface LabProbe {
+  id: string
+  title: string
+  kind: 'attack' | 'valid'
+  sql: string
+  /** Faqat o'qituvchiga */
+  hidden?: boolean
+}
+
+export interface LabProbeResult {
+  id: string
+  title: string
+  kind: LabProbe['kind']
+  passed: boolean
+  /** Cheklov yoki baza xabari (bo'sh bo'lishi mumkin) */
+  message: string
 }
 
 export type ExplanationVerdict = 'ok' | 'partial' | 'wrong'

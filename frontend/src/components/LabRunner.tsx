@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { PlanAssistant } from '@/components/PlanAssistant'
+import { ProbeResults } from '@/components/Probes'
 import { SelfExplain } from '@/components/SelfExplain'
 import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
@@ -228,9 +229,11 @@ function Verdict({ result }: { result: LabRunResult }) {
           To'g'ri!
         </div>
         <p className="mt-1 text-sm">
-          {result.checked_against_solution
-            ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
-            : 'Kod xatosiz ishladi.'}
+          {result.probes
+            ? "Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi."
+            : result.checked_against_solution
+              ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
+              : 'Kod xatosiz ishladi.'}
         </p>
         {result.ai_explain && result.attempt_id ? (
           <div className="mt-3">
@@ -251,7 +254,11 @@ function Verdict({ result }: { result: LabRunResult }) {
       {error ? (
         <ErrorDetails error={error} />
       ) : (
-        <p className="text-sm">Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:</p>
+        <p className="text-sm">
+          {result.probes
+            ? "Kod xatosiz ishladi, lekin ba'zi sinovlar o'tmadi:"
+            : 'Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:'}
+        </p>
       )}
       {result.differences.length ? (
         <ul className="list-disc space-y-1 pl-5 text-sm">
@@ -522,6 +529,7 @@ export function LabRunner({
         <div className="grid gap-4" aria-live="polite">
           {result.grade ? <GradeCard grade={result.grade} best={result.best_grade} /> : null}
           <Verdict result={result} />
+          <ProbeResults result={result} />
           <PlanView plan={result.plan} />
           <ConcurrencyTimeline steps={result.steps} />
           {result.result ? <ResultTable table={result.result} /> : null}

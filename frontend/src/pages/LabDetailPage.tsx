@@ -24,6 +24,7 @@ import { ErProcessView } from '@/components/ErProcessView'
 import { InterviewPanel, RequirementList } from '@/components/InterviewPanel'
 import { LabCoach, type LabWork } from '@/components/LabCoach'
 import { PeerReviewPanel } from '@/components/PeerReviewPanel'
+import { ProbeList } from '@/components/Probes'
 import { LabDialog } from '@/components/LabDialog'
 import { LabGenerateCard } from '@/components/LabGenerateCard'
 import { LabRunner } from '@/components/LabRunner'
@@ -107,7 +108,18 @@ function GivenModelCard({ lab }: { lab: Lab }) {
   )
 }
 
+/** Talabaga ko'rinadigan sinovlar: talaba uchun server tayyorlab beradi, o'qituvchida to'liq ro'yxatdan olinadi */
+function shownProbes(lab: Lab) {
+  if (lab.probe_info) return lab.probe_info
+  if (!lab.probes?.length) return null
+  return {
+    visible: lab.probes.filter((probe) => !probe.hidden),
+    hidden: lab.probes.filter((probe) => probe.hidden).length,
+  }
+}
+
 function ConditionCard({ lab }: { lab: Lab }) {
+  const probes = shownProbes(lab)
   return (
     <Card>
       <CardHeader>
@@ -123,6 +135,12 @@ function ConditionCard({ lab }: { lab: Lab }) {
               Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.
             </p>
             <SqlCode code={lab.plan_query.trim()} />
+          </div>
+        ) : null}
+        {probes ? (
+          <div>
+            <h3 className="mb-1 text-sm font-medium">Cheklovlar sinovlari</h3>
+            <ProbeList probes={probes.visible} hidden={probes.hidden} />
           </div>
         ) : null}
         {lab.theory.trim() ? (
@@ -713,6 +731,19 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
           />
         </CardContent>
       </Card>
+      {lab.probes?.some((probe) => probe.hidden) ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Yashirin sinovlar</CardTitle>
+            <CardDescription>
+              Talabaga faqat soni ko'rinadi: ko'rinadigan misollarga moslab yozilgan tor cheklovni ushlaydi.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProbeList probes={lab.probes.filter((probe) => probe.hidden)} hidden={0} />
+          </CardContent>
+        </Card>
+      ) : null}
       {supportsGeneration(lab) ? <LabGenerateCard lab={lab} /> : null}
     </>
   )

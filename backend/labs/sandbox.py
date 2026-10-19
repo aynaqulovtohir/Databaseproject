@@ -565,6 +565,56 @@ def run_sql(script, setup_sql="", explain_sql=""):
     return outcome
 
 
+# Barcha sinovlar uchun umumiy vaqt: talaba trigger'i har bir sinovni sekinlashtirsa ham tekshiruv cho'zilmaydi
+PROBES_TIME_BUDGET_SECONDS = 20
+PROBE_TIMEOUT_ERROR = SqlError("Sinovlar uchun ajratilgan vaqt tugadi.", sqlstate="57014")
+
+
+def run_probes(script, setup_sql, probes):
+    """`setup_sql` va `script` dan keyin har bir sinov buyrug'ini alohida tranzaksiyada bajarib, orqaga qaytaradi:
+    sinovlar bir-biriga ta'sir qilmaydi.
+
+    Qaytaradi: (RunOutcome — talaba kodi natijasi, [SqlError | None] — har bir sinov xatosi; None — bajarildi).
+    Talaba kodi xato bersa, sinovlar bajarilmaydi (ro'yxat bo'sh).
+    """
+    _ensure_database()
+    outcome, errors = RunOutcome(), []
+
+    with _connect(settings.LAB_SANDBOX_DB) as admin:
+        role, password = _create_role(admin)
+        try:
+            runner = _connect_runner(role, password)
+            try:
+                if setup_sql.strip():
+                    setup_error, _, _ = _execute_script(runner, setup_sql, admin)
+                    if setup_error:
+                        outcome.error = setup_error
+                        outcome.setup_failed = True
+                        return outcome, errors
+                outcome.error, outcome.result, outcome.status_message = _execute_script(runner, script, admin)
+                if outcome.error is None:
+                    deadline = time.monotonic() + PROBES_TIME_BUDGET_SECONDS
+                    for sql in probes:
+                        if runner.closed or time.monotonic() > deadline:
+                            errors.append(PROBE_TIMEOUT_ERROR)
+                            continue
+                        error, _, _ = _execute_script(runner, f"BEGIN;\n{sql}\n;", admin)
+                        errors.append(error)
+                        if not runner.closed:
+                            # Xato bo'lsa tranzaksiya ochiq qoladi; muvaffaqiyatli bo'lsa o'zgarish bekor qilinadi
+                            _execute_script(runner, "ROLLBACK", admin)
+            finally:
+                runner.close()
+            if outcome.error is None:
+                outcome.tables = _read_tables(admin, role)
+        finally:
+            try:
+                _drop_role(admin, role)
+            except psycopg.Error:
+                logger.exception("Laboratoriya rolini o'chirib bo'lmadi: %s", role)
+    return outcome, errors
+
+
 # ---------- Ikki sessiya bir vaqtda (tranzaksiyalar laboratoriyasi) ----------
 
 MAX_CONCURRENT_STATEMENTS = 20

@@ -6,6 +6,7 @@ from users.models import StudentGroup
 from .checker import LabSetupError, format_error, validate_concurrent, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
 from .interview import RequirementsError, validate_requirements
+from .probes import ProbesError, validate_lab_probes, validate_probes
 from .norm import NormError, parse_answer, parse_task, reference_solution
 from .models import MAX_LEVEL, MAX_SQL_LENGTH, Lab, LabModule
 from .sandbox import SandboxUnavailable
@@ -107,6 +108,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "starter_sql",
             "solution_sql",
             "hidden_setup_sql",
+            "probes",
             "reference_diagram",
             "given_diagram",
             "requirements",
@@ -185,6 +187,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["starter_sql"] = ""
         attrs["given_diagram"] = None
         attrs["concurrent"] = False
+        attrs["probes"] = []
         return attrs
 
     def validate_norm(self, attrs):
@@ -202,6 +205,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["reference_diagram"] = attrs["given_diagram"] = None
         attrs["requirements"], attrs["client_persona"] = [], ""
         attrs["concurrent"] = False
+        attrs["probes"] = []
         return attrs
 
     def validate_sql(self, attrs):
@@ -213,7 +217,12 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         plan_query = attrs.get("plan_query", current.plan_query if current else "")
         plan_forbidden = attrs.get("plan_forbidden", current.plan_forbidden if current else "Seq Scan")
         concurrent = attrs.get("concurrent", current.concurrent if current else False)
-        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent)
+        try:
+            probes = validate_probes(attrs.get("probes", current.probes if current else []))
+        except ProbesError as exc:
+            raise serializers.ValidationError({"probes": str(exc)})
+        attrs["probes"] = probes
+        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent, probes)
         changed = current is None or values != (
             current.setup_sql,
             current.solution_sql,
@@ -221,7 +230,12 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             current.plan_query,
             current.plan_forbidden,
             current.concurrent,
+            current.probes,
         )
+        if probes and (concurrent or plan_query.strip() or hidden_sql.strip()):
+            raise serializers.ValidationError(
+                {"probes": "Cheklov sinovlari ikki sessiyali tekshiruv, reja va yashirin ma'lumotlar bilan birga ishlatilmaydi."}
+            )
         if concurrent and (plan_query.strip() or hidden_sql.strip()):
             raise serializers.ValidationError(
                 {"concurrent": "Ikki sessiyali tekshiruv reja va yashirin ma'lumotlar bilan birga ishlatilmaydi."}
@@ -233,6 +247,8 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         if changed and (setup_sql.strip() or solution_sql.strip() or hidden_sql.strip()):
             try:
                 validate_lab_sql(setup_sql, solution_sql, hidden_sql)
+                if probes:
+                    validate_lab_probes(setup_sql, solution_sql, probes)
                 if concurrent:
                     validate_concurrent(setup_sql, solution_sql)
                 if plan_query.strip():
@@ -266,6 +282,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
     module_detail = serializers.SerializerMethodField()
     locked = serializers.SerializerMethodField()
     blocked_by = serializers.SerializerMethodField()
+    probe_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
@@ -291,6 +308,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "created_at",
             "my_progress",
             "interview",
+            "probe_info",
         ]
         read_only_fields = fields
 
@@ -314,7 +332,15 @@ class StudentLabSerializer(serializers.ModelSerializer):
             for field in ("description", "theory", "setup_sql", "starter_sql", "given_diagram", "norm_task", "plan_query"):
                 data[field] = "" if isinstance(data[field], str) else None
             data["interview"] = None
+            data["probe_info"] = None
         return data
+
+    def get_probe_info(self, lab):
+        """Cheklovlar laboratoriyasi: ko'rinadigan sinovlar (SQL bilan) va yashirinlari soni."""
+        if not lab.probes:
+            return None
+        visible = [{key: probe[key] for key in ("id", "title", "kind", "sql")} for probe in lab.probes if not probe.get("hidden")]
+        return {"visible": visible, "hidden": sum(1 for probe in lab.probes if probe.get("hidden"))}
 
     def get_interview(self, lab):
         """Talablarni aniqlash laboratoriyasi: AI yoqilgan guruhga talablar ko'rsatilmaydi (ularni buyurtmachidan

@@ -21,7 +21,15 @@ from users.models import User
 
 from .access import visible_labs
 from .sequence import ensure_unlocked, lock_map
-from .advice import MAX_HINT_LEVEL, ai_grade, ai_grade_diagram, auto_grade, auto_grade_diagram, generate_advice
+from .advice import (
+    MAX_HINT_LEVEL,
+    ai_grade,
+    ai_grade_diagram,
+    auto_grade,
+    auto_grade_diagram,
+    auto_grade_probes,
+    generate_advice,
+)
 from .checker import LabSetupError, check_code, try_code
 from .mistakes import build_report
 from .quota import (
@@ -337,7 +345,10 @@ class LabViewSet(viewsets.ModelViewSet):
             return result
 
         attempt = self.save_attempt(lab, request.user, payload, result, is_submission=True, confidence=confidence)
-        if lab.kind == Lab.Kind.ER:
+        if lab.probes:
+            score, comment = auto_grade_probes(attempt, result["ratio"])
+            source = LabGrade.Source.AUTO
+        elif lab.kind == Lab.Kind.ER:
             score, comment, source = grade_diagram_attempt(attempt, payload["ratio"])
             # Noto'g'ri diagramma: tuzatilgan variant faqat topshirilgandan keyin ko'rsatiladi
             result["fix"] = fix_payload(attempt)
