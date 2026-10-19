@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Info } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { ErrorState, ListSkeleton } from '@/components/States'
 import { Badge } from '@/components/ui/badge'
@@ -29,7 +30,7 @@ function normalityText(value: Normality | null | undefined) {
   return `W = ${value.w.toFixed(3)}, p = ${pText(value.p)} — ${value.normal ? 'normal' : 'normal emas'}`
 }
 
-function TestRow({ title, test }: { title: string; test: StatTest | null }) {
+export function TestRow({ title, test }: { title: ReactNode; test: StatTest | null }) {
   if (!test) {
     return (
       <TableRow>

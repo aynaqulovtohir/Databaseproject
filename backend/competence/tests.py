@@ -234,6 +234,16 @@ class StatsTests(SimpleTestCase):
         self.assertEqual(stats.mann_whitney(self.A, self.B)["u"], 101.0)
         self.assertAlmostEqual(stats.mann_whitney([1, 2, 2, 3, 3, 3, 4], [2, 3, 4, 4, 5, 5])["p"], 0.06662028301124995, places=12)
 
+    def test_kruskal_wallis(self):
+        # scipy.stats.kruskal
+        self.assertAlmostEqual(stats.kruskal_wallis([[1, 2, 3], [4, 5, 6]])["h"], 3.857142857142854, places=10)
+        result = stats.kruskal_wallis([self.A, self.B, [60, 60, 70, 71, 80, 52, 52], []])
+        self.assertAlmostEqual(result["h"], 8.532033242820683, places=10)
+        self.assertAlmostEqual(result["p"], 0.014037588963039693, places=10)
+        self.assertEqual(result["df"], 2)
+        self.assertIsNone(stats.kruskal_wallis([[1, 2], []]))
+        self.assertIsNone(stats.kruskal_wallis([[1, 1], [1, 1]]))
+
     def test_chi_square_drops_empty_level(self):
         result = stats.chi_square([[10, 15, 5, 0], [4, 12, 14, 0]])
         self.assertAlmostEqual(result["chi2"], 7.167919799498748, places=10)

@@ -3,6 +3,7 @@
 - Pirson χ² (darajalar taqsimoti: tajriba va nazorat guruhlari), Kramer V — effekt hajmi;
 - Styudent t-testi (Uelch varianti: dispersiyalar teng bo'lishi shart emas), Koen d va Xedjes g;
 - Mann–Uitni U testi (normal yaqinlashish, bir xil qiymatlar tuzatmasi bilan) — taqsimot normal bo'lmasa;
+- Kraskel–Uollis H testi — uch va undan ko'p guruh (masalan, loyihalash strategiyalari) parametrsiz;
 - juftlangan t-test — bitta guruhning tajriba boshi va oxiri (o'sish).
 
 p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes, 6.2 va 6.4) ishlatiladi.
@@ -206,6 +207,29 @@ def mann_whitney(a, b):
         return None
     z = (u - n1 * n2 / 2) / math.sqrt(variance)
     return {"u": u, "z": z, "p": normal_two_sided_p(z), "approximate": min(n1, n2) < 8}
+
+
+def kruskal_wallis(samples):
+    """Kraskel–Uollis H testi (uch va undan ko'p mustaqil guruh, parametrsiz), bir xil qiymatlar tuzatmasi bilan.
+
+    Bo'sh guruhlar tashlab yuboriladi; ikkitadan kam guruh qolsa — None. Effekt hajmi: ε² = H / (n − 1).
+    """
+    samples = [list(sample) for sample in samples if sample]
+    values = [value for sample in samples for value in sample]
+    n = len(values)
+    if len(samples) < 2 or n < 3:
+        return None
+    ranks, ties = _ranks(values)
+    total, start = 0.0, 0
+    for sample in samples:
+        total += sum(ranks[start:start + len(sample)]) ** 2 / len(sample)
+        start += len(sample)
+    correction = 1 - sum(t**3 - t for t in ties) / (n**3 - n)
+    if correction <= 0:
+        return None
+    h = (12 / (n * (n + 1)) * total - 3 * (n + 1)) / correction
+    df = len(samples) - 1
+    return {"h": h, "df": df, "p": chi2_sf(h, df), "epsilon2": h / (n - 1)}
 
 
 def paired_t_test(before, after):

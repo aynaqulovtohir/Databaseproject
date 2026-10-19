@@ -1206,6 +1206,31 @@ class StatisticsView(APIView):
         return Response(build_statistics(request.user, group))
 
 
+class ErProcessStatisticsView(APIView):
+    """ER-diagramma chizish jarayoni statistikasi (labs/process_stats.py): strategiyalar, AI ta'siri, o'tishlar.
+
+    ?group=<id> — bitta guruh, ?lab=<id> — bitta laboratoriya. Faqat tadqiqotga rozi talabalar.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .process_stats import build
+        from .statistics import allowed_groups
+
+        if request.user.is_student:
+            raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
+        groups = allowed_groups(request.user)
+        group_id, lab_id = request.query_params.get("group"), request.query_params.get("lab")
+        if group_id:
+            if not group_id.isdigit():
+                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            groups = [get_object_or_404(groups, pk=group_id)]
+        if lab_id and not lab_id.isdigit():
+            raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+        return Response(build(request.user, groups, int(lab_id) if lab_id else None))
+
+
 class LabAnalysisView(APIView):
     """Laboratoriyalarning psixometrik tahlili (qiyinlik 5 darajada, ajrata olish, Cronbach α).
 
