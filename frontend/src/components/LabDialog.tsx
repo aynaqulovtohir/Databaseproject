@@ -48,6 +48,8 @@ const TOPIC_OPTIONS = [
   ['select', "SELECT so'rovlari"],
   ['index', 'Indekslar'],
   ['transaction', 'Tranzaksiyalar'],
+  ['warehouse', "Ma'lumotlar ombori (OLAP)"],
+  ['json', "Yarim tuzilmali ma'lumot (JSONB)"],
   ['vector', 'Vektorli qidiruv (AI)'],
 ] as const
 const SQL_PROPS = { spellCheck: false, autoCapitalize: 'none', autoCorrect: 'off' } as const
