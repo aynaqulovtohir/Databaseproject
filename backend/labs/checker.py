@@ -444,6 +444,10 @@ def check_code(lab, sql_code):
         from .probes import check_probes
 
         return check_probes(lab, sql_code)
+    if getattr(lab, "check_queries", None):
+        from .evolution import check_evolution
+
+        return check_evolution(lab, sql_code)
     outcome = run_sql(sql_code, lab.setup_sql, lab.plan_query)
     if outcome.setup_failed:
         raise LabSetupError("setup_sql", outcome.error)

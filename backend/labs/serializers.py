@@ -6,6 +6,7 @@ from users.models import StudentGroup
 from .checker import LabSetupError, format_error, validate_concurrent, validate_lab_sql, validate_plan
 from .er import DiagramError, validate_diagram
 from .interview import RequirementsError, validate_requirements
+from .evolution import QueriesError, validate_lab_queries, validate_queries
 from .probes import ProbesError, validate_lab_probes, validate_probes
 from .norm import NormError, parse_answer, parse_task, reference_solution
 from .models import MAX_LEVEL, MAX_SQL_LENGTH, Lab, LabModule
@@ -109,6 +110,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             "solution_sql",
             "hidden_setup_sql",
             "probes",
+            "check_queries",
             "reference_diagram",
             "given_diagram",
             "requirements",
@@ -197,7 +199,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["starter_sql"] = ""
         attrs["given_diagram"] = None
         attrs["concurrent"] = False
-        attrs["probes"] = []
+        attrs["probes"] = attrs["check_queries"] = []
         return attrs
 
     @staticmethod
@@ -230,7 +232,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["reference_diagram"] = attrs["given_diagram"] = None
         attrs["requirements"], attrs["client_persona"] = [], ""
         attrs["concurrent"] = False
-        attrs["probes"] = []
+        attrs["probes"] = attrs["check_queries"] = []
         return attrs
 
     def validate_sql(self, attrs):
@@ -247,7 +249,16 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         except ProbesError as exc:
             raise serializers.ValidationError({"probes": str(exc)})
         attrs["probes"] = probes
-        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent, probes)
+        try:
+            queries = validate_queries(attrs.get("check_queries", current.check_queries if current else []))
+        except QueriesError as exc:
+            raise serializers.ValidationError({"check_queries": str(exc)})
+        attrs["check_queries"] = queries
+        if queries and (probes or concurrent or plan_query.strip()):
+            raise serializers.ValidationError(
+                {"check_queries": "Migratsiyadan keyingi so'rovlar cheklov sinovlari, ikki sessiyali tekshiruv va reja bilan birga ishlatilmaydi."}
+            )
+        values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent, probes, queries)
         changed = current is None or values != (
             current.setup_sql,
             current.solution_sql,
@@ -256,6 +267,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             current.plan_forbidden,
             current.concurrent,
             current.probes,
+            current.check_queries,
         )
         if probes and (concurrent or plan_query.strip() or hidden_sql.strip()):
             raise serializers.ValidationError(
@@ -274,6 +286,8 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
                 validate_lab_sql(setup_sql, solution_sql, hidden_sql)
                 if probes:
                     validate_lab_probes(setup_sql, solution_sql, probes)
+                if queries:
+                    validate_lab_queries(setup_sql, solution_sql, hidden_sql, queries)
                 if concurrent:
                     validate_concurrent(setup_sql, solution_sql)
                 if plan_query.strip():
@@ -334,6 +348,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
             "my_progress",
             "interview",
             "probe_info",
+            "check_queries",
         ]
         read_only_fields = fields
 
@@ -358,6 +373,7 @@ class StudentLabSerializer(serializers.ModelSerializer):
                 data[field] = "" if isinstance(data[field], str) else None
             data["interview"] = None
             data["probe_info"] = None
+            data["check_queries"] = []
         return data
 
     def get_probe_info(self, lab):
