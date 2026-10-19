@@ -167,6 +167,15 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
 
     def validate_er(self, attrs):
         current = self.instance
+        # Teskari loyihalash: berilgan bazadan namunaviy diagramma hosil qilinadi (labs/reverse.py)
+        setup_sql = attrs.get("setup_sql", current.setup_sql if current else "")
+        if setup_sql.strip():
+            if attrs.get("requirements", current.requirements if current else []):
+                raise serializers.ValidationError(
+                    {"setup_sql": "Berilgan baza va buyurtmachi bilan suhbat bitta laboratoriyada ishlatilmaydi."}
+                )
+            if current is None or setup_sql != current.setup_sql or not current.reference_diagram:
+                attrs["reference_diagram"] = self.reverse_diagram(setup_sql)
         diagram = attrs.get("reference_diagram", current.reference_diagram if current else None)
         if diagram is None:
             raise serializers.ValidationError({"reference_diagram": "Namunaviy ER-diagrammani chizing."})
@@ -182,13 +191,29 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
                 attrs["requirements"] = validate_requirements(attrs["requirements"])
             except RequirementsError as exc:
                 raise serializers.ValidationError({"requirements": str(exc)})
-        # ER laboratoriyasida SQL ishlatilmaydi
-        attrs["setup_sql"] = attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
+        # ER laboratoriyasida SQL faqat berilgan baza sifatida (teskari loyihalash) ishlatiladi
+        attrs["setup_sql"] = setup_sql
+        attrs["solution_sql"] = attrs["hidden_setup_sql"] = attrs["plan_query"] = ""
         attrs["starter_sql"] = ""
         attrs["given_diagram"] = None
         attrs["concurrent"] = False
         attrs["probes"] = []
         return attrs
+
+    @staticmethod
+    def reverse_diagram(setup_sql):
+        from .reverse import ReverseError, diagram_from_sql
+
+        try:
+            return diagram_from_sql(setup_sql)
+        except LabSetupError as exc:
+            raise serializers.ValidationError({"setup_sql": f"Kod xato berdi. {format_error(exc.error)}"})
+        except (ReverseError, DiagramError) as exc:
+            raise serializers.ValidationError({"setup_sql": str(exc)})
+        except SandboxUnavailable:
+            raise serializers.ValidationError(
+                {"detail": "Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."}
+            )
 
     def validate_norm(self, attrs):
         current = self.instance

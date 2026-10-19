@@ -18,3 +18,4 @@ export const QUIZ_TITLE = 'E2E: normallashtirish'
 
 export const ER_LAB_TITLE = 'E2E: ER-diagramma'
 export const INTEGRITY_LAB_TITLE = 'Cheklovlar 1. Kutubxona: NOT NULL, UNIQUE va CHECK'
+export const REVERSE_LAB_TITLE = 'Teskari loyihalash 1. Kafedra bazasi'

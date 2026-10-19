@@ -14,6 +14,7 @@ from .integrity_labs import INTEGRITY_LABS
 from .interview_labs import INTERVIEW_LABS
 from .norm_labs import NORM_LABS
 from .query_labs import QUERY_LABS
+from .reverse_labs import REVERSE_LABS
 from .theory import THEORY
 from .transaction_labs import TRANSACTION_LABS
 from .vector_labs import VECTOR_LABS
@@ -482,6 +483,6 @@ O'zingiz aniqlaysiz: bog'lanishlar, ularning kardinalligi va har bir obyektning 
 for _lab in ER_LABS + DESIGN_LABS:
     _lab["theory"] = THEORY.get(_lab["title"], "")
 
-# Kurs tartibida: ER-model → talablarni aniqlash → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar →
+# Kurs tartibida: ER-model → talablarni aniqlash → teskari loyihalash → loyihalash → normallashtirish → ER-modeldan jadvallarga → SELECT → indekslar →
 # tranzaksiyalar → vektorli qidiruv
-ALL_LABS = ER_LABS + INTERVIEW_LABS + DESIGN_LABS + INTEGRITY_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS + VECTOR_LABS
+ALL_LABS = ER_LABS + INTERVIEW_LABS + REVERSE_LABS + DESIGN_LABS + INTEGRITY_LABS + NORM_LABS + ER_SQL_LABS + QUERY_LABS + INDEX_LABS + TRANSACTION_LABS + VECTOR_LABS
