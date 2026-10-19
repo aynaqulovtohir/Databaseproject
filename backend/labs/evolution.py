@@ -7,7 +7,9 @@ ma'lumotni ko'chirish). Tekshiruv:
 2. ilovaning yangi so'rovlari (check_queries) xatosiz bajariladi va namunaviy migratsiyadagi natijani beradi;
 3. yashirin ma'lumotlarda (hidden_setup_sql) ham shunday — qiymatlarni qo'lda INSERT qilib aldab bo'lmaydi.
 
-So'rovlar talaba kodidan keyin alohida tranzaksiyada bajariladi (sandbox.run_followups).
+So'rovlar talaba kodidan keyin alohida tranzaksiyada bajariladi va orqaga qaytariladi (sandbox.run_followups). So'rov bir
+nechta buyruqdan iborat bo'lishi mumkin, oxirgisi SELECT: masalan, UPDATE dan keyin trigger yozgan tarix jadvalini yoki
+INSERT dan keyin view'ni o'qish. Shu bilan view, funksiya va trigger laboratoriyalari ham tekshiriladi.
 """
 import re
 
@@ -28,6 +30,7 @@ MAX_QUERY_SQL = 2000
 MAX_TITLE = 200
 ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
 ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)
+FINAL_SELECT = re.compile(r"^\(?\s*(SELECT|WITH|VALUES|TABLE)\b", re.IGNORECASE)
 
 
 class QueriesError(ValueError):
@@ -55,11 +58,11 @@ def validate_queries(value):
         if not isinstance(sql, str) or not sql.strip() or len(sql) > MAX_QUERY_SQL:
             raise QueriesError(f"«{query_id}» so'rovining SQL'i bo'sh bo'lmasligi va {MAX_QUERY_SQL} belgidan oshmasligi kerak.")
         statements = split_statements(sql)
-        if len(statements) != 1:
-            raise QueriesError(f"«{query_id}» — bitta so'rov (SELECT) bo'lishi kerak.")
-        if TRANSACTION_CONTROL.match(statements[0]):
+        if not statements or not FINAL_SELECT.match(statements[-1]):
+            raise QueriesError(f"«{query_id}» — oxirgi buyruq natija qaytaradigan so'rov (SELECT) bo'lishi kerak.")
+        if any(TRANSACTION_CONTROL.match(statement) for statement in statements):
             raise QueriesError(f"«{query_id}» so'rovida tranzaksiya buyruqlari bo'lmasligi kerak.")
-        clean.append({"id": query_id, "title": " ".join(title.split()), "sql": statements[0]})
+        clean.append({"id": query_id, "title": " ".join(title.split()), "sql": ";\n".join(statements)})
     return clean
 
 

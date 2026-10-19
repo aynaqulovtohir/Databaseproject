@@ -39,6 +39,7 @@ class Lab(models.Model):
         DESIGN = "design", "Jadvallarni loyihalash"
         INTEGRITY = "integrity", "Yaxlitlik cheklovlari"
         EVOLUTION = "evolution", "Sxemani rivojlantirish (migratsiya)"
+        PROGRAMMABILITY = "programmability", "View, funksiya va trigger"
         NORM = "norm", "Normallashtirish"
         ER_SQL = "er_sql", "ER-modeldan jadvallarga"
         SELECT = "select", "SELECT so'rovlari"

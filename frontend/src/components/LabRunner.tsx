@@ -233,7 +233,7 @@ function Verdict({ result }: { result: LabRunResult }) {
           {result.probes
             ? "Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi."
             : result.queries?.length
-              ? "Migratsiya ma'lumotlarni saqladi va ilovaning yangi so'rovlari to'g'ri ishladi."
+              ? "Jadvallar kutilganidek va barcha tekshiruv so'rovlari to'g'ri natija berdi."
               : result.checked_against_solution
                 ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
                 : 'Kod xatosiz ishladi.'}
@@ -261,7 +261,7 @@ function Verdict({ result }: { result: LabRunResult }) {
           {result.probes
             ? "Kod xatosiz ishladi, lekin ba'zi sinovlar o'tmadi:"
             : result.queries?.length
-              ? "Migratsiya xatosiz bajarildi, lekin natija kutilganidan farq qiladi:"
+              ? "Kod xatosiz bajarildi, lekin natija kutilganidan farq qiladi:"
               : 'Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:'}
         </p>
       )}

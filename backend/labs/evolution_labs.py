@@ -7,7 +7,7 @@ yangi so'rovlari. Yashirin ma'lumotlar (hidden_setup_sql) qiymatlarni qo'lda yoz
 EVOLUTION_NOTE = (
     "Jadvallarni o'chirib qayta yaratmang va qiymatlarni qo'lda yozmang: migratsiya mavjud ma'lumotlarni saqlashi va "
     "istalgan ma'lumotlar uchun ishlashi kerak (tekshiruv boshqa, yashirin ma'lumotlarda ham takrorlanadi). Oxirida "
-    "SELECT yozish shart emas: tekshiruv jadvallarni va «Ilovaning yangi so'rovlari»ni o'zi bajaradi."
+    "SELECT yozish shart emas: tekshiruv jadvallarni va «Tekshiruv so'rovlari»ni o'zi bajaradi."
 )
 
 THEORY_EVOLUTION = """\

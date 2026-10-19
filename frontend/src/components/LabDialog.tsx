@@ -41,6 +41,7 @@ const TOPIC_OPTIONS = [
   ['design', 'Jadvallarni loyihalash'],
   ['integrity', 'Yaxlitlik cheklovlari'],
   ['evolution', 'Sxemani rivojlantirish (migratsiya)'],
+  ['programmability', 'View, funksiya va trigger'],
   ['norm', 'Normallashtirish'],
   ['er_sql', 'ER-modeldan jadvallarga'],
   ['select', "SELECT so'rovlari"],
@@ -403,11 +404,11 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 ) : null}
               </div>
               <div className="grid gap-1.5">
-                <span className="text-sm font-medium">Migratsiyadan keyingi so'rovlar (sxemani rivojlantirish laboratoriyasi, ixtiyoriy)</span>
+                <span className="text-sm font-medium">Tekshiruv so'rovlari (migratsiya, view, funksiya va trigger laboratoriyalari, ixtiyoriy)</span>
                 <p className="text-xs text-muted-foreground">
                   Boshlang'ich jadvallar — eski sxema va ma'lumotlar, namunaviy yechim — migratsiya. Talaba migratsiyasidan keyin
                   jadvallar va shu so'rovlar natijasi namunaviy migratsiyadagi bilan solishtiriladi; yashirin ma'lumotlar berilsa,
-                  ularda ham. Saqlashda tekshiriladi: so'rov migratsiyadan keyin ishlaydi va migratsiyasiz boshqacha natija beradi.
+                  ularda ham. Bir nechta buyruq bo'lishi mumkin, oxirgisi SELECT (masalan, UPDATE dan keyin trigger yozgan jadvalni o'qish); ular orqaga qaytariladi. Saqlashda tekshiriladi: so'rov namunaviy yechimdan keyin ishlaydi va usiz boshqacha natija beradi.
                   Talabaga ko'rinadi.
                 </p>
                 <CheckQueriesEditor value={checkQueries} onChange={setCheckQueries} />
