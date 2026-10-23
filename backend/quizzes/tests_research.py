@@ -321,6 +321,43 @@ class ExperimentTests(ResearchBase):
         self.assertEqual(clustering["icc"]["effective_n"], round(10.873230298340037, 1))
         self.assertIn("Klasterlash", " ".join(result["conclusions"]))
 
+    def test_external_ai_contamination(self):
+        from .serializers import QuizSerializer
+        from .survey_bank import EXTERNAL_AI_TEXTS
+
+        survey = Quiz.objects.create(kind=Quiz.Kind.SURVEY, title="Yakuniy", author=self.teacher)
+        survey.groups.add(self.ai_group, self.control_group)
+        texts = ["Laboratoriya foydali bo'ldi.", "Topshiriqlar tushunarli edi.", *sorted(EXTERNAL_AI_TEXTS)]
+        QuizSerializer.write_questions(survey, [{"text": text, "kind": "likert", "points": 0, "choices": [
+            {"text": str(value), "is_correct": False} for value in range(1, 6)
+        ]} for text in texts])
+        questions = list(survey.questions.order_by("order"))
+        # ec0-ec2 va ea0 — ko'p foydalangan (o'rtacha 4.5), qolganlar — 1; fikr savoliga hamma 5
+        heavy = {"ec0", "ec1", "ec2", "ea0"}
+        for student in User.objects.filter(group__in=[self.ai_group, self.control_group]).exclude(username__in=["e_refused", "e_dropped"]):
+            values = [5, 4, 5, 4] if student.username in heavy else [5, 4, 1, 1]
+            answers = {str(q.pk): [q.choices.get(order=value).pk] for q, value in zip(questions, values)}
+            QuizAttempt.objects.create(quiz=survey, student=student, answers=answers, submitted_at=timezone.now())
+        result = self.result()
+        external = result["external_ai"]
+        self.assertEqual(external["answered"], 16)
+        self.assertEqual(external["cohorts"]["control"]["heavy"], 3)
+        self.assertEqual(external["cohorts"]["experimental"]["heavy"], 1)
+        # statsmodels: ols("post ~ C(g) + pre"), anova_lm(typ=2), ko'p foydalanganlarsiz
+        sensitivity = external["sensitivity"]
+        self.assertEqual(sensitivity["excluded"], 4)
+        self.assertAlmostEqual(sensitivity["f"], 18.677, places=3)
+        self.assertAlmostEqual(sensitivity["p"], 0.0019, places=4)
+        self.assertAlmostEqual(sensitivity["partial_eta2"], 0.675, places=3)
+        text = " ".join(result["conclusions"])
+        self.assertIn("nazorat guruhida 3 ta talaba", text)
+        self.assertIn("Sezgirlik tahlili", text)
+        # Tashqi AI savollari so'rovnomaning fikr shkalasiga (α) kirmaydi
+        from .psychometrics import analyse_survey
+
+        scale = analyse_survey(survey)["scales"][0]
+        self.assertEqual([item["text"] for item in scale["items"]], ["Laboratoriya foydali bo'ldi.", "Topshiriqlar tushunarli edi."])
+
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
         self.assertIsNone(result["baseline"])

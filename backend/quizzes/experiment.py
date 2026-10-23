@@ -17,7 +17,10 @@ va nazorat guruhlari.
    guruhlararo ICC(1), dizayn effekti va samarali talabalar soni hisoblanadi; har bir shartda bittadan guruh bo'lsa,
    guruh effektini AI effektidan ajratib bo'lmasligi haqida ogohlantiriladi.
 8. Parallel variantlar (forms.py): A va B ekvivalentligi (TOST), ishonchliligi va bir xil variant olganlar.
-9. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
+9. Nazorat guruhining "ifloslanishi": yakuniy so'rovnomadagi tashqi AI vositalari haqidagi savollar (survey_bank.py)
+   bo'yicha guruhlar solishtiriladi va sezgirlik tahlili — tashqi AI dan ko'p foydalanganlar (o'rtacha ≥ 4)
+   chiqarilgandagi ANCOVA.
+10. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
    maksimal ball olgan) va kechiktirilgan testni topshirmaganlar alohida ko'rsatiladi.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
@@ -45,8 +48,9 @@ from users.consent import consent_required, research_participants
 from users.models import User
 
 from . import forms as parallel_forms
-from .models import Quiz, QuizAttempt
-from .services import finalize_if_expired, percent
+from .models import Question, Quiz, QuizAttempt
+from .services import finalize_if_expired, likert_value, percent
+from .survey_bank import EXTERNAL_AI_TEXTS
 
 COHORTS = {"experimental": "Tajriba (AI yoqilgan)", "control": "Nazorat"}
 MIN_GROUP = 3
@@ -56,6 +60,8 @@ TARGET_POWER = 0.8
 PRIMARY_OUTCOME = "ancova"
 PRIMARY_LABEL = "Chiqish testi, kirish testini hisobga olgan holda (ANCOVA: chiqish ~ guruh + kirish)"
 SECONDARY = ("post", "gain", "delayed")
+# Tashqi AI dan "ko'p foydalangan": shu savollar o'rtachasi (1-5) shu qiymatdan kichik emas
+HEAVY_EXTERNAL = 4
 # Shift effekti: maksimal ball olganlar ulushi shu chegaradan oshsa, test guruhlarni farqlay olmasligi mumkin
 CEILING_SHARE = 0.15
 
@@ -218,6 +224,76 @@ def cluster_analysis(completers, covariance):
     return result
 
 
+def external_usage(surveys, students):
+    """{talaba_id: tashqi AI savollari o'rtachasi (1-5)} — yakuniy so'rovnoma(lar) bo'yicha."""
+    values = defaultdict(list)
+    attempts = QuizAttempt.objects.filter(quiz__in=surveys, student__in=students, submitted_at__isnull=False)
+    questions = defaultdict(list)
+    for question in Question.objects.filter(quiz__in=surveys, text__in=EXTERNAL_AI_TEXTS).prefetch_related("choices"):
+        questions[question.quiz_id].append(question)
+    for attempt in attempts:
+        for question in questions.get(attempt.quiz_id, []):
+            value = likert_value(question, attempt.answers.get(str(question.pk), []))
+            if value is not None:
+                values[attempt.student_id].append(value)
+    return {sid: sum(items) / len(items) for sid, items in values.items()}
+
+
+def external_ai(surveys, students, cohort_of, completers):
+    """Tashqi AI dan foydalanish: guruhlar bo'yicha o'rtacha, ko'p foydalanganlar ulushi va sezgirlik tahlili."""
+    usage = external_usage(surveys, students)
+    result = {"threshold": HEAVY_EXTERNAL, "answered": len(usage), "cohorts": {}, "comparison": None, "sensitivity": None}
+    if not usage:
+        return result
+    by_cohort = defaultdict(list)
+    for sid, value in usage.items():
+        by_cohort[cohort_of[sid]].append(value)
+    for cohort in COHORTS:
+        values = by_cohort[cohort]
+        heavy = sum(1 for value in values if value >= HEAVY_EXTERNAL)
+        result["cohorts"][cohort] = {**_describe(values), "heavy": heavy, "heavy_share": _r(heavy / len(values)) if values else None}
+    result["comparison"] = compare_independent(by_cohort["experimental"], by_cohort["control"])
+    # Sezgirlik: tashqi AI dan ko'p foydalanganlar chiqarilgandagi ANCOVA (asosiy xulosa o'zgarmasligi kerak)
+    kept = {
+        cohort: [(row["pre"], row["post"]) for row in rows if usage.get(row["student"], 0) < HEAVY_EXTERNAL]
+        for cohort, rows in completers.items()
+    }
+    excluded = sum(len(rows) for rows in completers.values()) - sum(len(rows) for rows in kept.values())
+    if excluded and min(len(rows) for rows in kept.values()) >= MIN_GROUP:
+        covariance = ancova(kept)
+        if covariance:
+            result["sensitivity"] = {
+                "excluded": excluded,
+                "f": _r(covariance["f"]),
+                "df1": covariance["df1"],
+                "df2": covariance["df2"],
+                "p": _r(covariance["p"], 4),
+                "significant": covariance["p"] < ALPHA,
+                "partial_eta2": _r(covariance["partial_eta2"]),
+            }
+    return result
+
+
+def external_conclusions(result):
+    if not result["answered"]:
+        return []
+    control = result["cohorts"].get("control") or {}
+    lines = []
+    if control.get("n"):
+        lines.append(
+            f"Tashqi AI vositalari: nazorat guruhida {control['heavy']} ta talaba (ulushi {control['heavy_share']}) ulardan ko'p "
+            f"foydalanganini bildirgan (o'rtacha ≥ {result['threshold']}) — bu AI effektini kamaytirib ko'rsatishi mumkin."
+        )
+    sensitivity = result["sensitivity"]
+    if sensitivity:
+        verdict = "ahamiyatli" if sensitivity["significant"] else "ahamiyatli emas"
+        lines.append(
+            f"Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {sensitivity['excluded']} ta talaba chiqarilganda ANCOVA "
+            f"F({sensitivity['df1']}, {sensitivity['df2']}) = {sensitivity['f']}, {_p_text(sensitivity['p'])} — {verdict}."
+        )
+    return lines
+
+
 def _describe(values):
     result = describe(values)
     return {"n": result["n"], "mean": _r(result["mean"], 2), "sd": _r(result["sd"], 2)}
@@ -237,6 +313,7 @@ def student_scores(quizzes, students):
 def analyse(quizzes, groups):
     """quizzes — ko'rinadigan testlar QuerySet'i, groups — guruhlar. Kirish/chiqish/kechiktirilgan testlar olinadi."""
     groups = list(groups)
+    surveys = quizzes.filter(kind=Quiz.Kind.SURVEY, groups__in=groups).distinct()
     quizzes = quizzes.filter(kind__in=[Quiz.Kind.PRE, Quiz.Kind.POST, Quiz.Kind.DELAYED], groups__in=groups).distinct()
     everyone = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups)
     students = list(research_participants(everyone).select_related("group"))
@@ -248,7 +325,7 @@ def analyse(quizzes, groups):
     pre_only = {cohort: 0 for cohort in COHORTS}
     for sid, item in scores.items():
         if "pre" in item and "post" in item:
-            completers[cohort_of[sid]].append({**item, "group": group_of[sid]})
+            completers[cohort_of[sid]].append({**item, "group": group_of[sid], "student": sid})
         elif "pre" in item:
             pre_only[cohort_of[sid]] += 1
 
@@ -316,6 +393,7 @@ def analyse(quizzes, groups):
         }
     clustering = cluster_analysis(completers, covariance)
     forms = parallel_forms.analyse(quizzes, students)
+    external = external_ai(surveys, students, cohort_of, completers)
 
     n1, n2 = len(completers["experimental"]), len(completers["control"])
     observed_d = comparisons["post"]["cohens_d"] if comparisons["post"] else None
@@ -343,8 +421,10 @@ def analyse(quizzes, groups):
         "power": power,
         "clustering": clustering,
         "forms": forms,
+        "external_ai": external,
         "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
-        + parallel_forms.conclusions(forms),
+        + parallel_forms.conclusions(forms)
+        + external_conclusions(external),
     }
 
 

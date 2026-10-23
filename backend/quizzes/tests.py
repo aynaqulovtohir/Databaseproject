@@ -522,4 +522,8 @@ class SurveyTests(QuizTestCase):
         short = surveys.get(groups=control)
         self.assertEqual(full.questions.count(), len(STATEMENTS))
         self.assertEqual(short.questions.count(), sum(1 for item in STATEMENTS if not item["ai"]))
-        self.assertFalse(short.questions.filter(text__icontains="AI").exists())
+        # Nazorat guruhida platforma AI si haqida savol yo'q, faqat tashqi AI vositalari haqida (hamma guruhga)
+        from .survey_bank import EXTERNAL_AI_TEXTS
+
+        self.assertFalse(short.questions.exclude(text__in=EXTERNAL_AI_TEXTS).filter(text__icontains="AI").exists())
+        self.assertEqual(short.questions.filter(text__in=EXTERNAL_AI_TEXTS).count(), len(EXTERNAL_AI_TEXTS))

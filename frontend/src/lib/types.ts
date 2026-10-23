@@ -1412,6 +1412,13 @@ export interface ExperimentAnalysis {
     approximate: boolean
   }
   forms: ParallelForms
+  external_ai: {
+    threshold: number
+    answered: number
+    cohorts: Partial<Record<ExperimentCohort, Descriptive & { heavy: number; heavy_share: number | null }>>
+    comparison: StatTest | null
+    sensitivity: { excluded: number; f: number; df1: number; df2: number; p: number; significant: boolean; partial_eta2: number } | null
+  }
   clustering: {
     groups: Record<ExperimentCohort, number>
     confounded: boolean

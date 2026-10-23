@@ -138,6 +138,41 @@ function FormsBlock({ forms }: { forms: ParallelForms }) {
   )
 }
 
+/** Tashqi AI vositalari (so'rovnoma): nazorat guruhining ifloslanishi va sezgirlik tahlili */
+function ExternalAiBlock({ external }: { external: ExperimentAnalysis['external_ai'] }) {
+  const { sensitivity } = external
+  return (
+    <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Tashqi AI vositalari (yakuniy so'rovnoma)</h3>
+      {external.answered ? (
+        <div className="mt-2 grid gap-1 text-sm">
+          {COHORTS.map((key) => {
+            const cohort = external.cohorts[key]
+            if (!cohort) return null
+            return (
+              <div key={key} className="tabular-nums">
+                {key === 'experimental' ? 'Tajriba' : 'Nazorat'}: o'rtacha {describe(cohort)} · ko'p foydalanganlar (≥{' '}
+                {external.threshold}) {cohort.heavy}
+              </div>
+            )
+          })}
+          {sensitivity ? (
+            <div className="text-muted-foreground tabular-nums">
+              Sezgirlik tahlili ({sensitivity.excluded} ta chiqarilgan): ANCOVA F({sensitivity.df1}, {sensitivity.df2}) ={' '}
+              {num(sensitivity.f)}, p = {pText(sensitivity.p)}, qisman η² = {num(sensitivity.partial_eta2, 3)} —{' '}
+              {sensitivity.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">
+          So'rovnomada tashqi AI haqidagi savollarga javob yo'q (seed_survey bilan yaratilgan so'rovnomada ular bor).
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** Tajriba natijasining statistik tahlili: tavsifiy statistika, Hake o'sishi, mezonni avtomatik tanlash, ANCOVA, quvvat */
 export function ExperimentCard() {
   const analysis = useQuery({ queryKey: ['experiment'], queryFn: () => api<ExperimentAnalysis>('/experiment/') })
@@ -304,6 +339,7 @@ export function ExperimentCard() {
             </div>
           </div>
           <FormsBlock forms={data.forms} />
+          <ExternalAiBlock external={data.external_ai} />
           <div className="rounded-xl border bg-card p-4 lg:col-span-2">
             <h3 className="text-sm font-semibold">Klasterlash: akademik guruhlar ta'siri</h3>
             <div className="mt-2 grid gap-1 text-sm">
