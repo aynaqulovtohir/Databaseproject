@@ -697,6 +697,9 @@ export const MAX_SCORE = 100
 
 export type QuizKind = 'pre' | 'post' | 'delayed' | 'practice' | 'survey'
 
+/** Parallel variant: kirish va chiqish testiga turli variant beriladi ('' — variantsiz) */
+export type QuizForm = '' | 'A' | 'B'
+
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
   pre: 'Kirish testi',
   post: 'Chiqish testi',
@@ -737,6 +740,8 @@ export interface MyQuizAttempt {
 export interface Quiz {
   id: number
   kind: QuizKind
+  /** Faqat admin va o'qituvchiga */
+  form?: QuizForm
   title: string
   description: string
   opens_at: string | null
@@ -1341,6 +1346,24 @@ export interface StatTest {
   significant_holm?: boolean
 }
 
+export interface ParallelForms {
+  margin: number
+  item_gap: number
+  alpha: number
+  by_kind: {
+    kind: 'pre' | 'post' | 'delayed'
+    label: string
+    A: Descriptive
+    B: Descriptive
+    difference: StatTest | null
+    equivalence: { diff: number; margin: number; ci: [number, number]; p: number; equivalent: boolean } | null
+  }[]
+  reliability: { kind: string; n: number; r: number | null; paired: StatTest | null } | null
+  items: { order: number; A: number; B: number; n_A: number; n_B: number; gap: boolean }[]
+  same_form: number
+  without_form: number
+}
+
 export interface ExperimentAnalysis {
   consent_required: boolean
   students: number
@@ -1388,6 +1411,7 @@ export interface ExperimentAnalysis {
     alpha: number
     approximate: boolean
   }
+  forms: ParallelForms
   clustering: {
     groups: Record<ExperimentCohort, number>
     confounded: boolean

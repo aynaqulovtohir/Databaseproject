@@ -337,3 +337,68 @@ class ExperimentTests(ResearchBase):
         # Boshqa o'qituvchi bu testlar va guruhlarni ko'rmaydi
         self.client.force_authenticate(User.objects.create_user("e_other", role=User.Role.TEACHER))
         self.assertEqual(self.client.get("/api/experiment/").data["cohorts"]["experimental"]["students"], 0)
+
+
+class ParallelFormsTests(ResearchBase):
+    """Kutilgan qiymatlar: statsmodels ttost_ind(usevar="unequal"), scipy pearsonr."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher = User.objects.create_user("pf_teacher", role=User.Role.TEACHER)
+        cls.groups = [StudentGroup.objects.create(name=f"PF-{index}", ai_enabled=index != 1) for index in range(3)]
+        for group in cls.groups:
+            group.teachers.add(cls.teacher)
+        cls.quizzes = {}
+        for kind in (Quiz.Kind.PRE, Quiz.Kind.POST):
+            for form in ("A", "B"):
+                quiz = Quiz.objects.create(kind=kind, form=form, title=f"{kind}-{form}", author=cls.teacher)
+                quiz.groups.add(*cls.groups)
+                for order in range(1, 5):
+                    question = Question.objects.create(quiz=quiz, order=order, text=f"{form}{order}", kind=Question.Kind.SINGLE, points=1)
+                    for index in range(3):
+                        Choice.objects.create(question=question, order=index, text=f"V{index}", is_correct=index == 0)
+                cls.quizzes[kind, form] = quiz
+        pre_a = [[1, 0, 0, 0], [1, 1, 0, 0], [1, 0, 1, 0], [1, 1, 1, 0], [1, 1, 0, 1], [1, 1, 1, 1]]
+        pre_b = [[0, 1, 0, 0], [0, 1, 1, 0], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 1, 1], [0, 0, 0, 0]]
+        pilot = [([1, 1, 0, 0], [0, 1, 1, 0]), ([1, 1, 1, 0], [0, 1, 1, 1]), ([1, 0, 0, 0], [0, 0, 0, 0])]
+        for index, pattern in enumerate(pre_a):
+            student = cls.make_student(f"pf_a{index}", cls.groups[0])
+            cls.answer(("pre", "A"), student, pattern)
+            # Birinchi talaba chiqishda ham A variantni olgan — test qilish effekti xavfi
+            cls.answer(("post", "A" if index == 0 else "B"), student, [1, 1, 1, 1])
+        for index, pattern in enumerate(pre_b):
+            cls.answer(("pre", "B"), cls.make_student(f"pf_b{index}", cls.groups[1]), pattern)
+        for index, (a, b) in enumerate(pilot):
+            student = cls.make_student(f"pf_p{index}", cls.groups[2])
+            cls.answer(("pre", "A"), student, a)
+            cls.answer(("pre", "B"), student, b)
+
+    @classmethod
+    def answer(cls, key, student, pattern):
+        quiz = cls.quizzes[key]
+        answers = {}
+        for question, correct in zip(quiz.questions.order_by("order"), pattern):
+            choice = question.choices.get(is_correct=True) if correct else question.choices.filter(is_correct=False).first()
+            answers[str(question.pk)] = [choice.pk]
+        cls.submit(quiz, student, answers)
+
+    def test_equivalence_reliability_items(self):
+        result = analyse_experiment(Quiz.objects.filter(author=self.teacher), self.groups)["forms"]
+        pre = next(row for row in result["by_kind"] if row["kind"] == "pre")
+        self.assertEqual(pre["A"], {"n": 9, "mean": 58.33, "sd": 25.0})
+        self.assertEqual(pre["B"], {"n": 9, "mean": 44.44, "sd": 30.05})
+        self.assertAlmostEqual(pre["equivalence"]["p"], 0.6153, places=4)
+        self.assertFalse(pre["equivalence"]["equivalent"])
+        self.assertEqual(pre["equivalence"]["diff"], 13.89)
+        post = next(row for row in result["by_kind"] if row["kind"] == "post")
+        self.assertIsNone(post["equivalence"])
+        self.assertEqual(result["reliability"]["n"], 3)
+        self.assertEqual(result["reliability"]["r"], 0.982)
+        first = result["items"][0]
+        self.assertEqual((first["order"], first["A"], first["B"], first["gap"]), (1, 1.0, 0.0, True))
+        self.assertEqual(result["same_form"], 1)
+        self.assertEqual(result["without_form"], 0)
+        text = " ".join(analyse_experiment(Quiz.objects.filter(author=self.teacher), self.groups)["conclusions"])
+        self.assertIn("ekvivalentligi isbotlanmadi", text)
+        self.assertIn("juft savollar: 1", text)
+        self.assertIn("Test qilish effekti xavfi: 1 ta", text)

@@ -37,6 +37,7 @@ QUIZ_COLUMNS = [
     "test_id",
     "test",
     "test_turi",
+    "variant",
     "holat",
     "ball",
     "maksimal_ball",
@@ -301,6 +302,7 @@ testlar.csv — har bir talaba va test (kirish/chiqish testlari)
 Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
 test_id, test
 test_turi                   kirish | chiqish | kechiktirilgan | oddiy | sorovnoma
+variant                     parallel variant: A | B (bo'sh — variantsiz test)
 holat                       topshirgan | boshlagan | boshlamagan
 ball, maksimal_ball, foiz   topshirmagan bo'lsa va so'rovnomada bo'sh
 boshlangan, topshirilgan
@@ -309,7 +311,7 @@ davomiylik_daqiqa           boshlangandan topshirilgangacha
 test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar tahlili uchun)
 ------------------------------------------------------------------------------------------
 test_id, test_turi
-savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
+savol_raqami                testdagi tartib raqami (A va B variantlarda bir xil raqamli savollar — juft savollar)
 savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob) |
                             likert (so'rovnoma fikri, ball qo'yilmaydi)
 ball, maksimal_ball         savol bo'yicha (likert savolida bo'sh)
@@ -669,6 +671,7 @@ def _quiz_rows(quizzes, allowed=None):
                     quiz.pk,
                     quiz.title,
                     kind,
+                    quiz.form,
                     QUIZ_STATUSES[attempt_status(attempt)],
                     attempt.score if scored else "",
                     attempt.max_score if scored else "",

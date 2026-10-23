@@ -16,7 +16,8 @@ va nazorat guruhlari.
 7. Klasterlash: AI butun akademik guruhga yoqiladi, ya'ni dizayn — klaster kvazi-tajriba. ANCOVA qoldiqlari bo'yicha
    guruhlararo ICC(1), dizayn effekti va samarali talabalar soni hisoblanadi; har bir shartda bittadan guruh bo'lsa,
    guruh effektini AI effektidan ajratib bo'lmasligi haqida ogohlantiriladi.
-8. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
+8. Parallel variantlar (forms.py): A va B ekvivalentligi (TOST), ishonchliligi va bir xil variant olganlar.
+9. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
    maksimal ball olgan) va kechiktirilgan testni topshirmaganlar alohida ko'rsatiladi.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
@@ -43,6 +44,7 @@ from competence.stats import (
 from users.consent import consent_required, research_participants
 from users.models import User
 
+from . import forms as parallel_forms
 from .models import Quiz, QuizAttempt
 from .services import finalize_if_expired, percent
 
@@ -313,6 +315,7 @@ def analyse(quizzes, groups):
             "slopes": None if slopes is None else {"f": _r(slopes["f"]), "p": _r(slopes["p"], 4), "parallel": slopes["p"] >= ALPHA},
         }
     clustering = cluster_analysis(completers, covariance)
+    forms = parallel_forms.analyse(quizzes, students)
 
     n1, n2 = len(completers["experimental"]), len(completers["control"])
     observed_d = comparisons["post"]["cohens_d"] if comparisons["post"] else None
@@ -339,7 +342,9 @@ def analyse(quizzes, groups):
         "ancova": ancova_result,
         "power": power,
         "clustering": clustering,
-        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering),
+        "forms": forms,
+        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
+        + parallel_forms.conclusions(forms),
     }
 
 

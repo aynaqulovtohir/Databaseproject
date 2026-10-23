@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, StatTest } from '@/lib/types'
+import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, ParallelForms, StatTest } from '@/lib/types'
 
 const COHORTS: ExperimentCohort[] = ['experimental', 'control']
 
@@ -90,6 +90,51 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
         {test.effect.label ? <span className="block text-xs text-muted-foreground">{test.effect.label}</span> : null}
       </TableCell>
     </TableRow>
+  )
+}
+
+/** Parallel variantlar (A/B): ekvivalentlik (TOST), ishonchlilik, juft savollar qiyinligi */
+function FormsBlock({ forms }: { forms: ParallelForms }) {
+  const gaps = forms.items.filter((item) => item.gap)
+  const repeated = forms.same_form + forms.without_form
+  return (
+    <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Parallel variantlar (A va B)</h3>
+      {forms.by_kind.length ? (
+        <div className="mt-2 grid gap-1 text-sm">
+          {forms.by_kind.map((row) => (
+            <div key={row.kind} className="tabular-nums">
+              <span className="font-medium">{row.label}:</span> A — {describe(row.A)}; B — {describe(row.B)}
+              {row.equivalence ? (
+                <span className="block text-xs text-muted-foreground">
+                  TOST (±{row.equivalence.margin} foiz punkti): farq {num(row.equivalence.diff, 1)}, 90% oraliq [
+                  {num(row.equivalence.ci[0], 1)}; {num(row.equivalence.ci[1], 1)}], p = {pText(row.equivalence.p)} —{' '}
+                  {row.equivalence.equivalent ? 'ekvivalent' : 'ekvivalentlik isbotlanmadi'}
+                </span>
+              ) : null}
+            </div>
+          ))}
+          {forms.reliability && forms.reliability.r !== null ? (
+            <div className="text-muted-foreground tabular-nums">
+              Ikkala variantni topshirganlar (n = {forms.reliability.n}): r = {num(forms.reliability.r, 3)}
+            </div>
+          ) : null}
+          {gaps.length ? (
+            <div className="text-muted-foreground">
+              Qiyinligi farq qiladigan juft savollar (kirish testi, &gt; {Math.round(100 * forms.item_gap)}%):{' '}
+              {gaps.map((item) => `${item.order} (A ${num(item.A)}, B ${num(item.B)})`).join(', ')}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">Variantli testlar yo'q: testlarga A yoki B variantni belgilang.</p>
+      )}
+      {repeated ? (
+        <p className="mt-2 text-xs text-destructive">
+          {repeated} ta talaba kirish va chiqish testida bir xil savollarni olgan: test qilish effekti xavfi.
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -258,6 +303,7 @@ export function ExperimentCard() {
               {power.approximate ? <div className="text-xs text-muted-foreground">Normal yaqinlashish: aniq qiymatdan ±3% farq qilishi mumkin.</div> : null}
             </div>
           </div>
+          <FormsBlock forms={data.forms} />
           <div className="rounded-xl border bg-card p-4 lg:col-span-2">
             <h3 className="text-sm font-semibold">Klasterlash: akademik guruhlar ta'siri</h3>
             <div className="mt-2 grid gap-1 text-sm">

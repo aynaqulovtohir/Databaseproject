@@ -1,4 +1,4 @@
-# Ma'lumotlar bazasini loyihalash: kirish va chiqish testi
+# Ma'lumotlar bazasini loyihalash: kirish va chiqish testi (A variant)
 
 Test ma'lumotlar bazasini loyihalash bo'yicha bilimingizni o'lchaydi: ER-model, kalitlar, bog'lanishlar, normallashtirish va cheklovlar. Bilmagan savolingizni taxmin qilmasdan o'tkazib yuborishingiz mumkin. Natija bahoga ta'sir qilmaydi.
 
