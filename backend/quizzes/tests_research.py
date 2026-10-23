@@ -49,6 +49,23 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertEqual(stats.required_n_per_group(0.8), 26)
         self.assertAlmostEqual(stats.achieved_power(0.5, 64, 64), 0.8, delta=0.02)
 
+    def test_holm_tost_icc(self):
+        # statsmodels.stats.multitest.multipletests(method="holm")
+        self.assertEqual([round(p, 10) for p in stats.holm([0.01, 0.04, 0.03, 0.005, None])[:4]], [0.03, 0.06, 0.06, 0.02])
+        self.assertIsNone(stats.holm([0.01, None])[1])
+        # statsmodels.stats.weightstats.ttost_ind(a, b, -10, 10, usevar="unequal")
+        result = stats.tost([60, 72, 65, 80, 75, 68, 71], [55, 58, 62, 50, 66, 59, 61, 57], 10)
+        self.assertAlmostEqual(result["p"], 0.7019397109246388, places=9)
+        self.assertAlmostEqual(result["p_lower"], 9.319629219148351e-06, places=12)
+        self.assertFalse(result["equivalent"])
+        self.assertTrue(stats.tost([60, 61, 59, 62, 58], [60.5, 59.5, 61, 60, 59], 5)["equivalent"])
+        # ICC(1): F va p — scipy.stats.f_oneway, ICC — ANOVA formulasi (numpy)
+        result = stats.icc_oneway([[50, 55, 60, 52], [70, 65, 72, 68, 75], [58, 61, 57]])
+        self.assertAlmostEqual(result["icc"], 0.8405056562096863, places=10)
+        self.assertAlmostEqual(result["p"], 0.0003643955882313509, places=10)
+        self.assertAlmostEqual(result["design_effect"], 1 + 3 * result["icc"], places=10)
+        self.assertIsNone(stats.icc_oneway([[1, 2, 3]]))
+
     def test_hake_levels(self):
         self.assertEqual([hake_level(g) for g in (0.1, 0.3, 0.69, 0.7)], ["past", "o'rta", "o'rta", "yuqori"])
 
@@ -230,6 +247,8 @@ class ExperimentTests(ResearchBase):
         self.assertEqual(ctrl["gain"]["class"], round(0.09207708779443255, 3))
         self.assertEqual(exp["pre_post"]["test"], "paired_t")
         self.assertAlmostEqual(exp["pre_post"]["statistic"]["value"], 9.088, places=3)
+        self.assertEqual((exp["gain"]["excluded_full_pre"], exp["ceiling"]["students"], exp["delayed_missing"]), (0, 0, 8))
+        self.assertFalse(exp["ceiling"]["warning"])
 
     def test_baseline_comparison_and_ancova(self):
         result = self.result()
@@ -247,11 +266,60 @@ class ExperimentTests(ResearchBase):
         self.assertAlmostEqual(ancova["partial_eta2"], 0.712, places=3)
         self.assertEqual(ancova["adjusted_means"], {"experimental": 57.63, "control": 47.12})
         self.assertEqual(ancova["effect_label"], "katta")
+        self.assertTrue(ancova["primary"])
+        self.assertEqual(result["primary"]["outcome"], "ancova")
+        # Ikkilamchi natijalar Xolm bo'yicha tuzatiladi (post va gain: ikkita solishtiruv)
+        gain = result["comparisons"]["gain"]
+        smaller, larger = sorted([post["p"], gain["p"]])
+        expected = min(1, 2 * smaller) if post["p"] == smaller else max(2 * smaller, larger)
+        self.assertAlmostEqual(post["p_holm"], expected, places=3)
+        self.assertNotIn("p_holm", result["baseline"])
         self.assertTrue(result["power"]["achieved"] < 0.8)
+        # Har bir shartda bittadan guruh: guruh effekti AI effektidan ajralmaydi
+        self.assertTrue(result["clustering"]["confounded"])
+        self.assertIsNone(result["clustering"]["icc"])
         text = " ".join(result["conclusions"])
         self.assertIn("teng bo'lgan", text)
-        self.assertIn("ANCOVA", text)
+        self.assertIn("Asosiy gipoteza", text)
+        self.assertIn("Xolm", text)
+        self.assertIn("Dizayn cheklovi", text)
         self.assertIn("quvvat past", text)
+        self.assertLess(text.index("Asosiy gipoteza"), text.index("Ikkilamchi"))
+
+    def test_full_pre_and_ceiling(self):
+        student = self.make_student("e_full", self.ai_group)
+        self.submit(self.pre, student, {}, score=100, max_score=100)
+        self.submit(self.post, student, {}, score=100, max_score=100)
+        for index in range(2):
+            other = self.make_student(f"e_top{index}", self.ai_group)
+            self.submit(self.pre, other, {}, score=70, max_score=100)
+            self.submit(self.post, other, {}, score=100, max_score=100)
+        exp = self.result()["cohorts"]["experimental"]
+        self.assertEqual(exp["gain"]["excluded_full_pre"], 1)
+        self.assertEqual(exp["gain"]["individual"]["n"], 10)
+        self.assertEqual(exp["ceiling"], {"students": 3, "share": round(3 / 11, 3), "warning": True})
+        text = " ".join(self.result()["conclusions"])
+        self.assertIn("100% olgan 1 ta talaba", text)
+        self.assertIn("Shift effekti", text)
+
+    def test_clustering_icc(self):
+        """Har bir shartda ikkita guruh: ICC ANCOVA qoldiqlari bo'yicha (statsmodels OLS + ANOVA formulasi)."""
+        groups = {}
+        for name, ai, members in (("E1", True, (0, 1, 2, 5)), ("C1", False, (0, 2, 4, 6))):
+            groups[name] = StudentGroup.objects.create(name=f"E-{name}", ai_enabled=ai)
+            groups[name].teachers.add(self.teacher)
+            prefix = "ea" if ai else "ec"
+            User.objects.filter(username__in=[f"{prefix}{index}" for index in members]).update(group=groups[name])
+        for quiz in (self.pre, self.post):
+            quiz.groups.add(*groups.values())
+        result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group, self.control_group, *groups.values()])
+        clustering = result["clustering"]
+        self.assertEqual(clustering["groups"], {"experimental": 2, "control": 2})
+        self.assertFalse(clustering["confounded"])
+        self.assertEqual(clustering["icc"]["value"], round(0.15716794246025922, 3))
+        self.assertEqual(clustering["icc"]["design_effect"], round(1.4715038273807777, 2))
+        self.assertEqual(clustering["icc"]["effective_n"], round(10.873230298340037, 1))
+        self.assertIn("Klasterlash", " ".join(result["conclusions"]))
 
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])

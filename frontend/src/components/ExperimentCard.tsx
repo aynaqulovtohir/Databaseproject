@@ -78,8 +78,11 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {pText(test.p)}
+        {test.p_holm !== undefined ? <span className="block text-xs text-muted-foreground">Xolm: {pText(test.p_holm)}</span> : null}
         <span className="block">
-          <Badge variant={test.significant ? 'default' : 'outline'}>{test.significant ? 'ahamiyatli' : 'ahamiyatsiz'}</Badge>
+          <Badge variant={(test.significant_holm ?? test.significant) ? 'default' : 'outline'}>
+            {(test.significant_holm ?? test.significant) ? 'ahamiyatli' : 'ahamiyatsiz'}
+          </Badge>
         </span>
       </TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">
@@ -118,6 +121,7 @@ export function ExperimentCard() {
 
         <div className="grid gap-2 rounded-xl border bg-muted/30 p-4">
           <h3 className="text-sm font-semibold">Xulosa</h3>
+          <p className="text-xs text-muted-foreground">Asosiy natija ko'rsatkichi (oldindan belgilangan): {data.primary.label}</p>
           <ul className="grid list-disc gap-1 pl-5 text-sm">
             {data.conclusions.map((line) => (
               <li key={line}>{line}</li>
@@ -147,8 +151,19 @@ export function ExperimentCard() {
                   <TableRow key={key} className="align-top">
                     <TableCell className="font-medium">
                       {cohort.label}
+                      <span className="block text-xs font-normal text-muted-foreground">{cohort.groups} ta akademik guruh</span>
                       {cohort.dropped ? (
                         <span className="block text-xs font-normal text-muted-foreground">{cohort.dropped} ta chiqish testini topshirmagan</span>
+                      ) : null}
+                      {data.quizzes.delayed && cohort.delayed_missing ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {cohort.delayed_missing} ta kechiktirilgan testni topshirmagan
+                        </span>
+                      ) : null}
+                      {cohort.ceiling.warning ? (
+                        <span className="block text-xs font-normal text-destructive">
+                          Shift effekti: {cohort.ceiling.students} ta talaba chiqish testida 100%
+                        </span>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{describe(cohort.pre)}</TableCell>
@@ -157,6 +172,11 @@ export function ExperimentCard() {
                     <TableCell className="text-right tabular-nums">
                       {num(cohort.gain.class)}
                       {cohort.gain.level ? <span className="block text-xs text-muted-foreground">{cohort.gain.level}</span> : null}
+                      {cohort.gain.excluded_full_pre ? (
+                        <span className="block text-xs text-muted-foreground" title="Kirish testida 100%: individual g aniqlanmaydi">
+                          {cohort.gain.excluded_full_pre} ta chiqarilgan
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums">
                       {cohort.pre_post ? (
@@ -178,7 +198,7 @@ export function ExperimentCard() {
         </div>
 
         <div className="grid gap-2">
-          <h3 className="text-sm font-semibold">Tajriba va nazorat guruhlarini solishtirish (α = {data.alpha})</h3>
+          <h3 className="text-sm font-semibold">Ikkilamchi solishtiruvlar (α = {data.alpha}, Xolm tuzatishi bilan)</h3>
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,7 +220,10 @@ export function ExperimentCard() {
 
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-sm font-semibold">ANCOVA: chiqish ~ guruh + kirish</h3>
+            <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              ANCOVA: chiqish ~ guruh + kirish
+              {ancova?.primary ? <Badge>asosiy gipoteza</Badge> : null}
+            </h3>
             {ancova ? (
               <div className="mt-2 grid gap-1 text-sm">
                 <div className="tabular-nums">
@@ -233,6 +256,28 @@ export function ExperimentCard() {
                 0.5) uchun {power.required_per_group_medium}
               </div>
               {power.approximate ? <div className="text-xs text-muted-foreground">Normal yaqinlashish: aniq qiymatdan ±3% farq qilishi mumkin.</div> : null}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+            <h3 className="text-sm font-semibold">Klasterlash: akademik guruhlar ta'siri</h3>
+            <div className="mt-2 grid gap-1 text-sm">
+              <div className="tabular-nums">
+                Guruhlar soni: tajriba {data.clustering.groups.experimental}, nazorat {data.clustering.groups.control}
+              </div>
+              {data.clustering.confounded ? (
+                <div className="text-muted-foreground">
+                  Kamida bitta shartda bitta guruh: AI ta'sirini guruh ta'siridan ajratib bo'lmaydi (kvazi-tajriba). Har bir shartga
+                  ikki va undan ko'p guruh oling.
+                </div>
+              ) : data.clustering.icc ? (
+                <div className="text-muted-foreground tabular-nums">
+                  ICC(1) = {num(data.clustering.icc.value, 3)} (F = {num(data.clustering.icc.f)}, p = {pText(data.clustering.icc.p)}) ·
+                  dizayn effekti {num(data.clustering.icc.design_effect)} · samarali talabalar soni ≈{' '}
+                  {num(data.clustering.icc.effective_n, 1)}
+                </div>
+              ) : (
+                <div className="text-muted-foreground">Ma'lumot kam.</div>
+              )}
             </div>
           </div>
         </div>

@@ -1336,6 +1336,9 @@ export interface StatTest {
     levene: { f: number; p: number; equal: boolean } | null
   }
   normality?: Normality | null
+  /** Ikkilamchi solishtiruvlar uchun Xolm bo'yicha tuzatilgan p */
+  p_holm?: number
+  significant_holm?: boolean
 }
 
 export interface ExperimentAnalysis {
@@ -1344,16 +1347,20 @@ export interface ExperimentAnalysis {
   excluded_no_consent: number
   quizzes: { pre: number; post: number; delayed: number }
   alpha: number
+  primary: { outcome: string; label: string }
   cohorts: Record<
     ExperimentCohort,
     {
       label: string
       students: number
       dropped: number
+      groups: number
       pre: Descriptive
       post: Descriptive
       delayed: Descriptive
-      gain: { class: number | null; level: string | null; individual: Descriptive }
+      delayed_missing: number
+      gain: { class: number | null; level: string | null; individual: Descriptive; excluded_full_pre: number }
+      ceiling: { students: number; share: number | null; warning: boolean }
       pre_post: StatTest | null
       post_delayed: StatTest | null
     }
@@ -1361,6 +1368,7 @@ export interface ExperimentAnalysis {
   baseline: StatTest | null
   comparisons: { post: StatTest | null; gain: StatTest | null; delayed: StatTest | null }
   ancova: {
+    primary: boolean
     f: number
     df1: number
     df2: number
@@ -1379,6 +1387,19 @@ export interface ExperimentAnalysis {
     target: number
     alpha: number
     approximate: boolean
+  }
+  clustering: {
+    groups: Record<ExperimentCohort, number>
+    confounded: boolean
+    icc: {
+      value: number
+      f: number
+      p: number
+      clusters: number
+      mean_size: number
+      design_effect: number
+      effective_n: number
+    } | null
   }
   conclusions: string[]
 }
