@@ -1364,6 +1364,17 @@ export interface ParallelForms {
   without_form: number
 }
 
+export interface AttritionStage {
+  cohorts: Record<ExperimentCohort, { label: string; started: number; lost: number; rate: number | null }>
+  overall: number | null
+  /** Tajriba − nazorat, ulushda */
+  differential: number | null
+  level: "past" | "o'rta" | 'yuqori' | null
+  test: { name: 'chi2' | 'fisher'; label: string; chi2?: number; df?: number; p: number; significant: boolean } | null
+  /** Tashlab ketganlar va qolganlar oldingi test bo'yicha */
+  baseline: StatTest | null
+}
+
 export interface ExperimentAnalysis {
   consent_required: boolean
   students: number
@@ -1419,6 +1430,7 @@ export interface ExperimentAnalysis {
     comparison: StatTest | null
     sensitivity: { excluded: number; f: number; df1: number; df2: number; p: number; significant: boolean; partial_eta2: number } | null
   }
+  attrition: { post: AttritionStage; delayed: AttritionStage | null }
   clustering: {
     groups: Record<ExperimentCohort, number>
     confounded: boolean

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, ParallelForms, StatTest } from '@/lib/types'
+import type { AttritionStage, Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, ParallelForms, StatTest } from '@/lib/types'
 
 const COHORTS: ExperimentCohort[] = ['experimental', 'control']
 
@@ -134,6 +134,71 @@ function FormsBlock({ forms }: { forms: ParallelForms }) {
           {repeated} ta talaba kirish va chiqish testida bir xil savollarni olgan: test qilish effekti xavfi.
         </p>
       ) : null}
+    </div>
+  )
+}
+
+function percentText(value: number | null) {
+  return value === null ? '—' : `${Math.round(100 * value)}%`
+}
+
+function AttritionRow({ title, stage, score }: { title: string; stage: AttritionStage; score: string }) {
+  const { test, baseline } = stage
+  return (
+    <TableRow className="align-top">
+      <TableCell className="font-medium">{title}</TableCell>
+      {COHORTS.map((key) => (
+        <TableCell key={key} className="text-right tabular-nums">
+          {stage.cohorts[key].lost} / {stage.cohorts[key].started}
+          <span className="block text-xs text-muted-foreground">{percentText(stage.cohorts[key].rate)}</span>
+        </TableCell>
+      ))}
+      <TableCell className="text-right tabular-nums">
+        {percentText(stage.overall)}
+        {stage.level ? (
+          <span className={`block text-xs ${stage.level === 'yuqori' ? 'text-destructive' : 'text-muted-foreground'}`}>xavf {stage.level}</span>
+        ) : null}
+      </TableCell>
+      <TableCell className="max-w-64 whitespace-normal text-sm">
+        {test ? (
+          <span className={test.significant ? 'text-destructive' : undefined}>
+            {test.label}: p = {pText(test.p)}
+          </span>
+        ) : (
+          '—'
+        )}
+        <span className="block text-xs text-muted-foreground">
+          {baseline
+            ? `Tashlab ketganlar ${score}: ${baseline.label}, p = ${pText(baseline.p)} — ${baseline.significant ? 'farq qilgan' : "farq yo'q"}`
+            : `Tashlab ketganlar ${score} solishtirilmadi (kamida 3 ta kerak)`}
+        </span>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+/** Tashlab ketish (CONSORT): guruhlar bo'yicha ulush, ularning farqi va tashlab ketganlar boshida qanday bo'lgani */
+function AttritionBlock({ attrition }: { attrition: ExperimentAnalysis['attrition'] }) {
+  return (
+    <div className="grid gap-2 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Tashlab ketish (attrition)</h3>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Bosqich</TableHead>
+            <TableHead className="text-right">Tajriba</TableHead>
+            <TableHead className="text-right">Nazorat</TableHead>
+            <TableHead className="text-right" title="Shulz va Grayms: < 5% — xavf past, > 20% — yuqori">
+              Umumiy
+            </TableHead>
+            <TableHead>Guruhlar farqi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <AttritionRow title="Kirish → chiqish" stage={attrition.post} score="kirish testida" />
+          {attrition.delayed ? <AttritionRow title="Chiqish → kechiktirilgan" stage={attrition.delayed} score="chiqish testida" /> : null}
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -338,6 +403,7 @@ export function ExperimentCard() {
               {power.approximate ? <div className="text-xs text-muted-foreground">Normal yaqinlashish: aniq qiymatdan ±3% farq qilishi mumkin.</div> : null}
             </div>
           </div>
+          <AttritionBlock attrition={data.attrition} />
           <FormsBlock forms={data.forms} />
           <ExternalAiBlock external={data.external_ai} />
           <div className="rounded-xl border bg-card p-4 lg:col-span-2">

@@ -22,6 +22,9 @@ va nazorat guruhlari.
    chiqarilgandagi ANCOVA.
 10. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
    maksimal ball olgan) va kechiktirilgan testni topshirmaganlar alohida ko'rsatiladi.
+11. Tashlab ketish (attrition, CONSORT): kirish → chiqish va chiqish → kechiktirilgan test bosqichlarida guruhlar bo'yicha
+   ulush, umumiy darajasi ("5 va 20" qoidasi), guruhlar farqi (χ², kutilgan sonlar kichik bo'lsa — Fisherning aniq testi)
+   va tashlab ketganlarning oldingi testda qolganlardan farqi.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
 faqat tadqiqotga rozi bo'lganlar. Hisob toza Python'da (competence/stats.py), natijalar scipy bilan solishtirilgan.
@@ -32,7 +35,9 @@ from competence.stats import (
     ALPHA,
     achieved_power,
     ancova,
+    chi_square,
     describe,
+    fisher_exact,
     holm,
     icc_oneway,
     levene,
@@ -64,6 +69,8 @@ SECONDARY = ("post", "gain", "delayed")
 HEAVY_EXTERNAL = 4
 # Shift effekti: maksimal ball olganlar ulushi shu chegaradan oshsa, test guruhlarni farqlay olmasligi mumkin
 CEILING_SHARE = 0.15
+# Tashlab ketish ulushi chegaralari (Shulz va Grayms, 2002, "5 va 20" qoidasi)
+ATTRITION_LOW, ATTRITION_HIGH = 0.05, 0.20
 
 TEST_LABELS = {
     "student": "Styudent t-testi",
@@ -294,6 +301,97 @@ def external_conclusions(result):
     return lines
 
 
+def attrition_stage(started, kept_key, score_key):
+    """Bir bosqichdagi tashlab ketish: started — {guruh: [baholar]} (bosqichni boshlaganlar), kept_key — keyingi test
+    turi (shu kalit bo'lmasa, talaba tashlab ketgan), score_key — tashlab ketganlar va qolganlar solishtiriladigan test."""
+    cohorts, table, lost_scores, kept_scores = {}, [], [], []
+    for cohort, label in COHORTS.items():
+        rows = started[cohort]
+        lost = [row for row in rows if kept_key not in row]
+        cohorts[cohort] = {"label": label, "started": len(rows), "lost": len(lost), "rate": _r(len(lost) / len(rows)) if rows else None}
+        table.append([len(lost), len(rows) - len(lost)])
+        lost_scores += [row[score_key] for row in lost]
+        kept_scores += [row[score_key] for row in rows if kept_key in row]
+    started_total, lost_total = sum(map(sum, table)), sum(row[0] for row in table)
+    result = {
+        "cohorts": cohorts,
+        "overall": _r(lost_total / started_total) if started_total else None,
+        "differential": None,
+        "level": None,
+        "test": None,
+        "baseline": None,
+    }
+    if not started_total:
+        return result
+    overall = lost_total / started_total
+    # Shulz va Grayms (2002) "5 va 20" qoidasi: < 5% — siljish xavfi kam, > 20% — jiddiy xavf
+    result["level"] = "past" if overall < ATTRITION_LOW else ("o'rta" if overall <= ATTRITION_HIGH else "yuqori")
+    exp_rate, ctrl_rate = cohorts["experimental"]["rate"], cohorts["control"]["rate"]
+    if exp_rate is not None and ctrl_rate is not None:
+        result["differential"] = _r(table[0][0] / sum(table[0]) - table[1][0] / sum(table[1]))
+    if lost_total and all(sum(row) for row in table):
+        chi = chi_square(table)
+        if chi and chi["reliable"]:
+            result["test"] = {"name": "chi2", "label": "Pirson χ²", "chi2": _r(chi["chi2"]), "df": chi["df"], "p": _r(chi["p"], 4)}
+        else:
+            # Kutilgan sonlar kichik (yoki bitta guruhda hech kim tashlab ketmagan) — Fisherning aniq testi
+            fisher = fisher_exact(table)
+            if fisher:
+                result["test"] = {"name": "fisher", "label": "Fisherning aniq testi", "p": _r(fisher["p"], 4)}
+        if result["test"]:
+            result["test"]["significant"] = result["test"]["p"] < ALPHA
+    # Tashlab ketganlar boshida qolganlardan farq qilganmi (farq qilsa, qolganlar tanlanmasi siljigan)
+    result["baseline"] = compare_independent(lost_scores, kept_scores)
+    return result
+
+
+def attrition_analysis(scores, cohort_of, has_delayed):
+    """Tashlab ketish: kirish → chiqish (kirish testi bo'yicha) va chiqish → kechiktirilgan (chiqish testi bo'yicha)."""
+    started = {cohort: [] for cohort in COHORTS}
+    for sid, item in scores.items():
+        if "pre" in item:
+            started[cohort_of[sid]].append(item)
+    result = {"post": attrition_stage(started, "post", "pre"), "delayed": None}
+    if has_delayed:
+        completed = {cohort: [row for row in rows if "post" in row] for cohort, rows in started.items()}
+        result["delayed"] = attrition_stage(completed, "delayed", "post")
+    return result
+
+
+def _attrition_lines(stage, title, score_label):
+    if stage is None or not stage["overall"]:
+        return []
+    exp, ctrl = stage["cohorts"]["experimental"], stage["cohorts"]["control"]
+    lines = [
+        f"{title}: tajriba guruhida {exp['lost']} ta talaba ({_share(exp['rate'])}), nazorat guruhida {ctrl['lost']} ta "
+        f"({_share(ctrl['rate'])}) tashlab ketgan; umumiy {_share(stage['overall'])} — siljish xavfi {stage['level']}."
+    ]
+    test = stage["test"]
+    if test and test["significant"]:
+        lines.append(
+            f"Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({test['label']}, {_p_text(test['p'])}) — "
+            "differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p "
+            "imputatsiya yoki chegaraviy baholar) bilan tekshiring."
+        )
+    baseline = stage["baseline"]
+    if baseline and baseline["significant"]:
+        lines.append(
+            f"Tashlab ketganlar {score_label} qolganlardan farq qilgan ({baseline['label']}, {_p_text(baseline['p'])}): "
+            "natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling."
+        )
+    return lines
+
+
+def attrition_conclusions(result):
+    return _attrition_lines(result["post"], "Tashlab ketish (kirish → chiqish)", "kirish testida") + _attrition_lines(
+        result["delayed"], "Kechiktirilgan testgacha tashlab ketish", "chiqish testida"
+    )
+
+
+def _share(value):
+    return f"{round(100 * value)}%"
+
+
 def _describe(values):
     result = describe(values)
     return {"n": result["n"], "mean": _r(result["mean"], 2), "sd": _r(result["sd"], 2)}
@@ -394,6 +492,7 @@ def analyse(quizzes, groups):
     clustering = cluster_analysis(completers, covariance)
     forms = parallel_forms.analyse(quizzes, students)
     external = external_ai(surveys, students, cohort_of, completers)
+    attrition = attrition_analysis(scores, cohort_of, quizzes.filter(kind=Quiz.Kind.DELAYED).exists())
 
     n1, n2 = len(completers["experimental"]), len(completers["control"])
     observed_d = comparisons["post"]["cohens_d"] if comparisons["post"] else None
@@ -422,7 +521,9 @@ def analyse(quizzes, groups):
         "clustering": clustering,
         "forms": forms,
         "external_ai": external,
+        "attrition": attrition,
         "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
+        + attrition_conclusions(attrition)
         + parallel_forms.conclusions(forms)
         + external_conclusions(external),
     }
