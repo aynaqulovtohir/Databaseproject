@@ -2,6 +2,9 @@
 
 Har bir savol — fikr (tasdiq), talaba unga 1 dan 5 gacha shkalada qo'shiladi yoki qo'shilmaydi.
 "ai": True savollar faqat AI yoqilgan (tajriba) guruhlariga beriladi.
+"external": True savollar — tashqi AI vositalaridan foydalanish (barcha guruhlarga): ular fikr shkalasiga kirmaydi
+(boshqa narsani o'lchaydi), tajriba tahlilida nazorat guruhining "ifloslanishi" ko'rsatkichi sifatida ishlatiladi
+(experiment.py). Ular matni bo'yicha topiladi, shuning uchun matnini o'zgartirmang.
 
 Bazaga qo'shish: python manage.py seed_survey --author <login> --group <guruh>
 """
@@ -28,4 +31,17 @@ STATEMENTS = [
     {"ai": True, "text": "AI maslahatiga tayanib qolmasdan, avval o'zim yechishga harakat qildim."},
     {"ai": True, "text": "AI bergan baho va izohlar adolatli bo'ldi."},
     {"ai": True, "text": "Boshqa fanlarda ham shunday AI yordamchisi bo'lishini xohlardim."},
+    # Tashqi AI vositalari (barcha guruhlar; javob bahoga ta'sir qilmaydi)
+    {
+        "ai": False,
+        "external": True,
+        "text": "Kurs davomida topshiriqlarni bajarishda platformadan tashqari AI vositalaridan (ChatGPT, Gemini, Copilot va h.k.) foydalandim.",
+    },
+    {
+        "ai": False,
+        "external": True,
+        "text": "Laboratoriya topshirig'ini yoki test savolini platformadan tashqari AI vositasiga berib, tayyor javob oldim.",
+    },
 ]
+
+EXTERNAL_AI_TEXTS = frozenset(item["text"] for item in STATEMENTS if item.get("external"))

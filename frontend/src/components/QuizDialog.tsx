@@ -13,10 +13,11 @@ import { api } from '@/lib/api'
 import { toLocalInputValue } from '@/lib/format'
 import { applyFormError } from '@/lib/forms'
 import { useGroupOptions } from '@/lib/groups'
-import { QUIZ_KIND_LABELS, type Quiz, type QuizKind, type QuizQuestion } from '@/lib/types'
+import { QUIZ_KIND_LABELS, type Quiz, type QuizForm, type QuizKind, type QuizQuestion } from '@/lib/types'
 
 const QUIZ_FIELDS = [
   'kind',
+  'form',
   'title',
   'description',
   'opens_at',
@@ -227,6 +228,7 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
   const locked = Boolean(quiz?.attempt_count)
 
   const [kind, setKind] = useState<QuizKind>(quiz?.kind ?? 'pre')
+  const [form, setForm] = useState<QuizForm>(quiz?.form ?? '')
   const [title, setTitle] = useState(quiz?.title ?? '')
   const [description, setDescription] = useState(quiz?.description ?? '')
   const [opensAt, setOpensAt] = useState(quiz?.opens_at ? toLocalInputValue(quiz.opens_at) : '')
@@ -241,12 +243,14 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
     ),
   )
   const survey = kind === 'survey'
+  const research = kind === 'pre' || kind === 'post' || kind === 'delayed'
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
     mutationFn: () => {
       const body: Record<string, unknown> = {
         kind,
+        form: research ? form : '',
         title: title.trim(),
         description,
         opens_at: opensAt ? new Date(opensAt).toISOString() : null,
@@ -304,12 +308,12 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
         <DialogHeader>
           <DialogTitle>{quiz ? 'Testni tahrirlash' : 'Yangi test'}</DialogTitle>
           <DialogDescription>
-            Kirish testi o'qitishdan oldin, chiqish testi keyin o'tkaziladi. Natijalarni solishtirish uchun ularga bir xil
-            savollarni bering. So'rovnomada ball qo'yilmaydi: talabalar fikrlarga 1–5 shkalada baho beradi.
+            Kirish testi o'qitishdan oldin, chiqish testi keyin o'tkaziladi. Ularga parallel variantlarni bering (masalan,
+            kirishga A, chiqishga B): juft savollar bir xil mavzu va qiyinlikda, lekin talaba savollarni eslab qolmaydi. So'rovnomada ball qo'yilmaydi: talabalar fikrlarga 1–5 shkalada baho beradi.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
+          <div className={research ? 'grid gap-4 sm:grid-cols-[12rem_9rem_1fr]' : 'grid gap-4 sm:grid-cols-[12rem_1fr]'}>
             <FormField id="quiz_kind" label="Turi" error={errors.kind}>
               <select
                 id="quiz_kind"
@@ -324,6 +328,21 @@ export function QuizDialog({ quiz, onClose }: QuizDialogProps) {
                 ))}
               </select>
             </FormField>
+            {research ? (
+              <FormField id="quiz_form" label="Parallel variant" error={errors.form}>
+                <select
+                  id="quiz_form"
+                  className="h-10 rounded-md border bg-background px-2 text-sm"
+                  value={form}
+                  disabled={locked}
+                  onChange={(event) => setForm(event.target.value as QuizForm)}
+                >
+                  <option value="">Variantsiz</option>
+                  <option value="A">A variant</option>
+                  <option value="B">B variant</option>
+                </select>
+              </FormField>
+            ) : null}
             <FormField id="quiz_title" label="Sarlavha" error={errors.title}>
               <Input
                 id="quiz_title"

@@ -51,6 +51,9 @@ class QuestionSerializer(serializers.ModelSerializer):
         return attrs
 
 
+RESEARCH_KINDS = (Quiz.Kind.PRE, Quiz.Kind.POST, Quiz.Kind.DELAYED)
+
+
 class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
     """Admin va o'qituvchi uchun: savollar to'g'ri javoblari bilan."""
 
@@ -66,6 +69,7 @@ class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         fields = [
             "id",
             "kind",
+            "form",
             "title",
             "description",
             "opens_at",
@@ -116,6 +120,11 @@ class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"questions": "Likert shkalali savollar faqat so'rovnomada bo'ladi."})
         if opens_at and closes_at and closes_at <= opens_at:
             raise serializers.ValidationError({"closes_at": "Yopilish vaqti ochilish vaqtidan keyin bo'lsin."})
+        form = attrs.get("form", current.form if current else "")
+        if form and kind not in RESEARCH_KINDS:
+            raise serializers.ValidationError({"form": "Parallel variant faqat kirish, chiqish va kechiktirilgan testga beriladi."})
+        if current is not None and "form" in attrs and attrs["form"] != current.form and current.attempts.exists():
+            raise serializers.ValidationError({"form": "Talabalar testni boshlagan: variantni o'zgartirib bo'lmaydi."})
         return attrs
 
     @staticmethod

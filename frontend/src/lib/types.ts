@@ -697,6 +697,9 @@ export const MAX_SCORE = 100
 
 export type QuizKind = 'pre' | 'post' | 'delayed' | 'practice' | 'survey'
 
+/** Parallel variant: kirish va chiqish testiga turli variant beriladi ('' — variantsiz) */
+export type QuizForm = '' | 'A' | 'B'
+
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
   pre: 'Kirish testi',
   post: 'Chiqish testi',
@@ -737,6 +740,8 @@ export interface MyQuizAttempt {
 export interface Quiz {
   id: number
   kind: QuizKind
+  /** Faqat admin va o'qituvchiga */
+  form?: QuizForm
   title: string
   description: string
   opens_at: string | null
@@ -1336,6 +1341,27 @@ export interface StatTest {
     levene: { f: number; p: number; equal: boolean } | null
   }
   normality?: Normality | null
+  /** Ikkilamchi solishtiruvlar uchun Xolm bo'yicha tuzatilgan p */
+  p_holm?: number
+  significant_holm?: boolean
+}
+
+export interface ParallelForms {
+  margin: number
+  item_gap: number
+  alpha: number
+  by_kind: {
+    kind: 'pre' | 'post' | 'delayed'
+    label: string
+    A: Descriptive
+    B: Descriptive
+    difference: StatTest | null
+    equivalence: { diff: number; margin: number; ci: [number, number]; p: number; equivalent: boolean } | null
+  }[]
+  reliability: { kind: string; n: number; r: number | null; paired: StatTest | null } | null
+  items: { order: number; A: number; B: number; n_A: number; n_B: number; gap: boolean }[]
+  same_form: number
+  without_form: number
 }
 
 export interface ExperimentAnalysis {
@@ -1344,16 +1370,20 @@ export interface ExperimentAnalysis {
   excluded_no_consent: number
   quizzes: { pre: number; post: number; delayed: number }
   alpha: number
+  primary: { outcome: string; label: string }
   cohorts: Record<
     ExperimentCohort,
     {
       label: string
       students: number
       dropped: number
+      groups: number
       pre: Descriptive
       post: Descriptive
       delayed: Descriptive
-      gain: { class: number | null; level: string | null; individual: Descriptive }
+      delayed_missing: number
+      gain: { class: number | null; level: string | null; individual: Descriptive; excluded_full_pre: number }
+      ceiling: { students: number; share: number | null; warning: boolean }
       pre_post: StatTest | null
       post_delayed: StatTest | null
     }
@@ -1361,6 +1391,7 @@ export interface ExperimentAnalysis {
   baseline: StatTest | null
   comparisons: { post: StatTest | null; gain: StatTest | null; delayed: StatTest | null }
   ancova: {
+    primary: boolean
     f: number
     df1: number
     df2: number
@@ -1379,6 +1410,27 @@ export interface ExperimentAnalysis {
     target: number
     alpha: number
     approximate: boolean
+  }
+  forms: ParallelForms
+  external_ai: {
+    threshold: number
+    answered: number
+    cohorts: Partial<Record<ExperimentCohort, Descriptive & { heavy: number; heavy_share: number | null }>>
+    comparison: StatTest | null
+    sensitivity: { excluded: number; f: number; df1: number; df2: number; p: number; significant: boolean; partial_eta2: number } | null
+  }
+  clustering: {
+    groups: Record<ExperimentCohort, number>
+    confounded: boolean
+    icc: {
+      value: number
+      f: number
+      p: number
+      clusters: number
+      mean_size: number
+      design_effect: number
+      effective_n: number
+    } | null
   }
   conclusions: string[]
 }

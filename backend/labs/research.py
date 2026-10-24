@@ -37,6 +37,7 @@ QUIZ_COLUMNS = [
     "test_id",
     "test",
     "test_turi",
+    "variant",
     "holat",
     "ball",
     "maksimal_ball",
@@ -207,7 +208,10 @@ ATTEMPT_COLUMNS = [
     "kod_qatorlari",
     "kod_belgilari",
     "ishonch",
+    "ai_modellari",
 ]
+
+AI_MODEL_COLUMNS = ["sana", "maqsad", "model", "sorovlar", "xatolar"]
 
 SUMMARY_COLUMNS = [
     "talaba",
@@ -276,6 +280,7 @@ maslahat_darajasi           olingan eng batafsil maslahat darajasi: 0 — olinma
                             oldingi maslahatlar 3 deb yoziladi, chunki ular darhol batafsil berilgan)
 kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
 ishonch                     talaba tekshirishdan oldin belgilagan ishonch (1-5); bo'sh — belgilamagan
+ai_modellari                shu urinishga maslahat yoki baho bergan AI modellari (aniq nomi), «;» bilan
 
 xulosa.csv — har bir talaba va laboratoriya
 --------------------------------------------
@@ -301,6 +306,7 @@ testlar.csv — har bir talaba va test (kirish/chiqish testlari)
 Test berilgan guruhdagi barcha faol talabalar kiradi, topshirmaganlari ham.
 test_id, test
 test_turi                   kirish | chiqish | kechiktirilgan | oddiy | sorovnoma
+variant                     parallel variant: A | B (bo'sh — variantsiz test)
 holat                       topshirgan | boshlagan | boshlamagan
 ball, maksimal_ball, foiz   topshirmagan bo'lsa va so'rovnomada bo'sh
 boshlangan, topshirilgan
@@ -309,7 +315,7 @@ davomiylik_daqiqa           boshlangandan topshirilgangacha
 test_javoblari.csv — har bir talabaning har bir savoldagi natijasi (savollar tahlili uchun)
 ------------------------------------------------------------------------------------------
 test_id, test_turi
-savol_raqami                testdagi tartib raqami (kirish va chiqish testlarida bir xil savollarni solishtirish uchun)
+savol_raqami                testdagi tartib raqami (A va B variantlarda bir xil raqamli savollar — juft savollar)
 savol_turi                  bitta (bitta to'g'ri javob) | kop (bir nechta to'g'ri javob) |
                             likert (so'rovnoma fikri, ball qo'yilmaydi)
 ball, maksimal_ball         savol bo'yicha (likert savolida bo'sh)
@@ -337,6 +343,15 @@ tizim_ball                  baholash paytida ishning namunaga mosligi (0-100)
 aniqlik                     100 − |baholovchi_ball − tizim_ball|
 foydali                     muallif izohni foydali deb belgiladimi (1 / 0; bo'sh — belgilamagan)
 izoh_uzunligi               izoh belgilari soni (izoh matni eksportga kirmaydi)
+
+ai_modellari.csv — butun platforma bo'yicha AI so'rovlari: qaysi kuni qaysi model ishlagan
+----------------------------------------------------------------------------------------
+Tajriba davomida model almashganini (masalan, zaxira modelga o'tish yoki yangi versiya) ko'rsatadi.
+Kim so'ragani va matn saqlanmaydi.
+sana                        so'rov kuni ({timezone})
+maqsad                      so'rov maqsadi (masalan, lab_advice — SQL maslahati, lab_grade — SQL baholash)
+model                       javob bergan model nomi
+sorovlar, xatolar           so'rovlar soni va ulardan xato bilan tugaganlari
 
 ai_sifati.csv — o'qituvchilarning AI matnlariga bergan baholari
 ----------------------------------------------------------------
@@ -669,6 +684,7 @@ def _quiz_rows(quizzes, allowed=None):
                     quiz.pk,
                     quiz.title,
                     kind,
+                    quiz.form,
                     QUIZ_STATUSES[attempt_status(attempt)],
                     attempt.score if scored else "",
                     attempt.max_score if scored else "",
@@ -836,6 +852,22 @@ LAB_ANALYSIS_COLUMNS = [
     "xulosa",
 ]
 VERDICT_CODES = {"good": "yaxshi", "review": "qayta_korib_chiqing", "replace": "tekshiring_almashtiring"}
+
+
+def _ai_model_rows():
+    """ai_modellari.csv: kun × maqsad × model bo'yicha AI so'rovlari soni (AIUsage dan, foydalanuvchisiz)."""
+    from django.db.models import Count, Q
+    from django.db.models.functions import TruncDate
+
+    from ai.models import AIUsage
+
+    rows = (
+        AIUsage.objects.annotate(day=TruncDate("created_at"))
+        .values("day", "purpose", "model_name")
+        .annotate(total=Count("id"), errors=Count("id", filter=Q(ok=False)))
+        .order_by("day", "purpose", "model_name")
+    )
+    return [[row["day"].isoformat(), row["purpose"], row["model_name"], row["total"], row["errors"]] for row in rows]
 
 
 def _blank(value):
@@ -1032,6 +1064,7 @@ def build_export(labs, quizzes=None, groups=None):
                         len(attempt.sql_code.splitlines()),
                         len(attempt.sql_code),
                         "" if attempt.confidence is None else attempt.confidence,
+                        "; ".join(attempt.ai_models),
                     ]
                 )
             summary_rows.append(
@@ -1065,6 +1098,7 @@ def build_export(labs, quizzes=None, groups=None):
         zip_file.writestr("baholash_mosligi.csv", _csv(REVIEW_COLUMNS, _review_rows(labs, allowed)))
         zip_file.writestr("ozaro_baholash.csv", _csv(PEER_REVIEW_COLUMNS, _peer_review_rows(labs, allowed)))
         zip_file.writestr("ai_sifati.csv", _csv(AI_QUALITY_COLUMNS, _ai_quality_rows(labs, allowed)))
+        zip_file.writestr("ai_modellari.csv", _csv(AI_MODEL_COLUMNS, _ai_model_rows()))
         event_rows, process_rows, traces = _process_rows(labs, allowed)
         zip_file.writestr("er_jarayon_hodisalari.csv", _csv(PROCESS_EVENT_COLUMNS, event_rows))
         zip_file.writestr("er_jarayon.csv", _csv(PROCESS_COLUMNS, process_rows))

@@ -31,6 +31,7 @@ from users.consent import consent_required, participant_ids
 
 from .models import Question, Quiz, QuizAttempt
 from .services import finalize_if_expired, likert_value
+from .survey_bank import EXTERNAL_AI_TEXTS
 
 MIN_STUDENTS = 5
 # Variantni shundan kam talaba tanlasa, u "ishlamaydi" (javobni topishga xalaqit bermaydi)
@@ -212,7 +213,12 @@ def _scale(label, questions, attempts, answers):
 
 
 def analyse_survey(quiz):
-    questions = [question for question in quiz.questions.prefetch_related("choices") if question.kind == Question.Kind.LIKERT]
+    # Tashqi AI haqidagi savollar fikr shkalasiga kirmaydi: ular foydalanish chastotasini o'lchaydi
+    questions = [
+        question
+        for question in quiz.questions.prefetch_related("choices")
+        if question.kind == Question.Kind.LIKERT and question.text not in EXTERNAL_AI_TEXTS
+    ]
     attempts, excluded = _attempts(quiz)
     answers = defaultdict(dict)
     for attempt in attempts:

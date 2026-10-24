@@ -4,7 +4,10 @@
 - Styudent t-testi (Uelch varianti: dispersiyalar teng bo'lishi shart emas), Koen d va Xedjes g;
 - Mann–Uitni U testi (normal yaqinlashish, bir xil qiymatlar tuzatmasi bilan) — taqsimot normal bo'lmasa;
 - Kraskel–Uollis H testi — uch va undan ko'p guruh (masalan, loyihalash strategiyalari) parametrsiz;
-- juftlangan t-test — bitta guruhning tajriba boshi va oxiri (o'sish).
+- juftlangan t-test — bitta guruhning tajriba boshi va oxiri (o'sish);
+- Xolm tuzatishi — bir nechta ikkilamchi solishtiruvda I tur xatoni nazorat qilish;
+- sinfichi korrelyatsiya ICC(1) va dizayn effekti — talabalar guruhlarga (klasterlarga) bo'lingan tajriba uchun;
+- TOST — ikki o'rtachaning ekvivalentligi (masalan, testning parallel variantlari).
 
 p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes, 6.2 va 6.4) ishlatiladi.
 Natijalar scipy.stats bilan solishtirib tekshirilgan (tests.py dagi namunaviy qiymatlar).
@@ -460,6 +463,7 @@ def ancova(groups):
         "p": f_sf(f, 1, df_error),
         "partial_eta2": ss_group / (ss_group + sse_full),
         "slope": beta[2],
+        "beta": beta,
         "adjusted_means": adjusted,
         "slopes_homogeneity": slopes,
     }
@@ -482,3 +486,100 @@ def achieved_power(d, n1, n2, alpha=ALPHA):
     z_alpha = normal_ppf(1 - alpha / 2)
     shift = abs(d) * math.sqrt(n1 * n2 / (n1 + n2))
     return normal_cdf(shift - z_alpha) + normal_cdf(-shift - z_alpha)
+
+
+def holm(pvalues):
+    """Xolm–Bonferroni tuzatishi: tuzatilgan p-qiymatlar (kirish tartibida). None qiymatlar o'zgarishsiz qoladi."""
+    present = sorted((p, index) for index, p in enumerate(pvalues) if p is not None)
+    adjusted = list(pvalues)
+    m = len(present)
+    running = 0.0
+    for rank, (p, index) in enumerate(present):
+        running = max(running, min(1.0, (m - rank) * p))
+        adjusted[index] = running
+    return adjusted
+
+
+def icc_oneway(samples):
+    """Bir omilli ANOVA bo'yicha sinfichi korrelyatsiya ICC(1) (klasterlar o'lchami har xil bo'lishi mumkin).
+
+    samples — klasterlar (masalan, akademik guruhlar) bo'yicha qiymatlar ro'yxati. ICC = (MSB − MSW) / (MSB + (k₀ − 1)·MSW),
+    k₀ — tuzatilgan o'rtacha klaster o'lchami. Manfiy baho 0 deb olinadi (Donner, 1986). Kamida 2 ta klaster kerak.
+    """
+    samples = [list(sample) for sample in samples if sample]
+    k = len(samples)
+    n = sum(len(sample) for sample in samples)
+    if k < 2 or n - k < 1:
+        return None
+    grand = sum(map(sum, samples)) / n
+    between = sum(len(sample) * (_mean(sample) - grand) ** 2 for sample in samples)
+    within = sum((value - _mean(sample)) ** 2 for sample in samples for value in sample)
+    msb, msw = between / (k - 1), within / (n - k)
+    k0 = (n - sum(len(sample) ** 2 for sample in samples) / n) / (k - 1)
+    denominator = msb + (k0 - 1) * msw
+    if denominator <= 0:
+        return None
+    icc = max(0.0, (msb - msw) / denominator)
+    f = msb / msw if msw else None
+    mean_size = n / k
+    design_effect = 1 + (mean_size - 1) * icc
+    return {
+        "icc": icc,
+        "f": f,
+        "df1": k - 1,
+        "df2": n - k,
+        "p": f_sf(f, k - 1, n - k) if f is not None else None,
+        "clusters": k,
+        "mean_size": mean_size,
+        "design_effect": design_effect,
+        "effective_n": n / design_effect,
+    }
+
+
+def tost(a, b, margin, alpha=ALPHA):
+    """Ikki mustaqil o'rtachaning ekvivalentligi (Shuirmann TOST, Uelch shaklida): |M_a − M_b| < margin.
+
+    Ikkala bir tomonlama test p < α bo'lsa — ekvivalent. p_tost = ikkalasining kattasi. Shu bilan birga
+    (1 − 2α) ishonch oralig'i qaytariladi: u (−margin, margin) ichida bo'lsa, ekvivalentlik isbotlangan.
+    """
+    if len(a) < 2 or len(b) < 2 or margin <= 0:
+        return None
+    var_a, var_b = _variance(a), _variance(b)
+    se2 = var_a / len(a) + var_b / len(b)
+    if se2 == 0:
+        return None
+    se = math.sqrt(se2)
+    df = se2**2 / ((var_a / len(a)) ** 2 / (len(a) - 1) + (var_b / len(b)) ** 2 / (len(b) - 1))
+    diff = _mean(a) - _mean(b)
+
+    def upper_tail(t):
+        """P(T > t) Styudent taqsimotida."""
+        half = t_two_sided_p(t, df) / 2
+        return half if t >= 0 else 1 - half
+
+    p_lower = upper_tail((diff + margin) / se)  # H0: diff ≤ −margin
+    p_upper = 1 - upper_tail((diff - margin) / se)  # H0: diff ≥ margin
+    t_crit = _t_ppf(1 - alpha, df)
+    p = max(p_lower, p_upper)
+    return {
+        "diff": diff,
+        "margin": margin,
+        "df": df,
+        "p_lower": p_lower,
+        "p_upper": p_upper,
+        "p": p,
+        "ci": (diff - t_crit * se, diff + t_crit * se),
+        "equivalent": p < alpha,
+    }
+
+
+def _t_ppf(q, df):
+    """Styudent taqsimoti kvantili (bisektsiya, P(T ≤ t) = q, q > 0.5)."""
+    low, high = 0.0, 1000.0
+    for _ in range(200):
+        middle = (low + high) / 2
+        if 1 - t_two_sided_p(middle, df) / 2 < q:
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2

@@ -49,6 +49,23 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertEqual(stats.required_n_per_group(0.8), 26)
         self.assertAlmostEqual(stats.achieved_power(0.5, 64, 64), 0.8, delta=0.02)
 
+    def test_holm_tost_icc(self):
+        # statsmodels.stats.multitest.multipletests(method="holm")
+        self.assertEqual([round(p, 10) for p in stats.holm([0.01, 0.04, 0.03, 0.005, None])[:4]], [0.03, 0.06, 0.06, 0.02])
+        self.assertIsNone(stats.holm([0.01, None])[1])
+        # statsmodels.stats.weightstats.ttost_ind(a, b, -10, 10, usevar="unequal")
+        result = stats.tost([60, 72, 65, 80, 75, 68, 71], [55, 58, 62, 50, 66, 59, 61, 57], 10)
+        self.assertAlmostEqual(result["p"], 0.7019397109246388, places=9)
+        self.assertAlmostEqual(result["p_lower"], 9.319629219148351e-06, places=12)
+        self.assertFalse(result["equivalent"])
+        self.assertTrue(stats.tost([60, 61, 59, 62, 58], [60.5, 59.5, 61, 60, 59], 5)["equivalent"])
+        # ICC(1): F va p — scipy.stats.f_oneway, ICC — ANOVA formulasi (numpy)
+        result = stats.icc_oneway([[50, 55, 60, 52], [70, 65, 72, 68, 75], [58, 61, 57]])
+        self.assertAlmostEqual(result["icc"], 0.8405056562096863, places=10)
+        self.assertAlmostEqual(result["p"], 0.0003643955882313509, places=10)
+        self.assertAlmostEqual(result["design_effect"], 1 + 3 * result["icc"], places=10)
+        self.assertIsNone(stats.icc_oneway([[1, 2, 3]]))
+
     def test_hake_levels(self):
         self.assertEqual([hake_level(g) for g in (0.1, 0.3, 0.69, 0.7)], ["past", "o'rta", "o'rta", "yuqori"])
 
@@ -230,6 +247,8 @@ class ExperimentTests(ResearchBase):
         self.assertEqual(ctrl["gain"]["class"], round(0.09207708779443255, 3))
         self.assertEqual(exp["pre_post"]["test"], "paired_t")
         self.assertAlmostEqual(exp["pre_post"]["statistic"]["value"], 9.088, places=3)
+        self.assertEqual((exp["gain"]["excluded_full_pre"], exp["ceiling"]["students"], exp["delayed_missing"]), (0, 0, 8))
+        self.assertFalse(exp["ceiling"]["warning"])
 
     def test_baseline_comparison_and_ancova(self):
         result = self.result()
@@ -247,11 +266,97 @@ class ExperimentTests(ResearchBase):
         self.assertAlmostEqual(ancova["partial_eta2"], 0.712, places=3)
         self.assertEqual(ancova["adjusted_means"], {"experimental": 57.63, "control": 47.12})
         self.assertEqual(ancova["effect_label"], "katta")
+        self.assertTrue(ancova["primary"])
+        self.assertEqual(result["primary"]["outcome"], "ancova")
+        # Ikkilamchi natijalar Xolm bo'yicha tuzatiladi (post va gain: ikkita solishtiruv)
+        gain = result["comparisons"]["gain"]
+        smaller, larger = sorted([post["p"], gain["p"]])
+        expected = min(1, 2 * smaller) if post["p"] == smaller else max(2 * smaller, larger)
+        self.assertAlmostEqual(post["p_holm"], expected, places=3)
+        self.assertNotIn("p_holm", result["baseline"])
         self.assertTrue(result["power"]["achieved"] < 0.8)
+        # Har bir shartda bittadan guruh: guruh effekti AI effektidan ajralmaydi
+        self.assertTrue(result["clustering"]["confounded"])
+        self.assertIsNone(result["clustering"]["icc"])
         text = " ".join(result["conclusions"])
         self.assertIn("teng bo'lgan", text)
-        self.assertIn("ANCOVA", text)
+        self.assertIn("Asosiy gipoteza", text)
+        self.assertIn("Xolm", text)
+        self.assertIn("Dizayn cheklovi", text)
         self.assertIn("quvvat past", text)
+        self.assertLess(text.index("Asosiy gipoteza"), text.index("Ikkilamchi"))
+
+    def test_full_pre_and_ceiling(self):
+        student = self.make_student("e_full", self.ai_group)
+        self.submit(self.pre, student, {}, score=100, max_score=100)
+        self.submit(self.post, student, {}, score=100, max_score=100)
+        for index in range(2):
+            other = self.make_student(f"e_top{index}", self.ai_group)
+            self.submit(self.pre, other, {}, score=70, max_score=100)
+            self.submit(self.post, other, {}, score=100, max_score=100)
+        exp = self.result()["cohorts"]["experimental"]
+        self.assertEqual(exp["gain"]["excluded_full_pre"], 1)
+        self.assertEqual(exp["gain"]["individual"]["n"], 10)
+        self.assertEqual(exp["ceiling"], {"students": 3, "share": round(3 / 11, 3), "warning": True})
+        text = " ".join(self.result()["conclusions"])
+        self.assertIn("100% olgan 1 ta talaba", text)
+        self.assertIn("Shift effekti", text)
+
+    def test_clustering_icc(self):
+        """Har bir shartda ikkita guruh: ICC ANCOVA qoldiqlari bo'yicha (statsmodels OLS + ANOVA formulasi)."""
+        groups = {}
+        for name, ai, members in (("E1", True, (0, 1, 2, 5)), ("C1", False, (0, 2, 4, 6))):
+            groups[name] = StudentGroup.objects.create(name=f"E-{name}", ai_enabled=ai)
+            groups[name].teachers.add(self.teacher)
+            prefix = "ea" if ai else "ec"
+            User.objects.filter(username__in=[f"{prefix}{index}" for index in members]).update(group=groups[name])
+        for quiz in (self.pre, self.post):
+            quiz.groups.add(*groups.values())
+        result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group, self.control_group, *groups.values()])
+        clustering = result["clustering"]
+        self.assertEqual(clustering["groups"], {"experimental": 2, "control": 2})
+        self.assertFalse(clustering["confounded"])
+        self.assertEqual(clustering["icc"]["value"], round(0.15716794246025922, 3))
+        self.assertEqual(clustering["icc"]["design_effect"], round(1.4715038273807777, 2))
+        self.assertEqual(clustering["icc"]["effective_n"], round(10.873230298340037, 1))
+        self.assertIn("Klasterlash", " ".join(result["conclusions"]))
+
+    def test_external_ai_contamination(self):
+        from .serializers import QuizSerializer
+        from .survey_bank import EXTERNAL_AI_TEXTS
+
+        survey = Quiz.objects.create(kind=Quiz.Kind.SURVEY, title="Yakuniy", author=self.teacher)
+        survey.groups.add(self.ai_group, self.control_group)
+        texts = ["Laboratoriya foydali bo'ldi.", "Topshiriqlar tushunarli edi.", *sorted(EXTERNAL_AI_TEXTS)]
+        QuizSerializer.write_questions(survey, [{"text": text, "kind": "likert", "points": 0, "choices": [
+            {"text": str(value), "is_correct": False} for value in range(1, 6)
+        ]} for text in texts])
+        questions = list(survey.questions.order_by("order"))
+        # ec0-ec2 va ea0 — ko'p foydalangan (o'rtacha 4.5), qolganlar — 1; fikr savoliga hamma 5
+        heavy = {"ec0", "ec1", "ec2", "ea0"}
+        for student in User.objects.filter(group__in=[self.ai_group, self.control_group]).exclude(username__in=["e_refused", "e_dropped"]):
+            values = [5, 4, 5, 4] if student.username in heavy else [5, 4, 1, 1]
+            answers = {str(q.pk): [q.choices.get(order=value).pk] for q, value in zip(questions, values)}
+            QuizAttempt.objects.create(quiz=survey, student=student, answers=answers, submitted_at=timezone.now())
+        result = self.result()
+        external = result["external_ai"]
+        self.assertEqual(external["answered"], 16)
+        self.assertEqual(external["cohorts"]["control"]["heavy"], 3)
+        self.assertEqual(external["cohorts"]["experimental"]["heavy"], 1)
+        # statsmodels: ols("post ~ C(g) + pre"), anova_lm(typ=2), ko'p foydalanganlarsiz
+        sensitivity = external["sensitivity"]
+        self.assertEqual(sensitivity["excluded"], 4)
+        self.assertAlmostEqual(sensitivity["f"], 18.677, places=3)
+        self.assertAlmostEqual(sensitivity["p"], 0.0019, places=4)
+        self.assertAlmostEqual(sensitivity["partial_eta2"], 0.675, places=3)
+        text = " ".join(result["conclusions"])
+        self.assertIn("nazorat guruhida 3 ta talaba", text)
+        self.assertIn("Sezgirlik tahlili", text)
+        # Tashqi AI savollari so'rovnomaning fikr shkalasiga (α) kirmaydi
+        from .psychometrics import analyse_survey
+
+        scale = analyse_survey(survey)["scales"][0]
+        self.assertEqual([item["text"] for item in scale["items"]], ["Laboratoriya foydali bo'ldi.", "Topshiriqlar tushunarli edi."])
 
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
@@ -269,3 +374,68 @@ class ExperimentTests(ResearchBase):
         # Boshqa o'qituvchi bu testlar va guruhlarni ko'rmaydi
         self.client.force_authenticate(User.objects.create_user("e_other", role=User.Role.TEACHER))
         self.assertEqual(self.client.get("/api/experiment/").data["cohorts"]["experimental"]["students"], 0)
+
+
+class ParallelFormsTests(ResearchBase):
+    """Kutilgan qiymatlar: statsmodels ttost_ind(usevar="unequal"), scipy pearsonr."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher = User.objects.create_user("pf_teacher", role=User.Role.TEACHER)
+        cls.groups = [StudentGroup.objects.create(name=f"PF-{index}", ai_enabled=index != 1) for index in range(3)]
+        for group in cls.groups:
+            group.teachers.add(cls.teacher)
+        cls.quizzes = {}
+        for kind in (Quiz.Kind.PRE, Quiz.Kind.POST):
+            for form in ("A", "B"):
+                quiz = Quiz.objects.create(kind=kind, form=form, title=f"{kind}-{form}", author=cls.teacher)
+                quiz.groups.add(*cls.groups)
+                for order in range(1, 5):
+                    question = Question.objects.create(quiz=quiz, order=order, text=f"{form}{order}", kind=Question.Kind.SINGLE, points=1)
+                    for index in range(3):
+                        Choice.objects.create(question=question, order=index, text=f"V{index}", is_correct=index == 0)
+                cls.quizzes[kind, form] = quiz
+        pre_a = [[1, 0, 0, 0], [1, 1, 0, 0], [1, 0, 1, 0], [1, 1, 1, 0], [1, 1, 0, 1], [1, 1, 1, 1]]
+        pre_b = [[0, 1, 0, 0], [0, 1, 1, 0], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 1, 1], [0, 0, 0, 0]]
+        pilot = [([1, 1, 0, 0], [0, 1, 1, 0]), ([1, 1, 1, 0], [0, 1, 1, 1]), ([1, 0, 0, 0], [0, 0, 0, 0])]
+        for index, pattern in enumerate(pre_a):
+            student = cls.make_student(f"pf_a{index}", cls.groups[0])
+            cls.answer(("pre", "A"), student, pattern)
+            # Birinchi talaba chiqishda ham A variantni olgan — test qilish effekti xavfi
+            cls.answer(("post", "A" if index == 0 else "B"), student, [1, 1, 1, 1])
+        for index, pattern in enumerate(pre_b):
+            cls.answer(("pre", "B"), cls.make_student(f"pf_b{index}", cls.groups[1]), pattern)
+        for index, (a, b) in enumerate(pilot):
+            student = cls.make_student(f"pf_p{index}", cls.groups[2])
+            cls.answer(("pre", "A"), student, a)
+            cls.answer(("pre", "B"), student, b)
+
+    @classmethod
+    def answer(cls, key, student, pattern):
+        quiz = cls.quizzes[key]
+        answers = {}
+        for question, correct in zip(quiz.questions.order_by("order"), pattern):
+            choice = question.choices.get(is_correct=True) if correct else question.choices.filter(is_correct=False).first()
+            answers[str(question.pk)] = [choice.pk]
+        cls.submit(quiz, student, answers)
+
+    def test_equivalence_reliability_items(self):
+        result = analyse_experiment(Quiz.objects.filter(author=self.teacher), self.groups)["forms"]
+        pre = next(row for row in result["by_kind"] if row["kind"] == "pre")
+        self.assertEqual(pre["A"], {"n": 9, "mean": 58.33, "sd": 25.0})
+        self.assertEqual(pre["B"], {"n": 9, "mean": 44.44, "sd": 30.05})
+        self.assertAlmostEqual(pre["equivalence"]["p"], 0.6153, places=4)
+        self.assertFalse(pre["equivalence"]["equivalent"])
+        self.assertEqual(pre["equivalence"]["diff"], 13.89)
+        post = next(row for row in result["by_kind"] if row["kind"] == "post")
+        self.assertIsNone(post["equivalence"])
+        self.assertEqual(result["reliability"]["n"], 3)
+        self.assertEqual(result["reliability"]["r"], 0.982)
+        first = result["items"][0]
+        self.assertEqual((first["order"], first["A"], first["B"], first["gap"]), (1, 1.0, 0.0, True))
+        self.assertEqual(result["same_form"], 1)
+        self.assertEqual(result["without_form"], 0)
+        text = " ".join(analyse_experiment(Quiz.objects.filter(author=self.teacher), self.groups)["conclusions"])
+        self.assertIn("ekvivalentligi isbotlanmadi", text)
+        self.assertIn("juft savollar: 1", text)
+        self.assertIn("Test qilish effekti xavfi: 1 ta", text)

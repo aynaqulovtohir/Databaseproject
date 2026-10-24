@@ -11,6 +11,17 @@ va nazorat guruhlari.
 4. ANCOVA: chiqish ~ guruh + kirish — boshlang'ich farqni hisobga olgan solishtiruv, regressiya chiziqlari
    parallelligi sharti bilan.
 5. Statistik quvvat: kuzatilgan effekt bilan erishilgan quvvat va kerakli talabalar soni (o'rta effekt d = 0.5 uchun ham).
+6. Asosiy gipoteza oldindan belgilangan (PRIMARY_OUTCOME): ANCOVA bo'yicha guruh effekti, α = 0.05 tuzatishsiz.
+   Qolgan solishtiruvlar (chiqish testi, Hake o'sishi, kechiktirilgan test) — ikkilamchi, ularga Xolm tuzatishi qo'llanadi.
+7. Klasterlash: AI butun akademik guruhga yoqiladi, ya'ni dizayn — klaster kvazi-tajriba. ANCOVA qoldiqlari bo'yicha
+   guruhlararo ICC(1), dizayn effekti va samarali talabalar soni hisoblanadi; har bir shartda bittadan guruh bo'lsa,
+   guruh effektini AI effektidan ajratib bo'lmasligi haqida ogohlantiriladi.
+8. Parallel variantlar (forms.py): A va B ekvivalentligi (TOST), ishonchliligi va bir xil variant olganlar.
+9. Nazorat guruhining "ifloslanishi": yakuniy so'rovnomadagi tashqi AI vositalari haqidagi savollar (survey_bank.py)
+   bo'yicha guruhlar solishtiriladi va sezgirlik tahlili — tashqi AI dan ko'p foydalanganlar (o'rtacha ≥ 4)
+   chiqarilgandagi ANCOVA.
+10. Ma'lumot sifati: kirish testida 100% olganlar (Hake g aniqlanmaydi), chiqish testidagi shift effekti (> 15% talaba
+   maksimal ball olgan) va kechiktirilgan testni topshirmaganlar alohida ko'rsatiladi.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
 faqat tadqiqotga rozi bo'lganlar. Hisob toza Python'da (competence/stats.py), natijalar scipy bilan solishtirilgan.
@@ -22,6 +33,8 @@ from competence.stats import (
     achieved_power,
     ancova,
     describe,
+    holm,
+    icc_oneway,
     levene,
     mann_whitney,
     paired_t_test,
@@ -34,13 +47,23 @@ from competence.stats import (
 from users.consent import consent_required, research_participants
 from users.models import User
 
-from .models import Quiz, QuizAttempt
-from .services import finalize_if_expired, percent
+from . import forms as parallel_forms
+from .models import Question, Quiz, QuizAttempt
+from .services import finalize_if_expired, likert_value, percent
+from .survey_bank import EXTERNAL_AI_TEXTS
 
 COHORTS = {"experimental": "Tajriba (AI yoqilgan)", "control": "Nazorat"}
 MIN_GROUP = 3
 MEDIUM_EFFECT = 0.5
 TARGET_POWER = 0.8
+# Asosiy (oldindan belgilangan) natija ko'rsatkichi: tajriba boshlanishidan oldin qayd etiladi va o'zgartirilmaydi
+PRIMARY_OUTCOME = "ancova"
+PRIMARY_LABEL = "Chiqish testi, kirish testini hisobga olgan holda (ANCOVA: chiqish ~ guruh + kirish)"
+SECONDARY = ("post", "gain", "delayed")
+# Tashqi AI dan "ko'p foydalangan": shu savollar o'rtachasi (1-5) shu qiymatdan kichik emas
+HEAVY_EXTERNAL = 4
+# Shift effekti: maksimal ball olganlar ulushi shu chegaradan oshsa, test guruhlarni farqlay olmasligi mumkin
+CEILING_SHARE = 0.15
 
 TEST_LABELS = {
     "student": "Styudent t-testi",
@@ -161,6 +184,116 @@ def compare_paired(before, after):
     }
 
 
+def apply_holm(tests):
+    """Ikkilamchi solishtiruvlarga Xolm tuzatishi: har biriga p_holm va significant_holm qo'shiladi."""
+    present = [test for test in tests if test]
+    adjusted = holm([test["p"] for test in present])
+    for test, p in zip(present, adjusted):
+        test["p_holm"] = _r(p, 4)
+        test["significant_holm"] = p < ALPHA
+
+
+def cluster_analysis(completers, covariance):
+    """Akademik guruhlar (klasterlar) ta'siri: ANCOVA qoldiqlari bo'yicha ICC(1), dizayn effekti, samarali n.
+
+    Qoldiq = chiqish − (b₀ + b₁·tajriba + b₂·kirish): AI va kirish testi ta'siri olib tashlangandan keyin
+    bir guruh talabalari bir-biriga qanchalik o'xshashligi. Har bir shartda bittadan guruh bo'lsa, qoldiqlarning
+    guruh o'rtachasi 0 ga teng bo'ladi va ICC ni baholab bo'lmaydi.
+    """
+    groups = {cohort: len({row["group"] for row in rows}) for cohort, rows in completers.items()}
+    result = {"groups": groups, "confounded": min(groups.values()) <= 1, "icc": None}
+    if covariance is None or result["confounded"]:
+        return result
+    b0, b1, b2 = covariance["beta"]
+    residuals = defaultdict(list)
+    for cohort, rows in completers.items():
+        flag = 1.0 if cohort == "experimental" else 0.0
+        for row in rows:
+            residuals[row["group"]].append(row["post"] - (b0 + b1 * flag + b2 * row["pre"]))
+    icc = icc_oneway(list(residuals.values()))
+    if icc:
+        result["icc"] = {
+            "value": _r(icc["icc"]),
+            "f": _r(icc["f"]),
+            "p": _r(icc["p"], 4),
+            "clusters": icc["clusters"],
+            "mean_size": _r(icc["mean_size"], 1),
+            "design_effect": _r(icc["design_effect"], 2),
+            "effective_n": _r(icc["effective_n"], 1),
+        }
+    return result
+
+
+def external_usage(surveys, students):
+    """{talaba_id: tashqi AI savollari o'rtachasi (1-5)} — yakuniy so'rovnoma(lar) bo'yicha."""
+    values = defaultdict(list)
+    attempts = QuizAttempt.objects.filter(quiz__in=surveys, student__in=students, submitted_at__isnull=False)
+    questions = defaultdict(list)
+    for question in Question.objects.filter(quiz__in=surveys, text__in=EXTERNAL_AI_TEXTS).prefetch_related("choices"):
+        questions[question.quiz_id].append(question)
+    for attempt in attempts:
+        for question in questions.get(attempt.quiz_id, []):
+            value = likert_value(question, attempt.answers.get(str(question.pk), []))
+            if value is not None:
+                values[attempt.student_id].append(value)
+    return {sid: sum(items) / len(items) for sid, items in values.items()}
+
+
+def external_ai(surveys, students, cohort_of, completers):
+    """Tashqi AI dan foydalanish: guruhlar bo'yicha o'rtacha, ko'p foydalanganlar ulushi va sezgirlik tahlili."""
+    usage = external_usage(surveys, students)
+    result = {"threshold": HEAVY_EXTERNAL, "answered": len(usage), "cohorts": {}, "comparison": None, "sensitivity": None}
+    if not usage:
+        return result
+    by_cohort = defaultdict(list)
+    for sid, value in usage.items():
+        by_cohort[cohort_of[sid]].append(value)
+    for cohort in COHORTS:
+        values = by_cohort[cohort]
+        heavy = sum(1 for value in values if value >= HEAVY_EXTERNAL)
+        result["cohorts"][cohort] = {**_describe(values), "heavy": heavy, "heavy_share": _r(heavy / len(values)) if values else None}
+    result["comparison"] = compare_independent(by_cohort["experimental"], by_cohort["control"])
+    # Sezgirlik: tashqi AI dan ko'p foydalanganlar chiqarilgandagi ANCOVA (asosiy xulosa o'zgarmasligi kerak)
+    kept = {
+        cohort: [(row["pre"], row["post"]) for row in rows if usage.get(row["student"], 0) < HEAVY_EXTERNAL]
+        for cohort, rows in completers.items()
+    }
+    excluded = sum(len(rows) for rows in completers.values()) - sum(len(rows) for rows in kept.values())
+    if excluded and min(len(rows) for rows in kept.values()) >= MIN_GROUP:
+        covariance = ancova(kept)
+        if covariance:
+            result["sensitivity"] = {
+                "excluded": excluded,
+                "f": _r(covariance["f"]),
+                "df1": covariance["df1"],
+                "df2": covariance["df2"],
+                "p": _r(covariance["p"], 4),
+                "significant": covariance["p"] < ALPHA,
+                "partial_eta2": _r(covariance["partial_eta2"]),
+            }
+    return result
+
+
+def external_conclusions(result):
+    if not result["answered"]:
+        return []
+    control = result["cohorts"].get("control") or {}
+    lines = []
+    if control.get("n"):
+        lines.append(
+            f"Tashqi AI vositalari: nazorat guruhida {control['heavy']} ta talaba (ulushi {control['heavy_share']}) ulardan ko'p "
+            f"foydalanganini bildirgan (o'rtacha ≥ {result['threshold']}) — bu AI effektini kamaytirib ko'rsatishi mumkin."
+        )
+    sensitivity = result["sensitivity"]
+    if sensitivity:
+        verdict = "ahamiyatli" if sensitivity["significant"] else "ahamiyatli emas"
+        lines.append(
+            f"Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {sensitivity['excluded']} ta talaba chiqarilganda ANCOVA "
+            f"F({sensitivity['df1']}, {sensitivity['df2']}) = {sensitivity['f']}, {_p_text(sensitivity['p'])} — {verdict}."
+        )
+    return lines
+
+
 def _describe(values):
     result = describe(values)
     return {"n": result["n"], "mean": _r(result["mean"], 2), "sd": _r(result["sd"], 2)}
@@ -180,17 +313,19 @@ def student_scores(quizzes, students):
 def analyse(quizzes, groups):
     """quizzes — ko'rinadigan testlar QuerySet'i, groups — guruhlar. Kirish/chiqish/kechiktirilgan testlar olinadi."""
     groups = list(groups)
+    surveys = quizzes.filter(kind=Quiz.Kind.SURVEY, groups__in=groups).distinct()
     quizzes = quizzes.filter(kind__in=[Quiz.Kind.PRE, Quiz.Kind.POST, Quiz.Kind.DELAYED], groups__in=groups).distinct()
     everyone = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups)
     students = list(research_participants(everyone).select_related("group"))
     scores = student_scores(quizzes, students)
     cohort_of = {student.pk: ("experimental" if student.group.ai_enabled else "control") for student in students}
+    group_of = {student.pk: student.group_id for student in students}
 
     completers = {cohort: [] for cohort in COHORTS}
     pre_only = {cohort: 0 for cohort in COHORTS}
     for sid, item in scores.items():
         if "pre" in item and "post" in item:
-            completers[cohort_of[sid]].append(item)
+            completers[cohort_of[sid]].append({**item, "group": group_of[sid], "student": sid})
         elif "pre" in item:
             pre_only[cohort_of[sid]] += 1
 
@@ -205,17 +340,27 @@ def analyse(quizzes, groups):
         class_gain = None
         if rows and pre_stats["mean"] is not None and pre_stats["mean"] < 100:
             class_gain = (sum(post) / len(post) - sum(pre) / len(pre)) / (100 - sum(pre) / len(pre))
+        at_ceiling = sum(1 for value in post if value >= 100)
         cohorts[cohort] = {
             "label": label,
             "students": len(rows),
             "dropped": pre_only[cohort],
+            "groups": len({row["group"] for row in rows}),
             "pre": pre_stats,
             "post": post_stats,
             "delayed": _describe([row["delayed"] for row in delayed_rows]),
+            "delayed_missing": len(rows) - len(delayed_rows),
             "gain": {
                 "class": _r(class_gain),
                 "level": hake_level(class_gain),
                 "individual": _describe(gains),
+                # Kirish testida 100% olganlarda g = (chiqish − 100) / 0 aniqlanmaydi: ular individual g dan chiqariladi
+                "excluded_full_pre": len(rows) - len(gains),
+            },
+            "ceiling": {
+                "students": at_ceiling,
+                "share": _r(at_ceiling / len(rows)) if rows else None,
+                "warning": bool(rows) and at_ceiling / len(rows) > CEILING_SHARE,
             },
             "pre_post": compare_paired(pre, post),
             "post_delayed": compare_paired([row["post"] for row in delayed_rows], [row["delayed"] for row in delayed_rows]),
@@ -228,12 +373,14 @@ def analyse(quizzes, groups):
 
     comparisons = {key: compare_independent(column("experimental", key), column("control", key)) for key in ("pre", "post", "gain", "delayed")}
     baseline = comparisons["pre"]
+    apply_holm([comparisons[key] for key in SECONDARY])
 
     covariance = ancova({cohort: [(row["pre"], row["post"]) for row in completers[cohort]] for cohort in COHORTS})
     ancova_result = None
     if covariance:
         slopes = covariance["slopes_homogeneity"]
         ancova_result = {
+            "primary": PRIMARY_OUTCOME == "ancova",
             "f": _r(covariance["f"]),
             "df1": covariance["df1"],
             "df2": covariance["df2"],
@@ -244,6 +391,9 @@ def analyse(quizzes, groups):
             "adjusted_means": {cohort: _r(value, 2) for cohort, value in covariance["adjusted_means"].items()},
             "slopes": None if slopes is None else {"f": _r(slopes["f"]), "p": _r(slopes["p"], 4), "parallel": slopes["p"] >= ALPHA},
         }
+    clustering = cluster_analysis(completers, covariance)
+    forms = parallel_forms.analyse(quizzes, students)
+    external = external_ai(surveys, students, cohort_of, completers)
 
     n1, n2 = len(completers["experimental"]), len(completers["control"])
     observed_d = comparisons["post"]["cohens_d"] if comparisons["post"] else None
@@ -263,12 +413,18 @@ def analyse(quizzes, groups):
         "excluded_no_consent": everyone.count() - len(students),
         "quizzes": {kind: quizzes.filter(kind=kind).count() for kind in ("pre", "post", "delayed")},
         "alpha": ALPHA,
+        "primary": {"outcome": PRIMARY_OUTCOME, "label": PRIMARY_LABEL},
         "cohorts": cohorts,
         "baseline": baseline,
         "comparisons": {key: comparisons[key] for key in ("post", "gain", "delayed")},
         "ancova": ancova_result,
         "power": power,
-        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2),
+        "clustering": clustering,
+        "forms": forms,
+        "external_ai": external,
+        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
+        + parallel_forms.conclusions(forms)
+        + external_conclusions(external),
     }
 
 
@@ -276,8 +432,15 @@ def _p_text(p):
     return "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
 
 
-def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2):
-    """Dissertatsiya matniga mos qisqa xulosalar (o'zbekcha)."""
+def _secondary_text(test):
+    """Ikkilamchi natija: xom p va Xolm bo'yicha tuzatilgan p."""
+    if "p_holm" not in test:
+        return _p_text(test["p"])
+    return f"{_p_text(test['p'])}, Xolm bo'yicha p = {test['p_holm']:.3f}"
+
+
+def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering=None):
+    """Dissertatsiya matniga mos qisqa xulosalar (o'zbekcha). Avval asosiy gipoteza, keyin ikkilamchi natijalar."""
     lines = []
     if min(n1, n2) < MIN_GROUP:
         return ["Har bir guruhda kamida 3 ta talaba kirish va chiqish testini topshirgan bo'lishi kerak."]
@@ -289,13 +452,23 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2):
             )
         else:
             lines.append(f"Tajriba boshida guruhlar kirish testi bo'yicha teng bo'lgan ({baseline['label']}, {_p_text(baseline['p'])}).")
+    if ancova_result:
+        verdict = "ahamiyatli" if ancova_result["significant"] else "ahamiyatli emas"
+        lines.append(
+            f"Asosiy gipoteza (oldindan belgilangan): kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi {verdict}: "
+            f"F({ancova_result['df1']}, {ancova_result['df2']}) = {ancova_result['f']}, {_p_text(ancova_result['p'])}, "
+            f"qisman η² = {ancova_result['partial_eta2']} ({ancova_result['effect_label']})."
+        )
+        if ancova_result["slopes"] and not ancova_result["slopes"]["parallel"]:
+            lines.append("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling.")
     post = comparisons["post"]
     if post:
         exp, ctrl = cohorts["experimental"]["post"]["mean"], cohorts["control"]["post"]["mean"]
-        verdict = "statistik ahamiyatli farq bor" if post["significant"] else "statistik ahamiyatli farq yo'q"
+        significant = post.get("significant_holm", post["significant"])
+        verdict = "statistik ahamiyatli farq bor" if significant else "statistik ahamiyatli farq yo'q"
         lines.append(
-            f"Chiqish testida tajriba guruhi o'rtachasi {exp}%, nazorat guruhiniki {ctrl}%: {verdict} "
-            f"({post['label']}, {_p_text(post['p'])}, {post['effect']['name']} = {post['effect']['value']} — {post['effect']['label']} effekt)."
+            f"Ikkilamchi: chiqish testida tajriba guruhi o'rtachasi {exp}%, nazorat guruhiniki {ctrl}%: {verdict} "
+            f"({post['label']}, {_secondary_text(post)}, {post['effect']['name']} = {post['effect']['value']} — {post['effect']['label']} effekt)."
         )
     gain_exp, gain_ctrl = cohorts["experimental"]["gain"], cohorts["control"]["gain"]
     if gain_exp["class"] is not None and gain_ctrl["class"] is not None:
@@ -303,14 +476,29 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2):
             f"Hake o'sishi: tajriba guruhida ⟨g⟩ = {gain_exp['class']} ({gain_exp['level']}), "
             f"nazorat guruhida ⟨g⟩ = {gain_ctrl['class']} ({gain_ctrl['level']})."
         )
-    if ancova_result:
-        verdict = "ahamiyatli" if ancova_result["significant"] else "ahamiyatli emas"
+    full_pre = sum(cohorts[key]["gain"]["excluded_full_pre"] for key in COHORTS)
+    if full_pre:
+        lines.append(f"Kirish testida 100% olgan {full_pre} ta talaba individual Hake o'sishidan chiqarildi (g aniqlanmaydi).")
+    ceiling = [cohorts[key]["label"] for key in COHORTS if cohorts[key]["ceiling"]["warning"]]
+    if ceiling:
         lines.append(
-            f"Kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi {verdict}: F({ancova_result['df1']}, {ancova_result['df2']}) = "
-            f"{ancova_result['f']}, {_p_text(ancova_result['p'])}, qisman η² = {ancova_result['partial_eta2']} ({ancova_result['effect_label']})."
+            f"Shift effekti: {', '.join(ceiling)} guruhida chiqish testida maksimal ball olganlar 15% dan ko'p — test "
+            "kuchli talabalarni farqlay olmaydi, guruhlar farqi kam ko'rsatilishi mumkin."
         )
-        if ancova_result["slopes"] and not ancova_result["slopes"]["parallel"]:
-            lines.append("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling.")
+    if clustering:
+        if clustering["confounded"]:
+            lines.append(
+                "Dizayn cheklovi: kamida bitta shartda faqat bitta akademik guruh bor — AI ta'sirini guruh (o'qituvchi, jadval, "
+                "muhit) ta'siridan statistik ajratib bo'lmaydi. Xulosani kvazi-tajriba sifatida bering yoki har bir shartga "
+                "ikki va undan ko'p guruh oling."
+            )
+        elif clustering["icc"]:
+            icc = clustering["icc"]
+            lines.append(
+                f"Klasterlash: guruhlararo ICC = {icc['value']}, dizayn effekti {icc['design_effect']}, samarali talabalar soni "
+                f"≈ {icc['effective_n']}. ICC 0.05 dan katta bo'lsa, ko'p darajali model (guruh — tasodifiy effekt) bilan "
+                "tekshiring (qayta hisoblash skripti)."
+            )
     if power["achieved"] is not None:
         if power["achieved"] < power["target"]:
             lines.append(

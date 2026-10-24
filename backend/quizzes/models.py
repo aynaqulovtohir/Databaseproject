@@ -33,7 +33,14 @@ class Quiz(models.Model):
         PRACTICE = "practice", "Oddiy test"
         SURVEY = "survey", "So'rovnoma"
 
+    class Form(models.TextChoices):
+        A = "A", "A variant"
+        B = "B", "B variant"
+
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.PRACTICE)
+    # Parallel variant (kirish/chiqish/kechiktirilgan testlar uchun): kirish va chiqishga turli variant beriladi,
+    # shunda talaba savollarni eslab qolgani o'sishga aralashmaydi. Bo'sh — variantsiz
+    form = models.CharField("parallel variant", max_length=1, choices=Form.choices, blank=True, default="")
     title = models.CharField("sarlavha", max_length=200)
     description = models.TextField("izoh", blank=True)
     author = models.ForeignKey(

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
-import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, StatTest } from '@/lib/types'
+import type { Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, ParallelForms, StatTest } from '@/lib/types'
 
 const COHORTS: ExperimentCohort[] = ['experimental', 'control']
 
@@ -78,8 +78,11 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {pText(test.p)}
+        {test.p_holm !== undefined ? <span className="block text-xs text-muted-foreground">Xolm: {pText(test.p_holm)}</span> : null}
         <span className="block">
-          <Badge variant={test.significant ? 'default' : 'outline'}>{test.significant ? 'ahamiyatli' : 'ahamiyatsiz'}</Badge>
+          <Badge variant={(test.significant_holm ?? test.significant) ? 'default' : 'outline'}>
+            {(test.significant_holm ?? test.significant) ? 'ahamiyatli' : 'ahamiyatsiz'}
+          </Badge>
         </span>
       </TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">
@@ -87,6 +90,86 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
         {test.effect.label ? <span className="block text-xs text-muted-foreground">{test.effect.label}</span> : null}
       </TableCell>
     </TableRow>
+  )
+}
+
+/** Parallel variantlar (A/B): ekvivalentlik (TOST), ishonchlilik, juft savollar qiyinligi */
+function FormsBlock({ forms }: { forms: ParallelForms }) {
+  const gaps = forms.items.filter((item) => item.gap)
+  const repeated = forms.same_form + forms.without_form
+  return (
+    <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Parallel variantlar (A va B)</h3>
+      {forms.by_kind.length ? (
+        <div className="mt-2 grid gap-1 text-sm">
+          {forms.by_kind.map((row) => (
+            <div key={row.kind} className="tabular-nums">
+              <span className="font-medium">{row.label}:</span> A — {describe(row.A)}; B — {describe(row.B)}
+              {row.equivalence ? (
+                <span className="block text-xs text-muted-foreground">
+                  TOST (±{row.equivalence.margin} foiz punkti): farq {num(row.equivalence.diff, 1)}, 90% oraliq [
+                  {num(row.equivalence.ci[0], 1)}; {num(row.equivalence.ci[1], 1)}], p = {pText(row.equivalence.p)} —{' '}
+                  {row.equivalence.equivalent ? 'ekvivalent' : 'ekvivalentlik isbotlanmadi'}
+                </span>
+              ) : null}
+            </div>
+          ))}
+          {forms.reliability && forms.reliability.r !== null ? (
+            <div className="text-muted-foreground tabular-nums">
+              Ikkala variantni topshirganlar (n = {forms.reliability.n}): r = {num(forms.reliability.r, 3)}
+            </div>
+          ) : null}
+          {gaps.length ? (
+            <div className="text-muted-foreground">
+              Qiyinligi farq qiladigan juft savollar (kirish testi, &gt; {Math.round(100 * forms.item_gap)}%):{' '}
+              {gaps.map((item) => `${item.order} (A ${num(item.A)}, B ${num(item.B)})`).join(', ')}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">Variantli testlar yo'q: testlarga A yoki B variantni belgilang.</p>
+      )}
+      {repeated ? (
+        <p className="mt-2 text-xs text-destructive">
+          {repeated} ta talaba kirish va chiqish testida bir xil savollarni olgan: test qilish effekti xavfi.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/** Tashqi AI vositalari (so'rovnoma): nazorat guruhining ifloslanishi va sezgirlik tahlili */
+function ExternalAiBlock({ external }: { external: ExperimentAnalysis['external_ai'] }) {
+  const { sensitivity } = external
+  return (
+    <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Tashqi AI vositalari (yakuniy so'rovnoma)</h3>
+      {external.answered ? (
+        <div className="mt-2 grid gap-1 text-sm">
+          {COHORTS.map((key) => {
+            const cohort = external.cohorts[key]
+            if (!cohort) return null
+            return (
+              <div key={key} className="tabular-nums">
+                {key === 'experimental' ? 'Tajriba' : 'Nazorat'}: o'rtacha {describe(cohort)} · ko'p foydalanganlar (≥{' '}
+                {external.threshold}) {cohort.heavy}
+              </div>
+            )
+          })}
+          {sensitivity ? (
+            <div className="text-muted-foreground tabular-nums">
+              Sezgirlik tahlili ({sensitivity.excluded} ta chiqarilgan): ANCOVA F({sensitivity.df1}, {sensitivity.df2}) ={' '}
+              {num(sensitivity.f)}, p = {pText(sensitivity.p)}, qisman η² = {num(sensitivity.partial_eta2, 3)} —{' '}
+              {sensitivity.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">
+          So'rovnomada tashqi AI haqidagi savollarga javob yo'q (seed_survey bilan yaratilgan so'rovnomada ular bor).
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -118,6 +201,7 @@ export function ExperimentCard() {
 
         <div className="grid gap-2 rounded-xl border bg-muted/30 p-4">
           <h3 className="text-sm font-semibold">Xulosa</h3>
+          <p className="text-xs text-muted-foreground">Asosiy natija ko'rsatkichi (oldindan belgilangan): {data.primary.label}</p>
           <ul className="grid list-disc gap-1 pl-5 text-sm">
             {data.conclusions.map((line) => (
               <li key={line}>{line}</li>
@@ -147,8 +231,19 @@ export function ExperimentCard() {
                   <TableRow key={key} className="align-top">
                     <TableCell className="font-medium">
                       {cohort.label}
+                      <span className="block text-xs font-normal text-muted-foreground">{cohort.groups} ta akademik guruh</span>
                       {cohort.dropped ? (
                         <span className="block text-xs font-normal text-muted-foreground">{cohort.dropped} ta chiqish testini topshirmagan</span>
+                      ) : null}
+                      {data.quizzes.delayed && cohort.delayed_missing ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {cohort.delayed_missing} ta kechiktirilgan testni topshirmagan
+                        </span>
+                      ) : null}
+                      {cohort.ceiling.warning ? (
+                        <span className="block text-xs font-normal text-destructive">
+                          Shift effekti: {cohort.ceiling.students} ta talaba chiqish testida 100%
+                        </span>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{describe(cohort.pre)}</TableCell>
@@ -157,6 +252,11 @@ export function ExperimentCard() {
                     <TableCell className="text-right tabular-nums">
                       {num(cohort.gain.class)}
                       {cohort.gain.level ? <span className="block text-xs text-muted-foreground">{cohort.gain.level}</span> : null}
+                      {cohort.gain.excluded_full_pre ? (
+                        <span className="block text-xs text-muted-foreground" title="Kirish testida 100%: individual g aniqlanmaydi">
+                          {cohort.gain.excluded_full_pre} ta chiqarilgan
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums">
                       {cohort.pre_post ? (
@@ -178,7 +278,7 @@ export function ExperimentCard() {
         </div>
 
         <div className="grid gap-2">
-          <h3 className="text-sm font-semibold">Tajriba va nazorat guruhlarini solishtirish (α = {data.alpha})</h3>
+          <h3 className="text-sm font-semibold">Ikkilamchi solishtiruvlar (α = {data.alpha}, Xolm tuzatishi bilan)</h3>
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,7 +300,10 @@ export function ExperimentCard() {
 
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-sm font-semibold">ANCOVA: chiqish ~ guruh + kirish</h3>
+            <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              ANCOVA: chiqish ~ guruh + kirish
+              {ancova?.primary ? <Badge>asosiy gipoteza</Badge> : null}
+            </h3>
             {ancova ? (
               <div className="mt-2 grid gap-1 text-sm">
                 <div className="tabular-nums">
@@ -233,6 +336,30 @@ export function ExperimentCard() {
                 0.5) uchun {power.required_per_group_medium}
               </div>
               {power.approximate ? <div className="text-xs text-muted-foreground">Normal yaqinlashish: aniq qiymatdan ±3% farq qilishi mumkin.</div> : null}
+            </div>
+          </div>
+          <FormsBlock forms={data.forms} />
+          <ExternalAiBlock external={data.external_ai} />
+          <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+            <h3 className="text-sm font-semibold">Klasterlash: akademik guruhlar ta'siri</h3>
+            <div className="mt-2 grid gap-1 text-sm">
+              <div className="tabular-nums">
+                Guruhlar soni: tajriba {data.clustering.groups.experimental}, nazorat {data.clustering.groups.control}
+              </div>
+              {data.clustering.confounded ? (
+                <div className="text-muted-foreground">
+                  Kamida bitta shartda bitta guruh: AI ta'sirini guruh ta'siridan ajratib bo'lmaydi (kvazi-tajriba). Har bir shartga
+                  ikki va undan ko'p guruh oling.
+                </div>
+              ) : data.clustering.icc ? (
+                <div className="text-muted-foreground tabular-nums">
+                  ICC(1) = {num(data.clustering.icc.value, 3)} (F = {num(data.clustering.icc.f)}, p = {pText(data.clustering.icc.p)}) ·
+                  dizayn effekti {num(data.clustering.icc.design_effect)} · samarali talabalar soni ≈{' '}
+                  {num(data.clustering.icc.effective_n, 1)}
+                </div>
+              ) : (
+                <div className="text-muted-foreground">Ma'lumot kam.</div>
+              )}
             </div>
           </div>
         </div>

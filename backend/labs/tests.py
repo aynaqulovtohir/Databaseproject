@@ -711,6 +711,11 @@ class ResearchExportTests(BaseTestCase):
         second.ai_advice = "maslahat"
         second.ai_hint_level = 2
         second.save(update_fields=["ai_advice", "ai_hint_level"])
+        from types import SimpleNamespace
+
+        second.record_ai_model(SimpleNamespace(model="gemini-2.5-flash"))
+        second.record_ai_model(SimpleNamespace(model="gemini-2.5-flash"))  # takrorlanmaydi
+        second.record_ai_model(SimpleNamespace(model=object()))  # model nomi matn emas — yozilmaydi
         self.client.credentials()
 
     def export(self, user, **params):
@@ -752,7 +757,7 @@ class ResearchExportTests(BaseTestCase):
             set(files),
             {
                 "urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv",
-                "ozaro_baholash.csv", "ai_sifati.csv", "kompetentlik.csv", "laboratoriyalar_tahlili.csv", "testlar_tahlili.csv", "ekspert_baholash.csv", "README.txt",
+                "ozaro_baholash.csv", "ai_sifati.csv", "ai_modellari.csv", "kompetentlik.csv", "laboratoriyalar_tahlili.csv", "testlar_tahlili.csv", "ekspert_baholash.csv", "README.txt",
                 "er_jarayon.csv", "er_jarayon_hodisalari.csv", "er_jarayon.xes",
             },
         )
@@ -777,7 +782,21 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(rows[1]["xato_turlari"], "natija_ustunlari_soni")
         self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
         self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
+        self.assertEqual([row["ai_modellari"] for row in rows], ["", "gemini-2.5-flash", ""])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)
+
+    def test_ai_model_timeline(self):
+        from ai.models import AIUsage
+
+        AIUsage.objects.create(purpose="lab_advice", model_name="gemini-2.5-flash")
+        AIUsage.objects.create(purpose="lab_advice", model_name="gemini-2.5-flash", ok=False, error="x")
+        AIUsage.objects.create(purpose="lab_grade", model_name="gemini-2.5-pro")
+        _, (_, tables) = self.export(self.teacher_a)
+        rows = [(row["maqsad"], row["model"], row["sorovlar"], row["xatolar"]) for row in tables["ai_modellari.csv"]]
+        self.assertEqual(rows, [("lab_advice", "gemini-2.5-flash", "2", "1"), ("lab_grade", "gemini-2.5-pro", "1", "0")])
+        self.assertRegex(tables["ai_modellari.csv"][0]["sana"], r"^\d{4}-\d{2}-\d{2}$")
 
     @override_settings(RESEARCH_CONSENT_REQUIRED=False)  # bu test eksport mazmunini tekshiradi, rozilik — users/tests_consent.py
 

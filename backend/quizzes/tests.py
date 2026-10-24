@@ -291,6 +291,7 @@ class QuizExportTests(QuizTestCase):
         rows = {row["talaba"]: row for row in read("testlar.csv")}
         mine = rows[pseudonym(self.student.pk)]
         self.assertEqual((mine["test_turi"], mine["holat"], mine["ball"], mine["foiz"]), ("kirish", "topshirgan", "2.0", "33.3"))
+        self.assertEqual(mine["variant"], "")
         self.assertEqual(rows[pseudonym(self.student2.pk)]["holat"], "boshlamagan")
         answers = read("test_javoblari.csv")
         self.assertEqual([(row["savol_raqami"], row["togri"]) for row in answers], [("1", "1"), ("2", "0")])
@@ -305,25 +306,49 @@ class QuizExportTests(QuizTestCase):
 
 
 class EntryTestCommandTests(QuizTestCase):
-    def test_question_bank_is_valid_and_pre_post_are_identical(self):
+    def test_question_bank_is_valid_and_pre_post_are_parallel(self):
         from io import StringIO
 
         from django.core.management import call_command
 
-        from .question_bank import QUESTIONS
+        from .question_bank import QUESTIONS, QUESTIONS_B
 
         call_command("seed_entry_test", author="q_teacher", group=["Q-guruh"], stdout=StringIO())
         call_command("seed_entry_test", author="q_teacher", group=["Q-guruh"], stdout=StringIO())  # takrorlanmaydi
         pre, post = Quiz.objects.get(kind="pre"), Quiz.objects.get(kind="post")
         self.assertEqual(Quiz.objects.count(), 2)
+        self.assertEqual((pre.form, post.form), ("A", "B"))
         self.assertEqual(pre.questions.count(), len(QUESTIONS))
+        self.assertEqual(post.questions.count(), len(QUESTIONS_B))
         self.assertEqual(pre.time_limit_minutes, 30)
         self.assertFalse(pre.show_answers)
-        signature = lambda quiz: [  # noqa: E731
-            (q.text, q.kind, q.points, [(c.text, c.is_correct) for c in q.choices.all()]) for q in quiz.questions.all()
+        # Juft savollar: mavzu, turi, variantlar va to'g'ri javoblar soni bir xil, matni boshqa
+        shape = lambda quiz: [  # noqa: E731
+            (q.kind, q.points, q.choices.count(), q.choices.filter(is_correct=True).count()) for q in quiz.questions.all()
         ]
-        self.assertEqual(signature(pre), signature(post))
+        self.assertEqual(shape(pre), shape(post))
+        self.assertFalse({q.text for q in pre.questions.all()} & {q.text for q in post.questions.all()})
+        self.assertEqual([q["topic"] for q in QUESTIONS], [q["topic"] for q in QUESTIONS_B])
         self.assertTrue(pre.groups.filter(pk=self.group.pk).exists())
+        # Almashlab berish: B → A
+        call_command("seed_entry_test", author="q_teacher", group=["Q-guruh"], form="B", stdout=StringIO())
+        self.assertEqual(sorted(Quiz.objects.values_list("kind", "form")), [("post", "A"), ("post", "B"), ("pre", "A"), ("pre", "B")])
+
+    def test_form_only_for_research_tests(self):
+        self.auth_as(self.teacher)
+        payload = {
+            "kind": "practice",
+            "form": "A",
+            "title": "Oddiy",
+            "groups": [self.group.pk],
+            "questions": [{"text": "?", "kind": "single", "choices": [{"text": "a", "is_correct": True}, {"text": "b"}]}],
+        }
+        response = self.client.post("/api/quizzes/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("form", response.data)
+        response = self.client.post("/api/quizzes/", {**payload, "kind": "pre"}, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["form"], "A")
 
     def test_markdown_has_answer_key(self):
         from io import StringIO
@@ -333,6 +358,9 @@ class EntryTestCommandTests(QuizTestCase):
         output = StringIO()
         call_command("seed_entry_test", markdown=True, stdout=output)
         self.assertIn("## Javoblar kaliti", output.getvalue())
+        output = StringIO()
+        call_command("seed_entry_test", markdown=True, form="B", stdout=output)
+        self.assertIn("(B variant)", output.getvalue())
         self.assertEqual(Quiz.objects.count(), 0)
 
 
@@ -494,4 +522,8 @@ class SurveyTests(QuizTestCase):
         short = surveys.get(groups=control)
         self.assertEqual(full.questions.count(), len(STATEMENTS))
         self.assertEqual(short.questions.count(), sum(1 for item in STATEMENTS if not item["ai"]))
-        self.assertFalse(short.questions.filter(text__icontains="AI").exists())
+        # Nazorat guruhida platforma AI si haqida savol yo'q, faqat tashqi AI vositalari haqida (hamma guruhga)
+        from .survey_bank import EXTERNAL_AI_TEXTS
+
+        self.assertFalse(short.questions.exclude(text__in=EXTERNAL_AI_TEXTS).filter(text__icontains="AI").exists())
+        self.assertEqual(short.questions.filter(text__in=EXTERNAL_AI_TEXTS).count(), len(EXTERNAL_AI_TEXTS))
