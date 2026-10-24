@@ -126,6 +126,7 @@ def generate_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
         ],
         output_config={"effort": "low"},
     )
+    attempt.record_ai_model(response)
     return extract_text(response).strip()
 
 
@@ -192,6 +193,7 @@ def ai_grade(attempt):
         ],
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": GRADE_JSON_SCHEMA}},
     )
+    attempt.record_ai_model(response)
     try:
         data = json.loads(extract_text(response))
         score, comment = int(data["score"]), str(data["comment"]).strip()
@@ -306,6 +308,7 @@ def generate_er_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
         messages=[{"role": "user", "content": _er_message(attempt, check_result) + level_block(level, previous)}],
         output_config={"effort": "low"},
     )
+    attempt.record_ai_model(response)
     return extract_text(response).strip()
 
 
@@ -351,6 +354,7 @@ def ai_grade_diagram(attempt, ratio, changes):
         messages=[{"role": "user", "content": _er_message(attempt, check_result)}],
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": ER_GRADE_JSON_SCHEMA}},
     )
+    attempt.record_ai_model(response)
     try:
         data = json.loads(extract_text(response))
         score = int(data["score"])
@@ -410,4 +414,5 @@ def generate_norm_advice(attempt, level=MAX_HINT_LEVEL, previous=()):
         messages=[{"role": "user", "content": content + level_block(level, previous)}],
         output_config={"effort": "low"},
     )
+    attempt.record_ai_model(response)
     return extract_text(response).strip()

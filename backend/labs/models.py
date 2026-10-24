@@ -195,6 +195,9 @@ class LabAttempt(models.Model):
     ai_hint_level = models.PositiveSmallIntegerField("olingan maslahat darajasi", default=0)
     # AI maslahati so'ralgan vaqt (kunlik limitni hisoblash uchun)
     ai_requested_at = models.DateTimeField("AI maslahati so'ralgan vaqti", null=True, blank=True)
+    # Shu urinish uchun maslahat yoki baho bergan AI modellari (aniq versiya nomi; zaxira modelga o'tilgan bo'lsa,
+    # o'sha model): tadqiqot natijasini qaysi model bilan olinganini ko'rsatish va takrorlash uchun
+    ai_models = models.JSONField("AI modellari", default=list, blank=True)
     # True - talaba bu urinishni baholashga topshirgan (oddiy ishga tushirish emas)
     is_submission = models.BooleanField("baholashga topshirilgan", default=False)
     # Urinish vaqtida talabaning guruhida AI yoqilganmi (tajriba tahlili uchun saqlanadi)
@@ -219,6 +222,16 @@ class LabAttempt(models.Model):
         verbose_name_plural = "laboratoriya urinishlari"
         ordering = ["-id"]
         indexes = [models.Index(fields=["lab", "student"])]
+
+    def record_ai_model(self, response):
+        """AI javobini bergan model nomini urinishga yozadi (takrorlanmaydi; saqlash alohida so'rov bilan,
+        chaqiruvchi urinishni qaysi maydonlar bilan saqlashidan qat'i nazar)."""
+        name = getattr(response, "model", "")
+        if not isinstance(name, str) or not name or not self.pk or name[:100] in self.ai_models:
+            return
+        name = name[:100]
+        self.ai_models = [*self.ai_models, name]
+        LabAttempt.objects.filter(pk=self.pk).update(ai_models=self.ai_models)
 
     def __str__(self):
         return f"{self.lab} / {self.student} / {"to'g'ri" if self.is_correct else "xato"}"

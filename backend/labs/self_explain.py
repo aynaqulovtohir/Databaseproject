@@ -77,6 +77,7 @@ def evaluate_explanation(attempt, explanation):
         ],
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
     )
+    attempt.record_ai_model(response)
     try:
         data = json.loads(extract_text(response))
         verdict, feedback = str(data["verdict"]), str(data["feedback"]).strip()
