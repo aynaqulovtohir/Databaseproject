@@ -160,6 +160,30 @@ def chi_square(table):
     }
 
 
+def fisher_exact(table):
+    """Fisherning aniq testi, 2 × 2 jadval, ikki tomonlama: kuzatilganidan ehtimolligi katta bo'lmagan barcha
+    jadvallar (chegaralar saqlangan holda) ehtimolliklari yig'indisi (scipy.stats.fisher_exact bilan bir xil).
+
+    χ² ning kutilgan sonlari kichik bo'lganda (MIN_EXPECTED dan kam) ishlatiladi. Bo'sh qator yoki ustun — None.
+    """
+    (a, b), (c, d) = table
+    row1, col1, total = a + b, a + c, a + b + c + d
+    if not row1 or not c + d or not col1 or not b + d:
+        return None
+
+    def log_p(x):
+        return (
+            math.lgamma(row1 + 1) - math.lgamma(x + 1) - math.lgamma(row1 - x + 1)
+            + math.lgamma(total - row1 + 1) - math.lgamma(col1 - x + 1) - math.lgamma(total - row1 - col1 + x + 1)
+            - math.lgamma(total + 1) + math.lgamma(col1 + 1) + math.lgamma(total - col1 + 1)
+        )
+
+    observed = log_p(a)
+    support = range(max(0, row1 + col1 - total), min(row1, col1) + 1)
+    p = sum(math.exp(log_p(x)) for x in support if log_p(x) <= observed + 1e-7)
+    return {"p": min(1.0, p)}
+
+
 def welch_t_test(a, b):
     """Ikki mustaqil tanlanma: Uelch t-testi va effekt hajmi (Koen d, Xedjes g; birlashgan dispersiya bilan)."""
     if len(a) < 2 or len(b) < 2:

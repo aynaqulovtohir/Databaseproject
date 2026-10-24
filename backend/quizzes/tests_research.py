@@ -13,7 +13,7 @@ from labs.psychometrics import cronbach_alpha
 from users.consent import record_decision
 from users.models import StudentGroup, User
 
-from .experiment import analyse as analyse_experiment, compare_independent, hake_level
+from .experiment import analyse as analyse_experiment, attrition_stage, compare_independent, hake_level
 from .models import LIKERT_SCALE, Choice, Question, Quiz, QuizAttempt
 from .psychometrics import analyse_quiz
 
@@ -65,6 +65,19 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertAlmostEqual(result["p"], 0.0003643955882313509, places=10)
         self.assertAlmostEqual(result["design_effect"], 1 + 3 * result["icc"], places=10)
         self.assertIsNone(stats.icc_oneway([[1, 2, 3]]))
+
+    def test_fisher_exact(self):
+        # scipy.stats.fisher_exact (ikki tomonlama)
+        for table, expected in (
+            ([[6, 8], [1, 8]], 0.1759566318726367),
+            ([[3, 17], [9, 11]], 0.08235877701951116),
+            ([[12, 5], [2, 10]], 0.007775059838501802),
+            ([[1, 9], [11, 3]], 0.0027594561852200836),
+        ):
+            self.assertAlmostEqual(stats.fisher_exact(table)["p"], expected, places=10)
+        self.assertAlmostEqual(stats.fisher_exact([[0, 8], [1, 8]])["p"], 1.0, places=10)
+        self.assertIsNone(stats.fisher_exact([[0, 0], [1, 8]]))
+        self.assertIsNone(stats.fisher_exact([[3, 0], [1, 0]]))
 
     def test_hake_levels(self):
         self.assertEqual([hake_level(g) for g in (0.1, 0.3, 0.69, 0.7)], ["past", "o'rta", "o'rta", "yuqori"])
@@ -357,6 +370,60 @@ class ExperimentTests(ResearchBase):
 
         scale = analyse_survey(survey)["scales"][0]
         self.assertEqual([item["text"] for item in scale["items"]], ["Laboratoriya foydali bo'ldi.", "Topshiriqlar tushunarli edi."])
+
+    def test_attrition(self):
+        """Faqat bitta nazorat talabasi tashlab ketgan: kutilgan sonlar kichik — Fisher, farq yo'q."""
+        attrition = self.result()["attrition"]
+        stage = attrition["post"]
+        self.assertEqual(
+            [(stage["cohorts"][key]["started"], stage["cohorts"][key]["lost"]) for key in ("experimental", "control")], [(8, 0), (9, 1)]
+        )
+        self.assertEqual((stage["overall"], stage["level"], stage["differential"]), (round(1 / 17, 3), "o'rta", round(-1 / 9, 3)))
+        self.assertEqual((stage["test"]["name"], stage["test"]["p"], stage["test"]["significant"]), ("fisher", 1.0, False))
+        self.assertIsNone(stage["baseline"])  # tashlab ketgan bitta — solishtirib bo'lmaydi
+        self.assertIsNone(attrition["delayed"])
+        self.assertIn("Tashlab ketish (kirish → chiqish)", " ".join(self.result()["conclusions"]))
+
+    def test_differential_attrition(self):
+        """Tajriba guruhidan kuchsiz talabalar tashlab ketgan: guruhlar farqi va boshlang'ich farq aniqlanadi."""
+        for index, score in enumerate([10, 12, 15, 8, 14, 11, 9, 13, 16, 7]):
+            self.submit(self.pre, self.make_student(f"e_left{index}", self.ai_group), {}, score=score, max_score=100)
+        delayed = Quiz.objects.create(kind=Quiz.Kind.DELAYED, title="Kechiktirilgan", author=self.teacher)
+        delayed.groups.add(self.ai_group, self.control_group)
+        for username in ("ea0", "ea1", "ec0"):
+            self.submit(delayed, User.objects.get(username=username), {}, score=50, max_score=100)
+        result = self.result()
+        stage = result["attrition"]["post"]
+        self.assertEqual(stage["cohorts"]["experimental"]["lost"], 10)
+        self.assertEqual(stage["level"], "yuqori")
+        # scipy.stats.fisher_exact([[10, 8], [1, 8]])
+        self.assertEqual(stage["test"]["name"], "fisher")
+        self.assertAlmostEqual(stage["test"]["p"], 0.04167106730035791, places=4)
+        self.assertTrue(stage["test"]["significant"])
+        self.assertEqual(stage["baseline"]["test"], "mann_whitney")
+        self.assertTrue(stage["baseline"]["significant"])
+        later = result["attrition"]["delayed"]
+        self.assertEqual([later["cohorts"][key]["lost"] for key in ("experimental", "control")], [6, 7])
+        # scipy.stats.fisher_exact([[6, 2], [7, 1]])
+        self.assertEqual((later["test"]["name"], later["test"]["p"]), ("fisher", 1.0))
+        text = " ".join(result["conclusions"])
+        self.assertIn("differensial tashlab ketish", text)
+        self.assertIn("Tashlab ketganlar kirish testida", text)
+        self.assertIn("Kechiktirilgan testgacha tashlab ketish", text)
+
+    def test_attrition_chi_square(self):
+        table = [[12, 28], [3, 37]]
+        started = {
+            "experimental": [{"pre": 50, **({} if i < 12 else {"post": 60})} for i in range(40)],
+            "control": [{"pre": 50, **({} if i < 3 else {"post": 60})} for i in range(40)],
+        }
+        stage = attrition_stage(started, "post", "pre")
+        self.assertEqual([[stage["cohorts"][key]["lost"], stage["cohorts"][key]["started"] - stage["cohorts"][key]["lost"]] for key in ("experimental", "control")], table)
+        # scipy.stats.chi2_contingency(table, correction=False)
+        self.assertEqual(stage["test"]["name"], "chi2")
+        self.assertAlmostEqual(stage["test"]["chi2"], 6.646, places=3)
+        self.assertAlmostEqual(stage["test"]["p"], 0.0099, places=4)
+        self.assertEqual(stage["differential"], 0.225)
 
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
