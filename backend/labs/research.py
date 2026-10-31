@@ -16,13 +16,15 @@ import zipfile
 from collections import defaultdict
 
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 
+from ai.models import ChatMessage
 from users.consent import consent_required, participant_ids, research_participants
 from users.models import User
 
 from .checker import ERROR_TIPS
-from .models import AIOutputReview, BlindReview, ErSnapshot, Lab, LabAttempt, LabGrade, PeerReview
+from .models import AIAction, AIOutputReview, BlindReview, ErSnapshot, Lab, LabAttempt, LabGrade, PeerReview
 from .process import analyse, build_points, metrics, to_xes
 from .psychometrics import MIN_STUDENTS as MIN_ANALYSIS_STUDENTS
 
@@ -213,6 +215,9 @@ ATTEMPT_COLUMNS = [
 
 AI_MODEL_COLUMNS = ["sana", "maqsad", "model", "sorovlar", "xatolar"]
 
+AI_USAGE_COLUMNS = ["talaba", "guruh", "ai_yoqilgan", "vaqt", "manba", "turi", "miqdor"]
+AI_SOURCE_LABELS = {"hints": "maslahat", "actions": "sorov", "chat": "chat"}
+
 SUMMARY_COLUMNS = [
     "talaba",
     "guruh",
@@ -352,6 +357,18 @@ sana                        so'rov kuni ({timezone})
 maqsad                      so'rov maqsadi (masalan, lab_advice — SQL maslahati, lab_grade — SQL baholash)
 model                       javob bergan model nomi
 sorovlar, xatolar           so'rovlar soni va ulardan xato bilan tugaganlari
+
+ai_foydalanish.csv — talabalarning platformadagi AI murojaatlari (har bir murojaat — bitta qator; matnlar kirmaydi)
+----------------------------------------------------------------------------------------
+Aralashuvning bajarilishini qayta hisoblash uchun. Doza — talabaning kirish testi topshirilgandan chiqish testi
+topshirilgunicha bo'lgan qatorlardagi miqdor yig'indisi (vaqtlarni testlar.csv dagi «topshirilgan» bilan solishtiring).
+AI baholashi kirmaydi: uni talaba so'ramaydi. Hech qachon murojaat qilmagan talabaning qatori yo'q.
+talaba, guruh, ai_yoqilgan  urinishlar.csv dagi kabi
+vaqt                        murojaat vaqti ({timezone})
+manba                       maslahat — laboratoriya maslahati, sorov — boshqa AI so'rovi, chat — topshiriq bo'yicha chat savoli
+turi                        sorov turi (lab_chat — murabbiy, plan_explain — EXPLAIN tushuntirishi, viva — loyiha himoyasi va h.k.);
+                            maslahat va chat uchun manba bilan bir xil
+miqdor                      maslahat uchun olingan daraja (1-3, darajalargacha bo'lgan maslahat 3), qolganlari uchun 1
 
 ai_sifati.csv — o'qituvchilarning AI matnlariga bergan baholari
 ----------------------------------------------------------------
@@ -542,6 +559,22 @@ def hint_level(attempt):
     if attempt.ai_hint_level:
         return attempt.ai_hint_level
     return 3 if attempt.ai_advice else 0
+
+
+def ai_events(student_ids):
+    """Talabalarning AI murojaatlari: (talaba_id, vaqt, manba, turi, miqdor). Matnlar natijaga chiqmaydi.
+
+    Tahlil (quizzes/fidelity.py) va eksport (ai_foydalanish.csv) shu ro'yxatdan hisoblanadi: natijani qayta tekshirish mumkin.
+    """
+    student_ids = list(student_ids)
+    hints = LabAttempt.objects.filter(Q(ai_hint_level__gt=0) | ~Q(ai_advice=""), student__in=student_ids)
+    for attempt in hints.only("student_id", "created_at", "ai_requested_at", "ai_hint_level", "ai_advice"):
+        yield attempt.student_id, attempt.ai_requested_at or attempt.created_at, "hints", AI_SOURCE_LABELS["hints"], hint_level(attempt)
+    for student_id, moment, kind in AIAction.objects.filter(student__in=student_ids).values_list("student_id", "created_at", "kind"):
+        yield student_id, moment, "actions", kind, 1
+    questions = ChatMessage.objects.filter(student__in=student_ids, role=ChatMessage.Role.USER)
+    for student_id, moment in questions.values_list("student_id", "created_at"):
+        yield student_id, moment, "chat", AI_SOURCE_LABELS["chat"], 1
 
 
 def _local(moment):
@@ -870,6 +903,23 @@ def _ai_model_rows():
     return [[row["day"].isoformat(), row["purpose"], row["model_name"], row["total"], row["errors"]] for row in rows]
 
 
+def _ai_usage_rows(groups):
+    """ai_foydalanish.csv: faqat ko'rinadigan guruhlarning tadqiqotga kiradigan talabalari (tahlildagi kabi)."""
+    students = {
+        student.pk: student
+        for student in research_participants(
+            User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups)
+        ).select_related("group")
+    }
+    rows = []
+    for student_id, moment, source, kind, amount in sorted(ai_events(students), key=lambda event: (event[1], pseudonym(event[0]))):
+        student = students[student_id]
+        rows.append(
+            [pseudonym(student_id), student.group.name, _group_ai(student), _local(moment), AI_SOURCE_LABELS[source], kind, amount]
+        )
+    return rows
+
+
 def _blank(value):
     return "" if value is None else value
 
@@ -1111,6 +1161,7 @@ def build_export(labs, quizzes=None, groups=None):
             zip_file.writestr("ekspert_baholash.csv", _csv(EXPERT_COLUMNS, _expert_rows(quizzes)))
         if groups is not None:
             zip_file.writestr("kompetentlik.csv", _csv(COMPETENCE_COLUMNS, _competence_rows(groups, allowed)))
+            zip_file.writestr("ai_foydalanish.csv", _csv(AI_USAGE_COLUMNS, _ai_usage_rows(groups)))
             zip_file.writestr("laboratoriyalar_tahlili.csv", _csv(LAB_ANALYSIS_COLUMNS, _lab_analysis_rows(labs_queryset, groups)))
         zip_file.writestr("README.txt", readme)
     return archive.getvalue()

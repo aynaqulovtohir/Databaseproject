@@ -17,12 +17,9 @@ mumkin: unda "effekt yo'q" degan xulosa AI haqida emas, foydalanilmagani haqida 
 from collections import defaultdict
 from statistics import median
 
-from django.db.models import Q
-
-from ai.models import ChatMessage
-from competence.stats import ALPHA, describe, linear_residuals, spearman
-from labs.models import AIAction, LabAttempt
-from labs.research import hint_level
+from competence.stats import ALPHA, linear_residuals, spearman
+from labs.models import LabAttempt
+from labs.research import ai_events
 
 from .models import Quiz, QuizAttempt
 
@@ -53,22 +50,10 @@ def exposure_windows(quizzes, student_ids):
 def ai_usage(windows):
     """{talaba_id: {manba: son}} — faqat o'z oynasi ichidagi AI murojaatlari."""
     usage = {sid: dict.fromkeys(SOURCES, 0) for sid in windows}
-
-    def inside(student_id, moment):
+    for student_id, moment, source, _, amount in ai_events(windows):
         start, end = windows[student_id]
-        return start <= moment <= end
-
-    hints = LabAttempt.objects.filter(Q(ai_hint_level__gt=0) | ~Q(ai_advice=""), student__in=windows)
-    for attempt in hints.only("student_id", "created_at", "ai_requested_at", "ai_hint_level", "ai_advice"):
-        if inside(attempt.student_id, attempt.ai_requested_at or attempt.created_at):
-            usage[attempt.student_id]["hints"] += hint_level(attempt)
-    for student_id, moment in AIAction.objects.filter(student__in=windows).values_list("student_id", "created_at"):
-        if inside(student_id, moment):
-            usage[student_id]["actions"] += 1
-    questions = ChatMessage.objects.filter(student__in=windows, role=ChatMessage.Role.USER)
-    for student_id, moment in questions.values_list("student_id", "created_at"):
-        if inside(student_id, moment):
-            usage[student_id]["chat"] += 1
+        if start <= moment <= end:
+            usage[student_id][source] += amount
     return usage
 
 

@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -757,7 +758,7 @@ class ResearchExportTests(BaseTestCase):
             set(files),
             {
                 "urinishlar.csv", "xulosa.csv", "baholash_mosligi.csv", "testlar.csv", "test_javoblari.csv",
-                "ozaro_baholash.csv", "ai_sifati.csv", "ai_modellari.csv", "kompetentlik.csv", "laboratoriyalar_tahlili.csv", "testlar_tahlili.csv", "ekspert_baholash.csv", "README.txt",
+                "ozaro_baholash.csv", "ai_sifati.csv", "ai_modellari.csv", "ai_foydalanish.csv", "kompetentlik.csv", "laboratoriyalar_tahlili.csv", "testlar_tahlili.csv", "ekspert_baholash.csv", "README.txt",
                 "er_jarayon.csv", "er_jarayon_hodisalari.csv", "er_jarayon.xes",
             },
         )
@@ -784,6 +785,41 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
         self.assertEqual([row["ai_modellari"] for row in rows], ["", "gemini-2.5-flash", ""])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
+
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)
+
+    def test_ai_usage_export(self):
+        from ai.models import ChatMessage
+        from learning.models import Assignment
+        from labs.models import AIAction
+
+        now = timezone.now()
+        AIAction.objects.create(student=self.student_a1, kind=AIAction.Kind.VIVA)
+        AIAction.objects.create(student=self.student_b, kind=AIAction.Kind.LAB_CHAT)  # boshqa o'qituvchining guruhi
+        assignment = Assignment.objects.create(title="A", description="A", author=self.teacher_a, deadline=now)
+        ChatMessage.objects.create(assignment=assignment, student=self.student_a1, role="user", content="MAXFIY-SAVOL")
+        ChatMessage.objects.create(assignment=assignment, student=self.student_a1, role="assistant", content="MAXFIY-JAVOB")
+        response, (files, tables) = self.export(self.teacher_a)
+        rows = tables["ai_foydalanish.csv"]
+        self.assertEqual(
+            sorted((row["manba"], row["turi"], row["miqdor"]) for row in rows),
+            [("chat", "chat", "1"), ("maslahat", "maslahat", "2"), ("sorov", "viva", "1")],
+        )
+        self.assertEqual({row["guruh"] for row in rows}, {"A-guruh"})
+        self.assertEqual({row["talaba"] for row in rows}, {row["talaba"] for row in tables["urinishlar.csv"]})
+        self.assertNotIn("MAXFIY", "".join(files.values()))
+        # Admin hammasini ko'radi
+        _, (_, everything) = self.export(self.admin)
+        self.assertEqual(len(everything["ai_foydalanish.csv"]), 4)
+
+    def test_ai_usage_export_respects_consent(self):
+        from labs.models import AIAction
+
+        AIAction.objects.create(student=self.student_a1, kind=AIAction.Kind.VIVA)
+        with override_settings(RESEARCH_CONSENT_REQUIRED=True):
+            User.objects.filter(pk=self.student_a1.pk).update(research_consent=False)
+            _, (_, tables) = self.export(self.admin)
+        self.assertEqual(tables["ai_foydalanish.csv"], [])
 
     @override_settings(RESEARCH_CONSENT_REQUIRED=False)
 

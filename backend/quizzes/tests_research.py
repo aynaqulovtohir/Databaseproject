@@ -2,7 +2,11 @@
 
 Kutilgan qiymatlar scipy.stats va numpy (eng kichik kvadratlar) bilan hisoblangan.
 """
+import csv
+import io
 import json
+import zipfile
+from collections import defaultdict
 from datetime import timedelta
 
 from django.core.cache import cache
@@ -569,6 +573,32 @@ class ExperimentTests(ResearchBase):
         self.assertIn("kuzatuv natijasi, sabab emas", text)
         self.assertIn("per-protocol", text)
         self.assertLess(text.index("Asosiy gipoteza"), text.index("Aralashuvning bajarilishi"))
+
+    def test_fidelity_can_be_recomputed_from_export(self):
+        # Eksportdagi ai_foydalanish.csv va testlar.csv dan doza qayta hisoblansa, tahlil bilan bir xil chiqadi
+        self.expose()
+        self.client.force_authenticate(self.teacher)
+        archive = zipfile.ZipFile(io.BytesIO(self.client.get("/api/labs/research-export/").content))
+
+        def table(name):
+            return list(csv.DictReader(io.StringIO(archive.read(name).decode("utf-8-sig")), delimiter=";"))
+
+        windows = defaultdict(dict)
+        for row in table("testlar.csv"):
+            if row["topshirilgan"] and row["test_turi"] in ("kirish", "chiqish"):
+                windows[row["talaba"]][row["test_turi"]] = row["topshirilgan"]
+        doses = defaultdict(int)
+        for row in table("ai_foydalanish.csv"):
+            window = windows[row["talaba"]]
+            if window["kirish"] <= row["vaqt"] <= window["chiqish"]:
+                doses[row["talaba"]] += int(row["miqdor"])
+        cohorts = {row["talaba"]: row["ai_yoqilgan"] for row in table("testlar.csv")}
+        exported = sorted(dose for student, dose in doses.items() if dose and cohorts[student] == "1")
+        self.assertEqual(exported, [1, 1, 2, 3, 4, 5])
+        fidelity = self.result()["fidelity"]["cohorts"]
+        self.assertEqual(len(exported), fidelity["experimental"]["users"])
+        self.assertEqual(sum(exported), sum(fidelity["experimental"]["sources"].values()))
+        self.assertEqual(sum(1 for student, dose in doses.items() if dose and cohorts[student] == "0"), fidelity["control"]["users"])
 
     def test_fidelity_high_uptake_and_no_usage(self):
         result = self.result()
