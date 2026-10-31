@@ -1437,6 +1437,35 @@ export interface ExperimentAnalysis {
     sensitivity: { excluded: number; f: number; df1: number; df2: number; p: number; significant: boolean; partial_eta2: number } | null
   }
   attrition: { post: AttritionStage; delayed: AttritionStage | null }
+  /** AI dan haqiqatda foydalanish: kirish va chiqish testlari orasidagi murojaatlar */
+  fidelity: {
+    target: number
+    cohorts: Record<
+      ExperimentCohort,
+      {
+        label: string
+        students: number
+        no_window: number
+        users: number
+        uptake: number | null
+        dose: Descriptive & { median: number | null }
+        sources: { hints: number; actions: number; chat: number }
+        changed_condition: number
+      }
+    >
+    dose_response: { n: number; rho: number; ci: [number, number] | null; p: number; significant: boolean } | null
+    per_protocol: {
+      excluded: number
+      f: number
+      df1: number
+      df2: number
+      p: number
+      significant: boolean
+      partial_eta2: number
+      adjusted_diff: number
+      adjusted_diff_ci: [number, number] | null
+    } | null
+  }
   clustering: {
     groups: Record<ExperimentCohort, number>
     confounded: boolean

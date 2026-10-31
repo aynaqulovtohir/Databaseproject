@@ -8,6 +8,7 @@
 - Xolm tuzatishi — bir nechta ikkilamchi solishtiruvda I tur xatoni nazorat qilish;
 - sinfichi korrelyatsiya ICC(1) va dizayn effekti — talabalar guruhlarga (klasterlarga) bo'lingan tajriba uchun;
 - TOST — ikki o'rtachaning ekvivalentligi (masalan, testning parallel variantlari);
+- Spirmen rang korrelyatsiyasi (Fisher z ishonch oralig'i bilan);
 - ishonch oraliqlari: o'rtachalar farqi (Styudent, Uelch), Xodjes–Leman siljishi, Xedjes g, ANCOVA tuzatilgan farqi.
 
 p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes, 6.2 va 6.4) ishlatiladi.
@@ -327,6 +328,38 @@ def kruskal_wallis(samples):
     h = (12 / (n * (n + 1)) * total - 3 * (n + 1)) / correction
     df = len(samples) - 1
     return {"h": h, "df": df, "p": chi2_sf(h, df), "epsilon2": h / (n - 1)}
+
+
+def linear_residuals(x, y):
+    """y ning x ga chiziqli regressiyasi qoldiqlari. x o'zgarmas bo'lsa — o'rtachadan farqlar."""
+    mean_x, mean_y = _mean(x), _mean(y)
+    sxx = sum((value - mean_x) ** 2 for value in x)
+    slope = sum((a - mean_x) * (b - mean_y) for a, b in zip(x, y)) / sxx if sxx else 0.0
+    return [b - mean_y - slope * (a - mean_x) for a, b in zip(x, y)]
+
+
+def spearman(x, y, alpha=ALPHA):
+    """Spirmen ρ: ranglar bo'yicha Pirson r (bir xil qiymatlarga o'rtacha rang), p — t yaqinlashishi (df = n − 2),
+    (1 − α) ishonch oralig'i — Fisher z, Bonett–Rayt xatosi √((1 + ρ²/2) / (n − 3)). Qiymatlardan biri o'zgarmas — None."""
+    n = len(x)
+    if n < 3:
+        return None
+    rx, ry = _ranks(list(x))[0], _ranks(list(y))[0]
+    mean_x, mean_y = _mean(rx), _mean(ry)
+    sxx = sum((value - mean_x) ** 2 for value in rx)
+    syy = sum((value - mean_y) ** 2 for value in ry)
+    if not sxx or not syy:
+        return None
+    rho = sum((a - mean_x) * (b - mean_y) for a, b in zip(rx, ry)) / math.sqrt(sxx * syy)
+    rho = max(-1.0, min(1.0, rho))
+    if abs(rho) == 1:
+        return {"n": n, "rho": rho, "p": 0.0, "ci": None}
+    t = rho * math.sqrt((n - 2) / (1 - rho * rho))
+    ci = None
+    if n > 3:
+        z, half = math.atanh(rho), normal_ppf(1 - alpha / 2) * math.sqrt((1 + rho * rho / 2) / (n - 3))
+        ci = (math.tanh(z - half), math.tanh(z + half))
+    return {"n": n, "rho": rho, "p": t_two_sided_p(t, n - 2), "ci": ci}
 
 
 def paired_t_test(before, after):

@@ -2,13 +2,19 @@
 
 Kutilgan qiymatlar scipy.stats va numpy (eng kichik kvadratlar) bilan hisoblangan.
 """
+import json
+from datetime import timedelta
+
 from django.core.cache import cache
 from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from ai.models import ChatMessage
 from competence import stats
+from labs.models import AIAction, Lab, LabAttempt
+from learning.models import Assignment
 from labs.psychometrics import cronbach_alpha
 from users.consent import record_decision
 from users.models import StudentGroup, User
@@ -107,6 +113,23 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertIsNone(stats.hodges_lehmann([1, 2], [3, 4])["ci"])
         self.assertIsNone(stats.hodges_lehmann([], [3, 4]))
         self.assertEqual(stats.hodges_lehmann([5, 5], [5, 5]), {"shift": 0, "ci": None, "approximate": True})
+
+    def test_spearman(self):
+        # scipy.stats.spearmanr; oraliq — Fisher z, Bonett–Rayt xatosi (numpy)
+        result = stats.spearman([1, 2, 3, 4, 5, 6], [2, 1, 4, 3, 6, 5])
+        self.assertAlmostEqual(result["rho"], 0.8285714285714287, places=10)
+        self.assertAlmostEqual(result["p"], 0.04156268221574335, places=10)
+        tied = stats.spearman([1, 1, 2, 2, 3, 4], [5, 6, 6, 7, 8, 8])
+        self.assertAlmostEqual(tied["rho"], 0.909090909090909, places=10)
+        self.assertAlmostEqual(tied["p"], 0.012021036814425278, places=10)
+        self.assertIsNone(stats.spearman([1, 1, 1], [1, 2, 3]))
+        self.assertIsNone(stats.spearman([1, 2], [1, 2]))
+        perfect = stats.spearman([1, 2, 3, 4], [2, 4, 6, 8])
+        self.assertEqual((perfect["rho"], perfect["ci"]), (1.0, None))
+        residuals = stats.linear_residuals(AI_PRE, AI_POST)
+        self.assertAlmostEqual(residuals[0], 3.8571428571428754, places=8)
+        self.assertAlmostEqual(residuals[6], -7.917293233082688, places=8)
+        self.assertEqual(stats.linear_residuals([1, 1, 1], [1, 2, 3]), [-1, 0, 1])
 
     def test_fisher_exact(self):
         # scipy.stats.fisher_exact (ikki tomonlama)
@@ -483,6 +506,105 @@ class ExperimentTests(ResearchBase):
         self.assertEqual((skewed["estimate"]["value"], skewed["estimate"]["ci"]), (-12, [-21, -4]))
         self.assertTrue(skewed["significant"])
         self.assertLess(skewed["estimate"]["ci"][1], 0)
+
+    def expose(self):
+        """Kirish testi 30 kun oldin, chiqish testi 1 kun oldin topshirilgan; dozalar: [3, 1, 5, 2, 4, 1, 0, 0]."""
+        now = timezone.now()
+        QuizAttempt.objects.filter(quiz=self.pre).update(submitted_at=now - timedelta(days=30))
+        QuizAttempt.objects.filter(quiz=self.post).update(submitted_at=now - timedelta(days=1))
+        lab = Lab.objects.create(title="L", description="L", author=self.teacher)
+        assignment = Assignment.objects.create(title="A", description="A", author=self.teacher, deadline=now)
+
+        def student(name):
+            return User.objects.get(username=name)
+
+        def attempt(name, enabled=True, **fields):
+            item = LabAttempt.objects.create(lab=lab, student=student(name), is_correct=False, ai_enabled=enabled, **fields)
+            LabAttempt.objects.filter(pk=item.pk).update(created_at=now - timedelta(days=5))
+
+        def action(name, days=5):
+            item = AIAction.objects.create(student=student(name), kind=AIAction.Kind.LAB_CHAT)
+            AIAction.objects.filter(pk=item.pk).update(created_at=now - timedelta(days=days))
+
+        for name, level in (("ea0", 2), ("ea2", 3), ("ea3", 2)):
+            attempt(name, ai_hint_level=level, ai_advice="MAXFIY-MASLAHAT", ai_requested_at=now - timedelta(days=5))
+        # Darajalargacha bo'lgan eski maslahat — to'liq (3)
+        attempt("ea4", ai_advice="MAXFIY-MASLAHAT", ai_requested_at=now - timedelta(days=5))
+        for name in ("ea0", "ea1", "ea2", "ea4", "ea5"):
+            action(name)
+        ChatMessage.objects.create(assignment=assignment, student=student("ea2"), role=ChatMessage.Role.USER, content="MAXFIY-SAVOL")
+        ChatMessage.objects.filter(student=student("ea2")).update(created_at=now - timedelta(days=5))
+        # AI javobi murojaat emas
+        ChatMessage.objects.create(assignment=assignment, student=student("ea1"), role=ChatMessage.Role.ASSISTANT, content="MAXFIY-JAVOB")
+        # Oynadan tashqari: kirish testidan oldin va chiqish testidan keyin
+        action("ea6", days=40)
+        action("ea6", days=0)
+        # Rozi bo'lmagan talaba hisobga kirmaydi
+        action("e_refused")
+        # Nazorat: AI ga kirgan va urinishida AI yoqilgan deb yozilgan talabalar
+        action("ec0")
+        attempt("ec1", enabled=True)
+        attempt("ec2", enabled=False)
+
+    def test_fidelity(self):
+        self.expose()
+        result = self.result()
+        fidelity = result["fidelity"]
+        exp, ctrl = fidelity["cohorts"]["experimental"], fidelity["cohorts"]["control"]
+        self.assertEqual((exp["students"], exp["users"], exp["uptake"], exp["no_window"]), (8, 6, 0.75, 0))
+        self.assertEqual(exp["dose"]["median"], 1.5)
+        self.assertEqual(exp["sources"], {"hints": 10, "actions": 5, "chat": 1})
+        self.assertEqual((exp["changed_condition"], ctrl["users"], ctrl["changed_condition"]), (0, 1, 1))
+        # scipy.stats.spearmanr, kirish testi ta'siri olib tashlangan chiqish natijasi bilan
+        self.assertEqual(fidelity["dose_response"], {"n": 8, "rho": 0.253, "ci": [-0.559, 0.817], "p": 0.5454, "significant": False})
+        # numpy: foydalanmagan 2 ta (tajriba) va AI ga kirgan 1 ta (nazorat) chiqarilgan
+        protocol = fidelity["per_protocol"]
+        self.assertEqual((protocol["excluded"], protocol["f"], protocol["df2"]), (3, 41.989, 10))
+        self.assertEqual((protocol["adjusted_diff"], protocol["adjusted_diff_ci"]), (11.06, [7.26, 14.87]))
+        text = " ".join(result["conclusions"])
+        self.assertIn("8 ta talabadan 6 tasi (75%)", text)
+        self.assertIn("80% dan kam", text)
+        self.assertIn("nazorat guruhida 1 ta talaba", text)
+        self.assertIn("1 ta talabaning urinishlarida", text)
+        self.assertIn("kuzatuv natijasi, sabab emas", text)
+        self.assertIn("per-protocol", text)
+        self.assertLess(text.index("Asosiy gipoteza"), text.index("Aralashuvning bajarilishi"))
+
+    def test_fidelity_high_uptake_and_no_usage(self):
+        result = self.result()
+        fidelity = result["fidelity"]
+        self.assertEqual(fidelity["cohorts"]["experimental"]["uptake"], 0)
+        self.assertIsNone(fidelity["dose_response"])  # hamma doza 0 — korrelyatsiya yo'q
+        self.assertIsNone(fidelity["per_protocol"])  # tajribada foydalanganlar qolmadi
+        self.assertIn("80% dan kam", " ".join(result["conclusions"]))
+        self.expose()
+        for name in ("ea6", "ea7"):
+            AIAction.objects.create(student=User.objects.get(username=name), kind=AIAction.Kind.VIVA)
+        QuizAttempt.objects.filter(quiz=self.post).update(submitted_at=timezone.now() + timedelta(days=1))
+        text = " ".join(self.result()["conclusions"])
+        self.assertIn("8 ta talabadan 8 tasi (100%)", text)
+        self.assertNotIn("80% dan kam", text)
+
+    def test_fidelity_exposes_no_text_and_respects_scope(self):
+        self.expose()
+        self.client.force_authenticate(self.teacher)
+        response = self.client.get("/api/experiment/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("MAXFIY", json.dumps(response.data, default=str))
+        self.client.force_authenticate(User.objects.get(username="ea0"))
+        self.assertEqual(self.client.get("/api/experiment/").status_code, status.HTTP_403_FORBIDDEN)
+        self.client.force_authenticate(User.objects.create_user("f_other", role=User.Role.TEACHER))
+        fidelity = self.client.get("/api/experiment/").data["fidelity"]
+        self.assertEqual(fidelity["cohorts"]["experimental"]["students"], 0)
+        self.assertEqual(fidelity["cohorts"]["experimental"]["sources"], {"hints": 0, "actions": 0, "chat": 0})
+
+    def test_fidelity_post_before_pre_has_no_window(self):
+        now = timezone.now()
+        student = User.objects.get(username="ea0")
+        QuizAttempt.objects.filter(quiz=self.pre, student=student).update(submitted_at=now)
+        QuizAttempt.objects.filter(quiz=self.post, student=student).update(submitted_at=now - timedelta(days=1))
+        exp = self.result()["fidelity"]["cohorts"]["experimental"]
+        self.assertEqual((exp["students"], exp["no_window"]), (7, 1))
 
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
