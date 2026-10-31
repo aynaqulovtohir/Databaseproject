@@ -428,7 +428,8 @@ def attrition_conclusions(result):
 
 
 def _share(value):
-    return f"{round(100 * value)}%"
+    """Foiz; guruhda hech kim bo'lmasa (masalan, nazorat guruhi yo'q) ulush aniqlanmaydi."""
+    return "—" if value is None else f"{round(100 * value)}%"
 
 
 def _describe(values):

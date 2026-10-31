@@ -606,6 +606,16 @@ class ExperimentTests(ResearchBase):
         exp = self.result()["fidelity"]["cohorts"]["experimental"]
         self.assertEqual((exp["students"], exp["no_window"]), (7, 1))
 
+    def test_single_cohort_with_dropout(self):
+        # Hamma guruhda AI yoqilgan: nazorat guruhi yo'q, tashlab ketgan talaba bor — tahlil yiqilmasligi kerak
+        dropped = self.make_student("e_dropped_ai", self.ai_group)
+        self.submit(self.pre, dropped, {}, score=40, max_score=100)
+        result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
+        stage = result["attrition"]["post"]
+        self.assertEqual((stage["cohorts"]["experimental"]["lost"], stage["cohorts"]["control"]["rate"]), (1, None))
+        self.assertIsNone(result["fidelity"]["cohorts"]["control"]["uptake"])
+        self.assertIn("nazorat guruhida 0 ta (—)", " ".join(result["conclusions"]))
+
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
         self.assertIsNone(result["baseline"])
