@@ -1336,6 +1336,9 @@ export interface StatTest {
   significant: boolean
   effect: { name: string; value: number | null; label: string | null }
   cohens_d?: number | null
+  /** Farq bahosi va tanlangan mezonga mos 95% ishonch oralig'i (faqat mustaqil guruhlar) */
+  estimate?: { name: string; value: number | null; ci: [number, number] | null; approximate: boolean } | null
+  hedges_g?: { value: number | null; ci: [number, number] | null } | null
   assumptions?: {
     normality: Record<ExperimentCohort, Normality | null>
     levene: { f: number; p: number; equal: boolean } | null
@@ -1411,6 +1414,9 @@ export interface ExperimentAnalysis {
     partial_eta2: number
     effect_label: string
     adjusted_means: Record<ExperimentCohort, number>
+    adjusted_diff: number
+    adjusted_diff_ci: [number, number] | null
+    hedges_g: { value: number; ci: [number, number] } | null
     slopes: { f: number; p: number; parallel: boolean } | null
   } | null
   power: {

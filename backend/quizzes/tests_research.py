@@ -66,6 +66,48 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertAlmostEqual(result["design_effect"], 1 + 3 * result["icc"], places=10)
         self.assertIsNone(stats.icc_oneway([[1, 2, 3]]))
 
+    def test_confidence_intervals(self):
+        # scipy.stats.ttest_ind(...).confidence_interval(0.95)
+        student = stats.mean_difference_ci(AI_POST, C_POST, equal_var=True)
+        self.assertEqual(student["diff"], 10.75)
+        self.assertAlmostEqual(student["ci"][0], -2.469799740665108, places=8)
+        self.assertAlmostEqual(student["ci"][1], 23.96979974066511, places=8)
+        welch = stats.mean_difference_ci(AI_POST, C_POST, equal_var=False)
+        self.assertAlmostEqual(welch["ci"][0], -2.567632584395481, places=8)
+        self.assertAlmostEqual(welch["ci"][1], 24.067632584395483, places=8)
+        self.assertIsNone(stats.mean_difference_ci([5, 5], [5, 5], equal_var=True))
+        self.assertIsNone(stats.mean_difference_ci([5, 5], [5, 5], equal_var=False))
+        # Xedjes–Olkin formulasi bo'yicha numpy bilan
+        g = stats.hedges_g_ci(AI_POST, C_POST)
+        self.assertAlmostEqual(g["value"], 0.8244766335797706, places=10)
+        self.assertAlmostEqual(g["ci"][0], -0.1962912639213168, places=10)
+        self.assertAlmostEqual(g["ci"][1], 1.845244531080858, places=10)
+        self.assertIsNone(stats.hedges_g_ci([5, 5], [5, 5]))
+
+    def test_ancova_adjusted_difference(self):
+        # numpy: (XᵀX)⁻¹ dan guruh koeffitsiyenti xatosi, t(13) kvantili
+        result = stats.ancova({"e": list(zip(AI_PRE, AI_POST)), "c": list(zip(C_PRE, C_POST))})
+        self.assertAlmostEqual(result["adjusted_diff"], 10.503854283227652, places=8)
+        self.assertAlmostEqual(result["adjusted_diff_ci"][0], 6.503533257900994, places=8)
+        self.assertAlmostEqual(result["adjusted_diff_ci"][1], 14.50417530855431, places=8)
+        self.assertAlmostEqual(result["hedges_g"]["value"], 0.8055983645626036, places=8)
+        self.assertAlmostEqual(result["hedges_g"]["ci"][0], 0.498791740171934, places=8)
+        self.assertAlmostEqual(result["hedges_g"]["ci"][1], 1.1124049889532734, places=8)
+
+    def test_hodges_lehmann(self):
+        # Kutilgan chegaralar: scipy.stats.mannwhitneyu(a − δ, b, asymptotic, use_continuity=False) p ≥ 0.05 bo'lgan δ lar
+        a, b = [12, 15, 9, 20, 35, 14, 11, 13, 50, 10], [22, 31, 18, 40, 28, 25, 19, 60, 33]
+        result = stats.hodges_lehmann(a, b)
+        self.assertEqual((result["shift"], result["ci"], result["approximate"]), (-12, (-21, -4), False))
+        self.assertEqual(stats.hodges_lehmann([1, 2, 3], [4, 5, 6])["ci"], (-5, -1))
+        # Bir xil ballar ko'p: farqlar orasida guruhlararo tenglik yo'q, tuzatma faqat guruh ichidagilardan
+        tied = stats.hodges_lehmann([70, 70, 80, 80, 90, 100, 100, 60, 70], [50, 60, 60, 70, 70, 80, 50, 40])
+        self.assertEqual((tied["shift"], tied["ci"]), (20, (0, 30)))
+        # Juda kichik tanlanma: 95% oraliqqa erishib bo'lmaydi
+        self.assertIsNone(stats.hodges_lehmann([1, 2], [3, 4])["ci"])
+        self.assertIsNone(stats.hodges_lehmann([], [3, 4]))
+        self.assertEqual(stats.hodges_lehmann([5, 5], [5, 5]), {"shift": 0, "ci": None, "approximate": True})
+
     def test_fisher_exact(self):
         # scipy.stats.fisher_exact (ikki tomonlama)
         for table, expected in (
@@ -279,6 +321,12 @@ class ExperimentTests(ResearchBase):
         self.assertAlmostEqual(ancova["partial_eta2"], 0.712, places=3)
         self.assertEqual(ancova["adjusted_means"], {"experimental": 57.63, "control": 47.12})
         self.assertEqual(ancova["effect_label"], "katta")
+        self.assertEqual(ancova["adjusted_diff"], 10.5)
+        self.assertEqual(ancova["adjusted_diff_ci"], [6.5, 14.5])
+        self.assertEqual(ancova["hedges_g"], {"value": 0.806, "ci": [0.5, 1.11]})
+        # Oraliq tanlangan mezonga mos: Styudent, p = 0.103 — oraliq 0 ni o'z ichiga oladi
+        self.assertEqual(post["estimate"], {"name": "O'rtachalar farqi", "value": 10.75, "ci": [-2.47, 23.97], "approximate": False})
+        self.assertEqual(post["hedges_g"], {"value": 0.824, "ci": [-0.2, 1.85]})
         self.assertTrue(ancova["primary"])
         self.assertEqual(result["primary"]["outcome"], "ancova")
         # Ikkilamchi natijalar Xolm bo'yicha tuzatiladi (post va gain: ikkita solishtiruv)
@@ -294,6 +342,8 @@ class ExperimentTests(ResearchBase):
         text = " ".join(result["conclusions"])
         self.assertIn("teng bo'lgan", text)
         self.assertIn("Asosiy gipoteza", text)
+        self.assertIn("Tuzatilgan farq (tajriba − nazorat): 10.5 ball, 95% CI [6.5; 14.5], Xedjes g = 0.806", text)
+        self.assertIn("o'rtachalar farqi = 10.75, 95% CI [-2.47; 23.97]", text)
         self.assertIn("Xolm", text)
         self.assertIn("Dizayn cheklovi", text)
         self.assertIn("quvvat past", text)
@@ -424,6 +474,15 @@ class ExperimentTests(ResearchBase):
         self.assertAlmostEqual(stage["test"]["chi2"], 6.646, places=3)
         self.assertAlmostEqual(stage["test"]["p"], 0.0099, places=4)
         self.assertEqual(stage["differential"], 0.225)
+
+    def test_estimate_matches_selected_test(self):
+        # Normal bo'lmagan taqsimot: Mann–Uitni tanlanadi, baho ham parametrsiz va oraliq p ga zid emas
+        skewed = compare_independent([12, 15, 9, 20, 35, 14, 11, 13, 50, 10], [22, 31, 18, 40, 28, 25, 19, 60, 33])
+        self.assertEqual(skewed["test"], "mann_whitney")
+        self.assertEqual(skewed["estimate"]["name"], "Xodjes–Leman siljishi")
+        self.assertEqual((skewed["estimate"]["value"], skewed["estimate"]["ci"]), (-12, [-21, -4]))
+        self.assertTrue(skewed["significant"])
+        self.assertLess(skewed["estimate"]["ci"][1], 0)
 
     def test_too_few_students(self):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])

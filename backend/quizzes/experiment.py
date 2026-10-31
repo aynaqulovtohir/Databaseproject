@@ -25,6 +25,9 @@ va nazorat guruhlari.
 11. Tashlab ketish (attrition, CONSORT): kirish → chiqish va chiqish → kechiktirilgan test bosqichlarida guruhlar bo'yicha
    ulush, umumiy darajasi ("5 va 20" qoidasi), guruhlar farqi (χ², kutilgan sonlar kichik bo'lsa — Fisherning aniq testi)
    va tashlab ketganlarning oldingi testda qolganlardan farqi.
+12. Natija kattaligi va aniqligi (APA 7): har bir solishtiruvda farq bahosi tanlangan mezonga mos 95% ishonch oralig'i bilan
+   (t-testlar — o'rtachalar farqi, Mann–Uitni — Xodjes–Leman siljishi) va Xedjes g; ANCOVA — tuzatilgan farq va uning oralig'i.
+   Oraliqlar Xolm bo'yicha tuzatilmagan va klasterlashni hisobga olmaydi.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
 faqat tadqiqotga rozi bo'lganlar. Hisob toza Python'da (competence/stats.py), natijalar scipy bilan solishtirilgan.
@@ -38,10 +41,13 @@ from competence.stats import (
     chi_square,
     describe,
     fisher_exact,
+    hedges_g_ci,
+    hodges_lehmann,
     holm,
     icc_oneway,
     levene,
     mann_whitney,
+    mean_difference_ci,
     paired_t_test,
     required_n_per_group,
     shapiro_wilk,
@@ -113,6 +119,23 @@ def _normality(values):
     return {"w": _r(result["w"]), "p": _r(result["p"], 4), "normal": result["p"] >= ALPHA}
 
 
+def _ci(interval, digits=2):
+    return None if interval is None else [_r(interval[0], digits), _r(interval[1], digits)]
+
+
+def _estimate(test, a, b):
+    """Farq bahosi (a − b) va tanlangan mezonga mos ishonch oralig'i: oraliq va p bir-biriga zid chiqmaydi."""
+    if test == "mann_whitney":
+        result = hodges_lehmann(a, b)
+        if result is None:
+            return None
+        return {"name": "Xodjes–Leman siljishi", "value": _r(result["shift"]), "ci": _ci(result["ci"], 3), "approximate": result["approximate"]}
+    result = mean_difference_ci(a, b, equal_var=test == "student")
+    if result is None:
+        return None
+    return {"name": "O'rtachalar farqi", "value": _r(result["diff"]), "ci": _ci(result["ci"], 3), "approximate": False}
+
+
 def compare_independent(a, b):
     """Ikki mustaqil guruh: shartlar tekshiriladi va mos mezon tanlanadi."""
     if len(a) < MIN_GROUP or len(b) < MIN_GROUP:
@@ -141,6 +164,7 @@ def compare_independent(a, b):
         effect = {"name": "d", "value": _r(result["cohens_d"]), "kind": "d"}
         statistic = {"name": "t", "value": _r(result["t"]), "df": _r(result["df"], 1)}
     effect["label"] = _effect_label(effect.pop("kind"), effect["value"])
+    g = hedges_g_ci(a, b)
     return {
         "test": test,
         "label": TEST_LABELS[test],
@@ -150,6 +174,8 @@ def compare_independent(a, b):
         "significant": result["p"] < ALPHA,
         "effect": effect,
         "cohens_d": _r(d),
+        "estimate": _estimate(test, a, b),
+        "hedges_g": None if g is None else {"value": _r(g["value"]), "ci": _ci(g["ci"])},
         "assumptions": {
             "normality": {"experimental": normal_a, "control": normal_b},
             "levene": None if variances is None else {"f": _r(variances["f"]), "p": _r(variances["p"], 4), "equal": equal_var},
@@ -477,6 +503,7 @@ def analyse(quizzes, groups):
     ancova_result = None
     if covariance:
         slopes = covariance["slopes_homogeneity"]
+        hedges_g = covariance["hedges_g"]
         ancova_result = {
             "primary": PRIMARY_OUTCOME == "ancova",
             "f": _r(covariance["f"]),
@@ -487,6 +514,9 @@ def analyse(quizzes, groups):
             "partial_eta2": _r(covariance["partial_eta2"]),
             "effect_label": _effect_label("eta2", covariance["partial_eta2"]),
             "adjusted_means": {cohort: _r(value, 2) for cohort, value in covariance["adjusted_means"].items()},
+            "adjusted_diff": _r(covariance["adjusted_diff"], 2),
+            "adjusted_diff_ci": _ci(covariance["adjusted_diff_ci"]),
+            "hedges_g": None if hedges_g is None else {"value": _r(hedges_g["value"]), "ci": _ci(hedges_g["ci"])},
             "slopes": None if slopes is None else {"f": _r(slopes["f"]), "p": _r(slopes["p"], 4), "parallel": slopes["p"] >= ALPHA},
         }
     clustering = cluster_analysis(completers, covariance)
@@ -533,6 +563,19 @@ def _p_text(p):
     return "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
 
 
+def _ci_text(interval):
+    return f"95% CI [{interval[0]}; {interval[1]}]"
+
+
+def _estimate_text(test):
+    """Solishtiruvning farq bahosi: «o'rtachalar farqi = 4.2, 95% CI [−1; 9.4]» (oraliq bo'lmasa — faqat baho)."""
+    estimate = test.get("estimate")
+    if not estimate:
+        return ""
+    interval = f", {_ci_text(estimate['ci'])}" if estimate["ci"] else ""
+    return f", {estimate['name'].lower()} = {estimate['value']}{interval}"
+
+
 def _secondary_text(test):
     """Ikkilamchi natija: xom p va Xolm bo'yicha tuzatilgan p."""
     if "p_holm" not in test:
@@ -560,6 +603,13 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, cl
             f"F({ancova_result['df1']}, {ancova_result['df2']}) = {ancova_result['f']}, {_p_text(ancova_result['p'])}, "
             f"qisman η² = {ancova_result['partial_eta2']} ({ancova_result['effect_label']})."
         )
+        if ancova_result["adjusted_diff_ci"]:
+            g = ancova_result["hedges_g"]
+            effect = f", Xedjes g = {g['value']}, {_ci_text(g['ci'])}" if g else ""
+            lines.append(
+                f"Tuzatilgan farq (tajriba − nazorat): {ancova_result['adjusted_diff']} ball, "
+                f"{_ci_text(ancova_result['adjusted_diff_ci'])}{effect}."
+            )
         if ancova_result["slopes"] and not ancova_result["slopes"]["parallel"]:
             lines.append("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling.")
     post = comparisons["post"]
@@ -569,7 +619,8 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, cl
         verdict = "statistik ahamiyatli farq bor" if significant else "statistik ahamiyatli farq yo'q"
         lines.append(
             f"Ikkilamchi: chiqish testida tajriba guruhi o'rtachasi {exp}%, nazorat guruhiniki {ctrl}%: {verdict} "
-            f"({post['label']}, {_secondary_text(post)}, {post['effect']['name']} = {post['effect']['value']} — {post['effect']['label']} effekt)."
+            f"({post['label']}, {_secondary_text(post)}, {post['effect']['name']} = {post['effect']['value']} — "
+            f"{post['effect']['label']} effekt{_estimate_text(post)})."
         )
     gain_exp, gain_ctrl = cohorts["experimental"]["gain"], cohorts["control"]["gain"]
     if gain_exp["class"] is not None and gain_ctrl["class"] is not None:
@@ -598,7 +649,8 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, cl
             lines.append(
                 f"Klasterlash: guruhlararo ICC = {icc['value']}, dizayn effekti {icc['design_effect']}, samarali talabalar soni "
                 f"≈ {icc['effective_n']}. ICC 0.05 dan katta bo'lsa, ko'p darajali model (guruh — tasodifiy effekt) bilan "
-                "tekshiring (qayta hisoblash skripti)."
+                "tekshiring (qayta hisoblash skripti). Ishonch oraliqlari klasterlashni hisobga olmaydi: ICC katta bo'lsa, "
+                "ular haqiqatdagidan tor."
             )
     if power["achieved"] is not None:
         if power["achieved"] < power["target"]:

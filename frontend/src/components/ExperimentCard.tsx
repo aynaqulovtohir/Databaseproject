@@ -25,6 +25,10 @@ function describe(value: Descriptive) {
   return `${value.mean.toFixed(1)} (${value.sd === null ? '—' : value.sd.toFixed(1)}), n = ${value.n}`
 }
 
+function ciText(ci: [number, number] | null | undefined) {
+  return ci ? `[${num(ci[0])}; ${num(ci[1])}]` : '—'
+}
+
 function normalityText(value: Normality | null | undefined) {
   if (!value) return 'tekshirilmadi'
   return `W = ${value.w.toFixed(3)}, p = ${pText(value.p)} — ${value.normal ? 'normal' : 'normal emas'}`
@@ -88,6 +92,17 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
       <TableCell className="text-right tabular-nums whitespace-nowrap">
         {test.effect.name} = {num(test.effect.value)}
         {test.effect.label ? <span className="block text-xs text-muted-foreground">{test.effect.label}</span> : null}
+        {test.estimate ? (
+          <span className="block text-xs text-muted-foreground">
+            {test.estimate.name} = {num(test.estimate.value)}, 95% CI {ciText(test.estimate.ci)}
+            {test.estimate.approximate ? ' (taxminiy)' : ''}
+          </span>
+        ) : null}
+        {test.hedges_g ? (
+          <span className="block text-xs text-muted-foreground">
+            g = {num(test.hedges_g.value)}, 95% CI {ciText(test.hedges_g.ci)}
+          </span>
+        ) : null}
       </TableCell>
     </TableRow>
   )
@@ -344,6 +359,9 @@ export function ExperimentCard() {
 
         <div className="grid gap-2">
           <h3 className="text-sm font-semibold">Ikkilamchi solishtiruvlar (α = {data.alpha}, Xolm tuzatishi bilan)</h3>
+          <p className="text-xs text-muted-foreground">
+            Farq: tajriba − nazorat. 95% ishonch oraliqlari Xolm bo'yicha tuzatilmagan va klasterlashni hisobga olmaydi.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
@@ -377,6 +395,10 @@ export function ExperimentCard() {
                 </div>
                 <div className="text-muted-foreground tabular-nums">
                   Tuzatilgan o'rtachalar: tajriba {num(ancova.adjusted_means.experimental, 1)}%, nazorat {num(ancova.adjusted_means.control, 1)}%
+                </div>
+                <div className="tabular-nums">
+                  Tuzatilgan farq: {num(ancova.adjusted_diff)} ball, 95% CI {ciText(ancova.adjusted_diff_ci)}
+                  {ancova.hedges_g ? `; g = ${num(ancova.hedges_g.value)}, 95% CI ${ciText(ancova.hedges_g.ci)}` : ''}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Regressiya chiziqlari parallelligi:{' '}
