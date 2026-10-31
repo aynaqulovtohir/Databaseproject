@@ -28,6 +28,8 @@ va nazorat guruhlari.
 12. Natija kattaligi va aniqligi (APA 7): har bir solishtiruvda farq bahosi tanlangan mezonga mos 95% ishonch oralig'i bilan
    (t-testlar — o'rtachalar farqi, Mann–Uitni — Xodjes–Leman siljishi) va Xedjes g; ANCOVA — tuzatilgan farq va uning oralig'i.
    Oraliqlar Xolm bo'yicha tuzatilmagan va klasterlashni hisobga olmaydi.
+13. Aralashuvning bajarilishi (fidelity.py): AI dan haqiqatda foydalanganlar ulushi, doza, shart buzilishi, doza va natija
+   bog'liqligi, per-protocol sezgirlik tahlili.
 
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
 faqat tadqiqotga rozi bo'lganlar. Hisob toza Python'da (competence/stats.py), natijalar scipy bilan solishtirilgan.
@@ -58,6 +60,7 @@ from competence.stats import (
 from users.consent import consent_required, research_participants
 from users.models import User
 
+from . import fidelity
 from . import forms as parallel_forms
 from .models import Question, Quiz, QuizAttempt
 from .services import finalize_if_expired, likert_value, percent
@@ -292,19 +295,29 @@ def external_ai(surveys, students, cohort_of, completers):
         for cohort, rows in completers.items()
     }
     excluded = sum(len(rows) for rows in completers.values()) - sum(len(rows) for rows in kept.values())
-    if excluded and min(len(rows) for rows in kept.values()) >= MIN_GROUP:
-        covariance = ancova(kept)
-        if covariance:
-            result["sensitivity"] = {
-                "excluded": excluded,
-                "f": _r(covariance["f"]),
-                "df1": covariance["df1"],
-                "df2": covariance["df2"],
-                "p": _r(covariance["p"], 4),
-                "significant": covariance["p"] < ALPHA,
-                "partial_eta2": _r(covariance["partial_eta2"]),
-            }
+    result["sensitivity"] = sensitivity_ancova(kept, excluded)
     return result
+
+
+def sensitivity_ancova(kept, excluded):
+    """Sezgirlik tahlili: kept — {guruh: [(kirish, chiqish), ...]}, excluded — chiqarilganlar soni. Hech kim chiqarilmagan
+    yoki guruhda talaba kam qolgan bo'lsa — None."""
+    if not excluded or min(len(rows) for rows in kept.values()) < MIN_GROUP:
+        return None
+    covariance = ancova(kept)
+    if not covariance:
+        return None
+    return {
+        "excluded": excluded,
+        "f": _r(covariance["f"]),
+        "df1": covariance["df1"],
+        "df2": covariance["df2"],
+        "p": _r(covariance["p"], 4),
+        "significant": covariance["p"] < ALPHA,
+        "partial_eta2": _r(covariance["partial_eta2"]),
+        "adjusted_diff": _r(covariance["adjusted_diff"], 2),
+        "adjusted_diff_ci": _ci(covariance["adjusted_diff_ci"]),
+    }
 
 
 def external_conclusions(result):
@@ -415,7 +428,8 @@ def attrition_conclusions(result):
 
 
 def _share(value):
-    return f"{round(100 * value)}%"
+    """Foiz; guruhda hech kim bo'lmasa (masalan, nazorat guruhi yo'q) ulush aniqlanmaydi."""
+    return "—" if value is None else f"{round(100 * value)}%"
 
 
 def _describe(values):
@@ -523,6 +537,7 @@ def analyse(quizzes, groups):
     forms = parallel_forms.analyse(quizzes, students)
     external = external_ai(surveys, students, cohort_of, completers)
     attrition = attrition_analysis(scores, cohort_of, quizzes.filter(kind=Quiz.Kind.DELAYED).exists())
+    treatment = fidelity.analyse(quizzes, completers)
 
     n1, n2 = len(completers["experimental"]), len(completers["control"])
     observed_d = comparisons["post"]["cohens_d"] if comparisons["post"] else None
@@ -552,7 +567,9 @@ def analyse(quizzes, groups):
         "forms": forms,
         "external_ai": external,
         "attrition": attrition,
+        "fidelity": treatment,
         "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
+        + fidelity.conclusions(treatment)
         + attrition_conclusions(attrition)
         + parallel_forms.conclusions(forms)
         + external_conclusions(external),

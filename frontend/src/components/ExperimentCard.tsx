@@ -218,6 +218,43 @@ function AttritionBlock({ attrition }: { attrition: ExperimentAnalysis['attritio
   )
 }
 
+/** Aralashuvning bajarilishi: AI dan haqiqatda foydalanish, shart buzilishi, doza va natija */
+function FidelityBlock({ fidelity }: { fidelity: ExperimentAnalysis['fidelity'] }) {
+  const { dose_response: response, per_protocol: protocol } = fidelity
+  return (
+    <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+      <h3 className="text-sm font-semibold">Aralashuvning bajarilishi: platformadagi AI dan foydalanish</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Kirish va chiqish testlari orasidagi murojaatlar: maslahat darajalari, boshqa AI so'rovlari, chat savollari.</p>
+      <div className="mt-2 grid gap-1 text-sm">
+        {COHORTS.map((key) => {
+          const cohort = fidelity.cohorts[key]
+          return (
+            <div key={key} className="tabular-nums">
+              {key === 'experimental' ? 'Tajriba' : 'Nazorat'}: {cohort.users} / {cohort.students} talaba foydalangan
+              {cohort.uptake === null ? '' : ` (${Math.round(100 * cohort.uptake)}%)`} · mediana {cohort.dose.median ?? '—'} · maslahat{' '}
+              {cohort.sources.hints}, so'rov {cohort.sources.actions}, chat {cohort.sources.chat}
+              {cohort.changed_condition ? ` · sharti mos emas: ${cohort.changed_condition}` : ''}
+            </div>
+          )
+        })}
+        <div className="text-muted-foreground tabular-nums">
+          Doza va natija (kuzatuv, sabab emas):{' '}
+          {response
+            ? `Spirmen ρ = ${num(response.rho)}, 95% CI ${ciText(response.ci)}, p = ${pText(response.p)}, n = ${response.n}`
+            : "hisoblab bo'lmadi (kamida 5 talaba va har xil doza kerak)"}
+        </div>
+        {protocol ? (
+          <div className="text-muted-foreground tabular-nums">
+            Per-protocol ({protocol.excluded} ta chiqarilgan): ANCOVA F({protocol.df1}, {protocol.df2}) = {num(protocol.f)}, p = {pText(protocol.p)},
+            tuzatilgan farq {num(protocol.adjusted_diff)}, 95% CI {ciText(protocol.adjusted_diff_ci)} —{' '}
+            {protocol.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /** Tashqi AI vositalari (so'rovnoma): nazorat guruhining ifloslanishi va sezgirlik tahlili */
 function ExternalAiBlock({ external }: { external: ExperimentAnalysis['external_ai'] }) {
   const { sensitivity } = external
@@ -427,6 +464,7 @@ export function ExperimentCard() {
           </div>
           <AttritionBlock attrition={data.attrition} />
           <FormsBlock forms={data.forms} />
+          <FidelityBlock fidelity={data.fidelity} />
           <ExternalAiBlock external={data.external_ai} />
           <div className="rounded-xl border bg-card p-4 lg:col-span-2">
             <h3 className="text-sm font-semibold">Klasterlash: akademik guruhlar ta'siri</h3>

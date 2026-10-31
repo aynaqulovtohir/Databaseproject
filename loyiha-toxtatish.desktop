@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Loyihani to'xtatish
+Comment=Databaseproject xizmatlarini to'xtatadi (ma'lumotlar o'chmaydi)
+Exec=sh /home/tohir/Databaseproject/loyiha.sh stop --oyna
+Path=/home/tohir/Databaseproject
+Icon=process-stop
+Terminal=true
+Categories=Development;
