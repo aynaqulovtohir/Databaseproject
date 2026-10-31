@@ -7,7 +7,8 @@
 - juftlangan t-test — bitta guruhning tajriba boshi va oxiri (o'sish);
 - Xolm tuzatishi — bir nechta ikkilamchi solishtiruvda I tur xatoni nazorat qilish;
 - sinfichi korrelyatsiya ICC(1) va dizayn effekti — talabalar guruhlarga (klasterlarga) bo'lingan tajriba uchun;
-- TOST — ikki o'rtachaning ekvivalentligi (masalan, testning parallel variantlari).
+- TOST — ikki o'rtachaning ekvivalentligi (masalan, testning parallel variantlari);
+- ishonch oraliqlari: o'rtachalar farqi (Styudent, Uelch), Xodjes–Leman siljishi, Xedjes g, ANCOVA tuzatilgan farqi.
 
 p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes, 6.2 va 6.4) ishlatiladi.
 Natijalar scipy.stats bilan solishtirib tekshirilgan (tests.py dagi namunaviy qiymatlar).
@@ -197,8 +198,72 @@ def welch_t_test(a, b):
     t = diff / math.sqrt(se2)
     df = se2**2 / ((var_a / len(a)) ** 2 / (len(a) - 1) + (var_b / len(b)) ** 2 / (len(b) - 1))
     d = diff / pooled if pooled else None
-    correction = 1 - 3 / (4 * (len(a) + len(b)) - 9)
+    correction = _hedges_correction(len(a) + len(b))
     return {"t": t, "df": df, "p": t_two_sided_p(t, df), "cohens_d": d, "hedges_g": d * correction if d is not None else None}
+
+
+def _pooled_sd(a, b):
+    return math.sqrt(((len(a) - 1) * _variance(a) + (len(b) - 1) * _variance(b)) / (len(a) + len(b) - 2))
+
+
+def _hedges_correction(n):
+    return 1 - 3 / (4 * n - 9)
+
+
+def mean_difference_ci(a, b, equal_var, alpha=ALPHA):
+    """O'rtachalar farqi (a − b) va (1 − α) ishonch oralig'i: Styudent (equal_var) yoki Uelch shaklida —
+    tanlangan t-test bilan mos: oraliq 0 ni o'z ichiga olmasa, test ham p < α beradi."""
+    if len(a) < 2 or len(b) < 2:
+        return None
+    if equal_var:
+        df = len(a) + len(b) - 2
+        se2 = _pooled_sd(a, b) ** 2 * (1 / len(a) + 1 / len(b))
+    else:
+        var_a, var_b = _variance(a) / len(a), _variance(b) / len(b)
+        se2 = var_a + var_b
+        df = se2**2 / (var_a**2 / (len(a) - 1) + var_b**2 / (len(b) - 1)) if se2 else 0
+    if se2 == 0:
+        return None
+    diff = _mean(a) - _mean(b)
+    half = _t_ppf(1 - alpha / 2, df) * math.sqrt(se2)
+    return {"diff": diff, "ci": (diff - half, diff + half)}
+
+
+def hedges_g_ci(a, b, alpha=ALPHA):
+    """Xedjes g va taxminiy (1 − α) ishonch oralig'i: Var(g) ≈ (n₁ + n₂) / (n₁n₂) + g² / (2(n₁ + n₂)) (Xedjes, Olkin, 1985)."""
+    if len(a) < 2 or len(b) < 2:
+        return None
+    pooled = _pooled_sd(a, b)
+    if not pooled:
+        return None
+    n1, n2 = len(a), len(b)
+    g = (_mean(a) - _mean(b)) / pooled * _hedges_correction(n1 + n2)
+    half = normal_ppf(1 - alpha / 2) * math.sqrt((n1 + n2) / (n1 * n2) + g * g / (2 * (n1 + n2)))
+    return {"value": g, "ci": (g - half, g + half)}
+
+
+def hodges_lehmann(a, b, alpha=ALPHA):
+    """Xodjes–Leman siljishi (a − b): barcha juft farqlar medianasi — Mann–Uitni testiga mos baho (parametrsiz).
+
+    Ishonch oralig'i — Mozes usuli: mann_whitney testini teskari yechish (a − δ va b testda rad etilmaydigan δ lar),
+    uchlari ochiq; bir xil ballar ko'p bo'lsa, uchi aynan 0 ga tushib, test ahamiyatli chiqishi mumkin. Tanlanma juda
+    kichik bo'lsa, (1 − α) oraliqqa erishib bo'lmaydi: ci = None.
+    """
+    n1, n2 = len(a), len(b)
+    if not n1 or not n2:
+        return None
+    diffs = sorted(x - y for x in a for y in b)
+    total = len(diffs)
+    middle = total // 2
+    shift = diffs[middle] if total % 2 else (diffs[middle - 1] + diffs[middle]) / 2
+    # Chegaralar juft farqlar orasida izlanadi: u yerda guruhlararo teng qiymatlar yo'q, faqat guruh ichidagilari qoladi
+    ties = _ranks(a)[1] + _ranks(b)[1]
+    variance = _mann_whitney_variance(n1, n2, ties)
+    if variance <= 0:
+        return None
+    k = math.floor(total / 2 - normal_ppf(1 - alpha / 2) * math.sqrt(variance))
+    ci = (diffs[k], diffs[total - 1 - k]) if k >= 0 else None
+    return {"shift": shift, "ci": ci, "approximate": min(n1, n2) < 8}
 
 
 def _ranks(values):
@@ -218,6 +283,11 @@ def _ranks(values):
     return ranks, ties
 
 
+def _mann_whitney_variance(n1, n2, ties):
+    n = n1 + n2
+    return n1 * n2 / 12 * ((n + 1) - sum(t**3 - t for t in ties) / (n * (n - 1)))
+
+
 def mann_whitney(a, b):
     """Mann–Uitni U testi: normal yaqinlashish, bir xil qiymatlar tuzatmasi, uzluksizlik tuzatmasisiz.
 
@@ -229,7 +299,7 @@ def mann_whitney(a, b):
     ranks, ties = _ranks(list(a) + list(b))
     u = sum(ranks[:n1]) - n1 * (n1 + 1) / 2
     n = n1 + n2
-    variance = n1 * n2 / 12 * ((n + 1) - sum(t**3 - t for t in ties) / (n * (n - 1)))
+    variance = _mann_whitney_variance(n1, n2, ties)
     if variance <= 0:
         return None
     z = (u - n1 * n2 / 2) / math.sqrt(variance)
@@ -395,7 +465,7 @@ def student_t_test(a, b):
     diff = _mean(a) - _mean(b)
     t = diff / math.sqrt(pooled_var * (1 / len(a) + 1 / len(b)))
     d = diff / math.sqrt(pooled_var)
-    correction = 1 - 3 / (4 * (len(a) + len(b)) - 9)
+    correction = _hedges_correction(len(a) + len(b))
     return {"t": t, "df": df, "p": t_two_sided_p(t, df), "cohens_d": d, "hedges_g": d * correction}
 
 
@@ -449,8 +519,9 @@ def ancova(groups):
     """Bir omilli kovariatsion tahlil (ANCOVA): chiqish natijasi ~ guruh + kirish natijasi.
 
     groups — {nom: [(kirish, chiqish), ...]} (2 ta guruh). Kirish testidagi boshlang'ich farqni hisobga olib
-    guruhlarni solishtiradi: F, p, qisman η², tuzatilgan o'rtachalar va regressiya chiziqlari parallelligi
-    (guruh × kirish o'zaro ta'siri; p < 0.05 bo'lsa ANCOVA sharti buzilgan).
+    guruhlarni solishtiradi: F, p, qisman η², tuzatilgan o'rtachalar, ularning farqi (birinchi guruh − ikkinchi) va
+    uning ishonch oralig'i, regressiya chiziqlari parallelligi (guruh × kirish o'zaro ta'siri; p < 0.05 bo'lsa ANCOVA
+    sharti buzilgan). Xedjes g — tuzatilgan farq / chiqish testining birlashgan SD si (WWC usuli).
     """
     names = list(groups)
     if len(names) != 2 or any(len(groups[name]) < 2 for name in names):
@@ -466,6 +537,7 @@ def ancova(groups):
     sse_reduced, _ = _ols_sse([ones, pre], post)
     interaction = [g * x for g, x in zip(group, pre)]
     sse_interaction, _ = _ols_sse([ones, group, pre, interaction], post)
+    sse_group_on_pre, _ = _ols_sse([ones, pre], group)
     if sse_full is None or sse_reduced is None or sse_full <= 0:
         return None
     df_error = n - 3
@@ -475,6 +547,16 @@ def ancova(groups):
     if sse_interaction is not None and sse_interaction > 0 and n > 4:
         f_slopes = max(0.0, sse_full - sse_interaction) / (sse_interaction / (n - 4))
         slopes = {"f": f_slopes, "df1": 1, "df2": n - 4, "p": f_sf(f_slopes, 1, n - 4)}
+    # Guruh koeffitsiyenti xatosi: guruh ustunining kirish testidan mustaqil qismi bo'yicha (Friš–Vo teoremasi)
+    ci = None
+    if sse_group_on_pre:
+        half = _t_ppf(1 - ALPHA / 2, df_error) * math.sqrt(sse_full / df_error / sse_group_on_pre)
+        ci = (beta[1] - half, beta[1] + half)
+    pooled = _pooled_sd(*[[y for _, y in groups[name]] for name in names])
+    hedges_g = None
+    if pooled and ci:
+        scale = _hedges_correction(n) / pooled
+        hedges_g = {"value": beta[1] * scale, "ci": (ci[0] * scale, ci[1] * scale)}
     grand_pre = _mean(pre)
     adjusted = {
         name: _mean([y for _, y in groups[name]]) - beta[2] * (_mean([x for x, _ in groups[name]]) - grand_pre)
@@ -489,6 +571,9 @@ def ancova(groups):
         "slope": beta[2],
         "beta": beta,
         "adjusted_means": adjusted,
+        "adjusted_diff": beta[1],
+        "adjusted_diff_ci": ci,
+        "hedges_g": hedges_g,
         "slopes_homogeneity": slopes,
     }
 
