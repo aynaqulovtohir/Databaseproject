@@ -19,6 +19,11 @@ function pText(p: number) {
   return p < 0.001 ? '< 0.001' : p.toFixed(3)
 }
 
+/** «p = 0.012» yoki «p < 0.001» */
+function pEquals(p: number) {
+  return p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`
+}
+
 /** «M (SD), n» — dissertatsiya jadvallaridagi ko'rinishda */
 function describe(value: Descriptive) {
   if (!value.n || value.mean === null) return '—'
@@ -31,7 +36,7 @@ function ciText(ci: [number, number] | null | undefined) {
 
 function normalityText(value: Normality | null | undefined) {
   if (!value) return 'tekshirilmadi'
-  return `W = ${value.w.toFixed(3)}, p = ${pText(value.p)} — ${value.normal ? 'normal' : 'normal emas'}`
+  return `W = ${value.w.toFixed(3)}, ${pEquals(value.p)} — ${value.normal ? 'normal' : 'normal emas'}`
 }
 
 export function TestRow({ title, test }: { title: ReactNode; test: StatTest | null }) {
@@ -65,7 +70,7 @@ export function TestRow({ title, test }: { title: ReactNode; test: StatTest | nu
                 <span>
                   Levene:{' '}
                   {test.assumptions.levene
-                    ? `F = ${test.assumptions.levene.f.toFixed(2)}, p = ${pText(test.assumptions.levene.p)} — ${test.assumptions.levene.equal ? 'dispersiyalar teng' : 'teng emas'}`
+                    ? `F = ${test.assumptions.levene.f.toFixed(2)}, ${pEquals(test.assumptions.levene.p)} — ${test.assumptions.levene.equal ? 'dispersiyalar teng' : 'teng emas'}`
                     : 'tekshirilmadi'}
                 </span>
               </>
@@ -123,7 +128,7 @@ function FormsBlock({ forms }: { forms: ParallelForms }) {
               {row.equivalence ? (
                 <span className="block text-xs text-muted-foreground">
                   TOST (±{row.equivalence.margin} foiz punkti): farq {num(row.equivalence.diff, 1)}, 90% oraliq [
-                  {num(row.equivalence.ci[0], 1)}; {num(row.equivalence.ci[1], 1)}], p = {pText(row.equivalence.p)} —{' '}
+                  {num(row.equivalence.ci[0], 1)}; {num(row.equivalence.ci[1], 1)}], {pEquals(row.equivalence.p)} —{' '}
                   {row.equivalence.equivalent ? 'ekvivalent' : 'ekvivalentlik isbotlanmadi'}
                 </span>
               ) : null}
@@ -177,14 +182,14 @@ function AttritionRow({ title, stage, score }: { title: string; stage: Attrition
       <TableCell className="max-w-64 whitespace-normal text-sm">
         {test ? (
           <span className={test.significant ? 'text-destructive' : undefined}>
-            {test.label}: p = {pText(test.p)}
+            {test.label}: {pEquals(test.p)}
           </span>
         ) : (
           '—'
         )}
         <span className="block text-xs text-muted-foreground">
           {baseline
-            ? `Tashlab ketganlar ${score}: ${baseline.label}, p = ${pText(baseline.p)} — ${baseline.significant ? 'farq qilgan' : "farq yo'q"}`
+            ? `Tashlab ketganlar ${score}: ${baseline.label}, ${pEquals(baseline.p)} — ${baseline.significant ? 'farq qilgan' : "farq yo'q"}`
             : `Tashlab ketganlar ${score} solishtirilmadi (kamida 3 ta kerak)`}
         </span>
       </TableCell>
@@ -240,12 +245,12 @@ function FidelityBlock({ fidelity }: { fidelity: ExperimentAnalysis['fidelity'] 
         <div className="text-muted-foreground tabular-nums">
           Doza va natija (kuzatuv, sabab emas):{' '}
           {response
-            ? `Spirmen ρ = ${num(response.rho)}, 95% CI ${ciText(response.ci)}, p = ${pText(response.p)}, n = ${response.n}`
+            ? `Spirmen ρ = ${num(response.rho)}, 95% CI ${ciText(response.ci)}, ${pEquals(response.p)}, n = ${response.n}`
             : "hisoblab bo'lmadi (kamida 5 talaba va har xil doza kerak)"}
         </div>
         {protocol ? (
           <div className="text-muted-foreground tabular-nums">
-            Per-protocol ({protocol.excluded} ta chiqarilgan): ANCOVA F({protocol.df1}, {protocol.df2}) = {num(protocol.f)}, p = {pText(protocol.p)},
+            Per-protocol ({protocol.excluded} ta chiqarilgan): ANCOVA F({protocol.df1}, {protocol.df2}) = {num(protocol.f)}, {pEquals(protocol.p)},
             tuzatilgan farq {num(protocol.adjusted_diff)}, 95% CI {ciText(protocol.adjusted_diff_ci)} —{' '}
             {protocol.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
           </div>
@@ -276,7 +281,7 @@ function ExternalAiBlock({ external }: { external: ExperimentAnalysis['external_
           {sensitivity ? (
             <div className="text-muted-foreground tabular-nums">
               Sezgirlik tahlili ({sensitivity.excluded} ta chiqarilgan): ANCOVA F({sensitivity.df1}, {sensitivity.df2}) ={' '}
-              {num(sensitivity.f)}, p = {pText(sensitivity.p)}, qisman η² = {num(sensitivity.partial_eta2, 3)} —{' '}
+              {num(sensitivity.f)}, {pEquals(sensitivity.p)}, qisman η² = {num(sensitivity.partial_eta2, 3)} —{' '}
               {sensitivity.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
             </div>
           ) : null}
@@ -440,7 +445,7 @@ export function ExperimentCard() {
                 <div className="text-xs text-muted-foreground">
                   Regressiya chiziqlari parallelligi:{' '}
                   {ancova.slopes
-                    ? `F = ${num(ancova.slopes.f)}, p = ${pText(ancova.slopes.p)} — ${ancova.slopes.parallel ? 'shart bajarilgan' : "shart buzilgan, ehtiyot bo'ling"}`
+                    ? `F = ${num(ancova.slopes.f)}, ${pEquals(ancova.slopes.p)} — ${ancova.slopes.parallel ? 'shart bajarilgan' : "shart buzilgan, ehtiyot bo'ling"}`
                     : 'tekshirilmadi'}
                 </div>
               </div>
@@ -479,7 +484,7 @@ export function ExperimentCard() {
                 </div>
               ) : data.clustering.icc ? (
                 <div className="text-muted-foreground tabular-nums">
-                  ICC(1) = {num(data.clustering.icc.value, 3)} (F = {num(data.clustering.icc.f)}, p = {pText(data.clustering.icc.p)}) ·
+                  ICC(1) = {num(data.clustering.icc.value, 3)} (F = {num(data.clustering.icc.f)}, {pEquals(data.clustering.icc.p)}) ·
                   dizayn effekti {num(data.clustering.icc.design_effect)} · samarali talabalar soni ≈{' '}
                   {num(data.clustering.icc.effective_n, 1)}
                 </div>

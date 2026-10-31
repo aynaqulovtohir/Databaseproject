@@ -28,6 +28,12 @@ cd frontend && BASE_URL=http://127.0.0.1:4173 PW_CHANNEL=chrome npx playwright t
 Qayta ishga tushirishdan oldin `up ... --force-recreate` ni takrorlang: baza toza bo'ladi (talaba testni
 faqat bir marta topshira oladi) va login cheklovi (minutiga 5 ta) hisoblagichi ham tozalanadi.
 
+## Pilot
+
+`e2e/pilot.spec.ts` tajribaning butun yo'lini tekshiradi: rozilik, kirish testi, laboratoriya, chiqish testi, so'rovnoma
+(tajriba va nazorat talabasi), keyin o'qituvchi tahlil kartasi va eksport. Natijalar `frontend/test-results/pilot/` da:
+`statistika.png` va `eksport.zip`. Testlar haqiqiy AI ni chaqirmaydi: e2e muhitida kalitlar bo'sh.
+
 ## Test ma'lumotlari
 
 `backend/users/management/commands/seed_e2e.py` yaratadi, loginlar `e2e/accounts.ts` da.

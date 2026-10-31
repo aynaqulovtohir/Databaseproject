@@ -10,6 +10,9 @@ services:
     environment:
       E2E: "1"
       POSTGRES_DB: dbproject_e2e
+      # Testlar haqiqiy AI ga so'rov yubormaydi (xarajat va ma'lumot tashqariga chiqmasin), .env dagi kalitlardan qat'i nazar
+      ANTHROPIC_API_KEY: ""
+      GEMINI_API_KEY: ""
       # Frontend proksi so'rovlari Host: e2e-frontend bilan keladi (xizmat nomida "_" yo'q: Django uni host sifatida rad etadi)
       ALLOWED_HOSTS: e2e-frontend,localhost,127.0.0.1
       LAB_DB_HOST: lab_db

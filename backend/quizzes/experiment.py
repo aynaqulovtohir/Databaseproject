@@ -590,7 +590,9 @@ def _estimate_text(test):
     if not estimate:
         return ""
     interval = f", {_ci_text(estimate['ci'])}" if estimate["ci"] else ""
-    return f", {estimate['name'].lower()} = {estimate['value']}{interval}"
+    # Xodjes–Leman — atoqli ot, bosh harf bilan qoladi
+    name = estimate["name"] if test["test"] == "mann_whitney" else estimate["name"].lower()
+    return f", {name} = {estimate['value']}{interval}"
 
 
 def _secondary_text(test):

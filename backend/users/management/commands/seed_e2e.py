@@ -14,18 +14,20 @@ import psycopg
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 from django.utils import timezone
 from django.db import connection
 from psycopg import sql
 
 from labs.evolution_labs import EVOLUTION_LABS
 from labs.integrity_labs import INTEGRITY_LABS
-from labs.models import Lab, LabModule
+from labs.models import AIAction, Lab, LabModule
 from labs.probes import validate_probes
 from labs.reverse import diagram_from_sql
 from labs.reverse_labs import REVERSE_LABS
-from quizzes.models import Quiz
+from quizzes.models import Quiz, QuizAttempt
 from quizzes.serializers import QuizSerializer
+from quizzes.survey_bank import EXTERNAL_AI_TEXTS
 from users.consent import CONSENT_VERSION
 from users.models import StudentGroup, User
 
@@ -45,6 +47,15 @@ ER_REFERENCE = {
     "entities": [{"id": "t", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
     "relationships": [],
 }
+# Pilot (e2e/pilot.spec.ts): to'liq tajriba yo'li. Har bir shartda ikkita guruh; guruhdagi tayyor talabalar (kirish, chiqish)
+# natijalari tahlil kartasi to'lishi uchun, brauzerda yo'lni pilot_ai va pilot_nazorat bosib o'tadi
+PILOT_LAB_TITLE = "Pilot: kitoblar ro'yxati"
+PILOT_GROUPS = [
+    ("Pilot-AI-1", True, [35, 42, 50, 28, 60, 45], [58, 66, 72, 47, 80, 61]),
+    ("Pilot-AI-2", True, [38, 47, 55, 30, 52, 41], [55, 70, 68, 52, 77, 60]),
+    ("Pilot-Nazorat-1", False, [36, 44, 49, 29, 58, 46], [44, 52, 58, 35, 66, 50]),
+    ("Pilot-Nazorat-2", False, [40, 45, 53, 31, 51, 42], [50, 49, 60, 38, 62, 51]),
+]
 QUIZ_TITLE = "E2E: normallashtirish"
 QUESTIONS = [
     {
@@ -144,6 +155,8 @@ class Command(BaseCommand):
             title=EXAM_MODULE_TITLE, sequential=False, author=users["e2e_teacher"],
             exam_starts_at=now - timedelta(hours=1), exam_ends_at=now + timedelta(hours=2),
         )
+        self.seed_pilot(users["e2e_teacher"], now)
+
         lab = Lab.objects.create(
             title=EXAM_LAB_TITLE,
             description="Barcha kitoblar nomini chiqaring.",
@@ -153,3 +166,68 @@ class Command(BaseCommand):
             module=exam,
         )
         lab.groups.add(group)
+
+    def seed_pilot(self, teacher, now):
+        groups = {}
+        for name, ai_enabled, _, _ in PILOT_GROUPS:
+            groups[name] = StudentGroup.objects.create(name=name, ai_enabled=ai_enabled)
+            groups[name].teachers.add(teacher)
+        names = ["--group=" + name for name in groups]
+        call_command("seed_entry_test", "--author", teacher.username, *names, verbosity=0, stdout=self.stdout)
+        call_command("seed_survey", "--author", teacher.username, *names, verbosity=0, stdout=self.stdout)
+        lab = Lab.objects.create(
+            title=PILOT_LAB_TITLE,
+            description="Barcha kitoblar nomini chiqaring.",
+            setup_sql="CREATE TABLE kitob (id INT PRIMARY KEY, nomi TEXT); INSERT INTO kitob VALUES (1, 'Alifbo');",
+            solution_sql="SELECT nomi FROM kitob;",
+            author=teacher,
+        )
+        lab.groups.add(*groups.values())
+
+        # Brauzerda yo'lni bosib o'tadigan talabalar: rozilik hali so'ralmagan
+        for username, group, first_name in (("pilot_ai", "Pilot-AI-1", "Tajriba"), ("pilot_nazorat", "Pilot-Nazorat-1", "Nazorat")):
+            user = User(username=username, role=User.Role.STUDENT, first_name=first_name, last_name="Pilot", group=groups[group])
+            user.set_password(PASSWORD)
+            user.save()
+
+        pre = Quiz.objects.get(author=teacher, kind=Quiz.Kind.PRE)
+        post = Quiz.objects.get(author=teacher, kind=Quiz.Kind.POST)
+        surveys = {quiz.groups.first().ai_enabled: quiz for quiz in Quiz.objects.filter(author=teacher, kind=Quiz.Kind.SURVEY)}
+        for name, ai_enabled, pres, posts in PILOT_GROUPS:
+            for index, (pre_score, post_score) in enumerate(zip(pres, posts)):
+                student = User(
+                    username=f"{name.lower()}-{index}", role=User.Role.STUDENT, group=groups[name], first_name="MAXFIY-ISM",
+                    research_consent=True, research_consent_version=CONSENT_VERSION,
+                )
+                student.set_unusable_password()
+                student.save()
+                self.pilot_attempt(pre, student, pre_score, now - timedelta(days=30))
+                self.pilot_attempt(post, student, post_score, now - timedelta(days=1))
+                # Har guruhda oxirgi talaba AI dan foydalanmagan, qolganlarining dozasi har xil
+                if ai_enabled and index < len(pres) - 1:
+                    for _ in range(index + 1):
+                        action = AIAction.objects.create(student=student, kind=AIAction.Kind.LAB_CHAT)
+                        AIAction.objects.filter(pk=action.pk).update(created_at=now - timedelta(days=5))
+                self.pilot_survey(surveys[ai_enabled], student, 2 if index else 4, now)
+            # Faqat kirish testini topshirib tashlab ketgan talaba
+            dropped = User(
+                username=f"{name.lower()}-ketgan", role=User.Role.STUDENT, group=groups[name], first_name="MAXFIY-ISM",
+                research_consent=True, research_consent_version=CONSENT_VERSION,
+            )
+            dropped.set_unusable_password()
+            dropped.save()
+            self.pilot_attempt(pre, dropped, 33, now - timedelta(days=30))
+
+    @staticmethod
+    def pilot_attempt(quiz, student, score, moment):
+        attempt = QuizAttempt.objects.create(quiz=quiz, student=student, answers={}, results={}, score=score, max_score=100, submitted_at=moment)
+        QuizAttempt.objects.filter(pk=attempt.pk).update(started_at=moment - timedelta(minutes=20))
+
+    @staticmethod
+    def pilot_survey(quiz, student, external, now):
+        """Likert javoblari: umumiy savollarga 4, tashqi AI savollariga external."""
+        answers = {}
+        for question in quiz.questions.prefetch_related("choices").filter(Q(kind="likert")):
+            value = external if question.text in EXTERNAL_AI_TEXTS else 4
+            answers[str(question.pk)] = [choice.pk for choice in question.choices.all() if choice.order == value]
+        QuizAttempt.objects.create(quiz=quiz, student=student, answers=answers, results={}, submitted_at=now - timedelta(hours=20))
