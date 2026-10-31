@@ -61,7 +61,7 @@ function Choices({ question, groups }: { question: QuizQuestionAnalysis; groups:
                   {choice.is_correct ? '✓ ' : ''}
                   {choice.text}
                 </span>
-                {choice.flag ? <span className="block text-amber-700 dark:text-amber-400">{choice.flag}</span> : null}
+                {choice.flag ? <span className="block text-amber-700">{choice.flag}</span> : null}
               </td>
               <td className="py-1 text-right tabular-nums">{percent(choice.share)}</td>
               {groups ? (

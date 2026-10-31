@@ -137,8 +137,8 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
 
 const STEP_STATUS: Record<LabConcurrentStep['status'], { label: string; className: string }> = {
   ok: { label: 'bajarildi', className: 'text-muted-foreground' },
-  waiting: { label: 'qulf kutmoqda…', className: 'text-amber-700 dark:text-amber-400' },
-  resumed: { label: 'kutgandan keyin bajarildi', className: 'text-amber-700 dark:text-amber-400' },
+  waiting: { label: 'qulf kutmoqda…', className: 'text-amber-700' },
+  resumed: { label: 'kutgandan keyin bajarildi', className: 'text-amber-700' },
   error: { label: 'xato', className: 'text-destructive' },
 }
 

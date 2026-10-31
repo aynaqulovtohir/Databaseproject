@@ -2,6 +2,7 @@ import { Database, LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigation } from 'react-router-dom'
 
+import { AppearanceMenu } from '@/components/AppearanceMenu'
 import { ConsentPrompt } from '@/components/Consent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -97,7 +98,8 @@ export function AppShell() {
             </SheetContent>
           </Sheet>
 
-          <div className="ml-auto flex min-w-0 items-center gap-3">
+          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+            <AppearanceMenu />
             <div className="min-w-0 text-right leading-tight">
               <div className="truncate text-sm font-medium">{fullName(user)}</div>
               <div className="hidden text-xs text-muted-foreground sm:block">{user.username}</div>
@@ -112,7 +114,7 @@ export function AppShell() {
           <NavigationProgress />
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 p-4 lg:p-6">
+        <main className="w-full flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
         <ConsentPrompt />

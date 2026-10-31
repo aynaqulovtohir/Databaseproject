@@ -30,7 +30,7 @@ export function ExamBanner({ exam }: { exam: LabExamInfo }) {
         : `Imtihon ${formatDateTime(exam.starts_at)} da boshlanadi.`
   return (
     <div
-      className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+      className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
       role="status"
     >
       <Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
