@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Loyihani ishga tushirish
+Comment=Databaseproject: xizmatlar, migratsiya va sayt (http://localhost:5173)
+Exec=sh /home/tohir/Databaseproject/loyiha.sh start --oyna
+Path=/home/tohir/Databaseproject
+Icon=system-run
+Terminal=true
+Categories=Development;
