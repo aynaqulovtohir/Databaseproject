@@ -21,3 +21,6 @@ export const INTEGRITY_LAB_TITLE = 'Cheklovlar 1. Kutubxona: NOT NULL, UNIQUE va
 export const REVERSE_LAB_TITLE = 'Teskari loyihalash 1. Kafedra bazasi'
 export const EVOLUTION_LAB_TITLE = "Migratsiya 1. Do'kon: to'liq ismni ism va familiyaga ajratish"
 export const EXAM_LAB_TITLE = 'E2E: imtihon laboratoriyasi'
+export const PILOT_LAB_TITLE = "Pilot: kitoblar ro'yxati"
+// Pilot talabalari saqlangan sessiyasiz, o'z logini bilan kiradi
+export const PILOT_ACCOUNTS = { ai: 'pilot_ai', control: 'pilot_nazorat' } as const
