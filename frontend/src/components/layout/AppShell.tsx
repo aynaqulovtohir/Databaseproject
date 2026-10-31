@@ -13,13 +13,13 @@ import { cn } from '@/lib/utils'
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2.5 px-2">
-      <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+    <div className="flex items-center gap-2.5 text-sidebar-accent-foreground">
+      <div className="brand-gradient flex size-9 items-center justify-center rounded-md text-sidebar">
         <Database className="size-5" aria-hidden="true" />
       </div>
       <div className="leading-tight">
         <div className="text-sm font-semibold">MB loyihalash</div>
-        <div className="text-xs text-muted-foreground">Ta'lim platformasi</div>
+        <div className="text-xs text-sidebar-foreground">Ta'lim platformasi</div>
       </div>
     </div>
   )
@@ -28,7 +28,7 @@ function Brand() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const user = useUser()
   return (
-    <nav className="flex flex-col gap-1" aria-label="Asosiy menyu">
+    <nav className="flex flex-col gap-0.5" aria-label="Asosiy menyu">
       {navItemsFor(user.role).map((item) => (
         <NavLink
           key={item.to}
@@ -37,10 +37,10 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              'relative flex items-center gap-3 px-5 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-ring',
               isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:brand-gradient'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             )
           }
         >
@@ -69,15 +69,17 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <div className="flex min-h-svh bg-muted/40">
+    <div className="flex min-h-svh bg-page">
       {/* Kompyuter: doimiy yon menyu */}
-      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col gap-6 border-r bg-background p-4 lg:flex">
-        <Brand />
+      <aside className="sticky top-0 hidden h-svh w-66 shrink-0 flex-col overflow-y-auto bg-sidebar pb-4 lg:flex">
+        <div className="flex h-[70px] shrink-0 items-center px-5">
+          <Brand />
+        </div>
         <NavList />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
+        <header className="sticky top-0 z-30 flex h-[70px] items-center gap-3 bg-card px-4 shadow-(--card-shadow) lg:px-6">
           {/* Telefon: yig'iladigan menyu */}
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
@@ -85,8 +87,8 @@ export function AppShell() {
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 gap-6 p-4">
-              <SheetHeader className="p-0">
+            <SheetContent side="left" className="w-72 gap-2 overflow-y-auto border-none bg-sidebar p-0 pb-4 text-sidebar-foreground">
+              <SheetHeader className="flex h-[70px] shrink-0 justify-center px-5 py-0">
                 <SheetTitle className="sr-only">Menyu</SheetTitle>
                 <SheetDescription className="sr-only">Sahifalar ro'yxati</SheetDescription>
                 <Brand />
