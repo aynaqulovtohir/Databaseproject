@@ -20,12 +20,12 @@ function MeasureView({ title, measure }: { title: string; measure: PlanMeasure }
         <>
           <SqlCode code={measure.plan.join('\n')} />
           {measure.remaining.length ? (
-            <p className="flex gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <p className="flex gap-1.5 text-xs text-amber-800">
               <CircleX className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               {measure.remaining[0]}
             </p>
           ) : (
-            <p className="flex gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+            <p className="flex gap-1.5 text-xs text-emerald-700">
               <CircleCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               Rejada taqiqlangan tugun yo'q.
             </p>

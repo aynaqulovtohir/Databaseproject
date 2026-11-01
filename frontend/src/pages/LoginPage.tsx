@@ -2,6 +2,7 @@ import { Database, Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 
+import { AppearanceMenu } from '@/components/AppearanceMenu'
 import { FormField } from '@/components/FormField'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -33,14 +34,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-muted/40 p-4">
+    <div className="relative flex min-h-svh items-center justify-center bg-page p-4">
+      <div className="absolute top-3 right-3">
+        <AppearanceMenu />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <div className="brand-gradient flex size-12 items-center justify-center rounded-lg text-sidebar">
             <Database className="size-6" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Ma'lumotlar bazasini loyihalash</h1>
+            <h1 className="text-xl font-normal text-heading">Ma'lumotlar bazasini loyihalash</h1>
             <p className="text-sm text-muted-foreground">Ta'lim platformasi</p>
           </div>
         </div>

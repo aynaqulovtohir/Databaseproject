@@ -30,6 +30,7 @@ import { ProbeList } from '@/components/Probes'
 import { LabDialog } from '@/components/LabDialog'
 import { LabGenerateCard } from '@/components/LabGenerateCard'
 import { LabRunner } from '@/components/LabRunner'
+import { LabSteps } from '@/components/LabSteps'
 import { NormLabRunner, NormTaskView } from '@/components/NormLabRunner'
 import { PageHeader } from '@/components/PageHeader'
 import { VerdictBadge } from '@/components/SelfExplain'
@@ -873,6 +874,7 @@ function StudentView({ lab }: { lab: Lab }) {
           description={`O'qituvchi: ${fullName(lab.author)}`}
           actions={<LabProgressBadge progress={progress} />}
         />
+        <LabSteps lab={lab} />
         <div className="grid gap-4">
           <ConditionCard lab={lab} />
           <InterviewCard lab={lab} />
@@ -926,6 +928,7 @@ function StudentView({ lab }: { lab: Lab }) {
           description={`O'qituvchi: ${fullName(lab.author)}`}
           actions={<LabProgressBadge progress={progress} />}
         />
+        <LabSteps lab={lab} />
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <ConditionCard lab={lab} />
           <Card>
@@ -964,6 +967,7 @@ function StudentView({ lab }: { lab: Lab }) {
         description={`O'qituvchi: ${fullName(lab.author)}`}
         actions={<LabProgressBadge progress={progress} />}
       />
+      <LabSteps lab={lab} />
       <GivenModelCard lab={lab} />
       <div className={cn('grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]', lab.given_diagram?.entities.length && 'mt-4')}>
         <ConditionCard lab={lab} />

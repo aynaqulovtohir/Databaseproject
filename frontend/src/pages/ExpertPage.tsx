@@ -112,7 +112,7 @@ function ItemCard({
             {item.choices.map((choice, index) => (
               <li
                 key={index}
-                className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100')}
+                className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900')}
               >
                 {choice.is_correct ? <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" /> : <span className="size-4 shrink-0" />}
                 {choice.text}

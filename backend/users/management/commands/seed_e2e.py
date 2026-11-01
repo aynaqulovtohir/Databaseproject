@@ -43,6 +43,7 @@ GROUP = "E2E-guruh"
 EXAM_MODULE_TITLE = "E2E: imtihon moduli"
 EXAM_LAB_TITLE = "E2E: imtihon laboratoriyasi"
 ER_LAB_TITLE = "E2E: ER-diagramma"
+STEPS_LAB_TITLE = "E2E: bajarish tartibi"
 ER_REFERENCE = {
     "entities": [{"id": "t", "name": "Talaba", "x": 0, "y": 0, "attributes": [{"name": "id", "key": "pk"}]}],
     "relationships": [],
@@ -147,6 +148,15 @@ class Command(BaseCommand):
         lab.groups.add(group)
 
         lab = Lab.objects.create(**EVOLUTION_LABS[0], author=users["e2e_teacher"])
+        lab.groups.add(group)
+
+        lab = Lab.objects.create(
+            title=STEPS_LAB_TITLE,
+            description="Barcha kitoblar nomini chiqaring.",
+            setup_sql="CREATE TABLE kitob (id INT PRIMARY KEY, nomi TEXT); INSERT INTO kitob VALUES (1, 'Alifbo');",
+            solution_sql="SELECT nomi FROM kitob;",
+            author=users["e2e_teacher"],
+        )
         lab.groups.add(group)
 
         # Davom etayotgan imtihon: AI yordami o'chirilgan modul

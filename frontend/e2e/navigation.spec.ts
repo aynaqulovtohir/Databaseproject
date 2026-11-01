@@ -28,7 +28,7 @@ for (const role of Object.keys(MENUS) as SavedRole[]) {
       const menu = page.getByRole('navigation', { name: 'Asosiy menyu' })
       for (const label of MENUS[role]) {
         await menu.getByRole('link', { name: label, exact: true }).click()
-        await expect(menu.getByRole('link', { name: label, exact: true })).toHaveClass(/text-primary/)
+        await expect(menu.getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page')
         await expectPageOpened(page)
       }
       // Menyuda boshqa rolning sahifalari ko'rinmaydi

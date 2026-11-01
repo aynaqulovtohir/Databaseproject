@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useIsDark } from '@/lib/appearance'
 import { cn } from '@/lib/utils'
 import type { ErAttribute, ErCardinality, ErDiagram, ErEntity, ErKey, ErRelationship, ErStatus } from '@/lib/types'
 
@@ -393,6 +394,7 @@ interface ErEditorProps {
 
 function ErEditorInner({ value, onChange, className }: ErEditorProps) {
   const readOnly = !onChange
+  const dark = useIsDark()
   const { fitView } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<EntityNode>(value.entities.map((entity) => toNode(entity)))
   const [selected, setSelected] = useState<{ kind: 'entity' | 'relationship'; id: string } | null>(null)
@@ -481,6 +483,7 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
   const canvas = (
     <div className={cn('h-[32rem] overflow-hidden rounded-lg border bg-muted/30', className)}>
       <ReactFlow<EntityNode, RelationshipEdge>
+        colorMode={dark ? 'dark' : 'light'}
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
