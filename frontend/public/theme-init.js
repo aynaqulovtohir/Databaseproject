@@ -7,7 +7,7 @@
     try {
       var value = localStorage.getItem(key)
       return allowed.indexOf(value) >= 0 ? value : allowed[0]
-    } catch (error) {
+    } catch {
       return allowed[0]
     }
   }
