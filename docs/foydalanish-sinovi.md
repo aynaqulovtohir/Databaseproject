@@ -28,6 +28,19 @@ Maqolada bu savol **RQ4** bo'ladi.
 
 ## 3. Platformani tayyorlash (mashg'ulotdan 1–2 kun oldin)
 
+**Qisqa yo'l: hammasi bitta buyruq bilan.** Quyidagi 1–4-bandlarni bitta buyruq bajaradi:
+
+```
+python manage.py prepare_usability_session --author <o'qituvchi logini> --group FS-2026 --count 15 \
+    --start "2026-11-20 10:00" --url "https://<sayt manzili>"
+```
+
+U guruhni (AI yoqilgan, tadqiqotga belgilanmagan) va tasodifiy parolli hisoblarni yaratadi. O'quv laboratoriyasi
+(«Kutubxona») va imtihon rejimidagi topshiriq («Shifoxona», mashg'ulot boshidan 45–70-daqiqalar) nusxalanadi, SUS
+so'rovnomasi biriktiriladi. Natijada `kartochkalar.html` fayli chiqadi: uni brauzerda ochib, A4 ga chop etasiz.
+Chop etgach faylni o'chiring, chunki unda parollar bor. Buyruq oxirida hisobot buyruqlari tayyor id'lar bilan
+chiqadi. Quyidagi bandlar buyruq nima qilishini tushuntiradi.
+
 1. **Guruh:** admin «Guruhlar» sahifasida, masalan, `FS-2026` guruhini yaratadi, «AI yordamchisi yoqilgan»
    belgisini qo'yadi.
    - «Tadqiqotga kiradi» belgisini **qo'ymang**. Pilot guruhlari belgilangan bo'lsa ham, bu guruh tadqiqot
