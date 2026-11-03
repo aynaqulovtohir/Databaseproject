@@ -127,6 +127,30 @@ class LoginThrottleTests(BaseTestCase):
         # To'g'ri parol bilan ham vaqtincha kirib bo'lmaydi
         self.assertEqual(self.login("student1").status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
+    def test_limit_is_per_username_not_per_classroom_ip(self):
+        """Auditoriyada hamma bitta IP orqali kiradi: bitta hisob bloklansa ham boshqalar kira oladi."""
+        for _ in range(6):
+            self.login("student1", "notogri-parol")
+        self.assertEqual(self.login("student1").status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        for index in range(12):
+            User.objects.create_user(f"sinf{index}", password=PASSWORD, role=User.Role.STUDENT, group=self.group)
+            self.assertEqual(self.login(f"sinf{index}").status_code, status.HTTP_200_OK)
+
+    def test_username_case_and_spaces_share_one_counter(self):
+        for name in ("student1", "Student1", " STUDENT1 ", "student1 ", "STUDENT1"):
+            self.login(name, "notogri-parol")
+        self.assertEqual(self.login("student1").status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_ip_wide_limit_still_applies(self):
+        from unittest import mock
+
+        from .throttles import LoginIPThrottle
+
+        with mock.patch.object(LoginIPThrottle, "THROTTLE_RATES", {"login_ip": "3/min"}):
+            for index in range(3):
+                self.assertEqual(self.login(f"yoq{index}", "x").status_code, status.HTTP_401_UNAUTHORIZED)
+            self.assertEqual(self.login("student1").status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
 
 class ChangePasswordTests(BaseTestCase):
     def test_change_password(self):

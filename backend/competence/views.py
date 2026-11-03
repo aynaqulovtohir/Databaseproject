@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from labs.statistics import allowed_groups
+from labs.statistics import allowed_groups, research_groups
 
 from .services import (
     LEVELS,
@@ -56,14 +56,14 @@ class CompetenceReportView(StaffView):
 
 
 class CompetenceComparisonView(StaffView):
-    """Ruxsat etilgan barcha guruhlar: tajriba va nazorat guruhlari, ikkala kesimda."""
+    """Tadqiqot guruhlari (labs.statistics.research_groups): tajriba va nazorat guruhlari, ikkala kesimda."""
 
     def get(self, request):
-        return Response(comparison(load_model(), list(allowed_groups(request.user))))
+        return Response(comparison(load_model(), list(research_groups(request.user))))
 
 
 class CompetenceEfficiencyView(StaffView):
-    """Statistik tahlil: tajriba va nazorat guruhlari solishtiruvi va o'sish (ruxsat etilgan guruhlar bo'yicha)."""
+    """Statistik tahlil: tajriba va nazorat guruhlari solishtiruvi va o'sish (tadqiqot guruhlari bo'yicha)."""
 
     def get(self, request):
-        return Response(efficiency(load_model(), list(allowed_groups(request.user))))
+        return Response(efficiency(load_model(), list(research_groups(request.user))))

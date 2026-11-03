@@ -76,6 +76,8 @@ export interface Group {
   teachers: number[]
   /** Tajriba: false bo'lsa, guruh talabalariga AI yordamchisi ko'rsatilmaydi */
   ai_enabled: boolean
+  /** Tadqiqot tahlillariga kiradimi (sinov va o'quv guruhlari kirmaydi) */
+  in_study: boolean
   student_count: number
   created_at: string
 }

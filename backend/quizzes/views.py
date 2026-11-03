@@ -231,19 +231,19 @@ class QuizViewSet(viewsets.ModelViewSet):
 
 
 class ExperimentView(APIView):
-    """Tajriba natijasining statistik tahlili (kirish/chiqish/kechiktirilgan testlar): ruxsat etilgan barcha guruhlar."""
+    """Tajriba natijasining statistik tahlili (kirish/chiqish/kechiktirilgan testlar): tadqiqot guruhlari."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from labs.statistics import allowed_groups
+        from labs.statistics import research_groups
 
         from .experiment import analyse
 
         if request.user.is_student:
             raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
         quizzes = Quiz.objects.all() if request.user.is_admin else Quiz.objects.filter(author=request.user)
-        return Response(analyse(quizzes, allowed_groups(request.user)))
+        return Response(analyse(quizzes, research_groups(request.user)))
 
 
 class ExpertPanelViewSet(viewsets.ModelViewSet):

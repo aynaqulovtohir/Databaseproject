@@ -88,6 +88,9 @@ class StudentGroup(models.Model):
     )
     # Tajriba: nazorat guruhida o'chiriladi, shunda AI ta'sirini alohida o'lchash mumkin
     ai_enabled = models.BooleanField("AI yordamchisi yoqilgan", default=True)
+    # Tadqiqot tahlillariga (tajriba natijasi, ER jarayoni, eksport, kompetentlik solishtiruvi) kiradimi.
+    # Sinov va o'quv guruhlari tahlilga aralashmasligi uchun: birorta guruh belgilansa, faqat belgilanganlar olinadi.
+    in_study = models.BooleanField("tadqiqotga kiradi", default=False)
     created_at = models.DateTimeField("yaratilgan vaqti", auto_now_add=True)
 
     class Meta:

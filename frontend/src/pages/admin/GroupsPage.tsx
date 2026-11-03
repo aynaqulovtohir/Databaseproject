@@ -19,7 +19,7 @@ import { fullName } from '@/lib/auth'
 import { applyFormError } from '@/lib/forms'
 import type { AdminUser, Group } from '@/lib/types'
 
-const GROUP_FIELDS = ['name', 'teachers', 'ai_enabled'] as const
+const GROUP_FIELDS = ['name', 'teachers', 'ai_enabled', 'in_study'] as const
 
 interface GroupDialogProps {
   group?: Group
@@ -32,11 +32,12 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
   const [name, setName] = useState(group?.name ?? '')
   const [teacherIds, setTeacherIds] = useState<number[]>(group?.teachers ?? [])
   const [aiEnabled, setAiEnabled] = useState(group?.ai_enabled ?? true)
+  const [inStudy, setInStudy] = useState(group?.in_study ?? false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
     mutationFn: () => {
-      const body = { name: name.trim(), teachers: teacherIds, ai_enabled: aiEnabled }
+      const body = { name: name.trim(), teachers: teacherIds, ai_enabled: aiEnabled, in_study: inStudy }
       return group
         ? api<Group>(`/groups/${group.id}/`, { method: 'PATCH', body })
         : api<Group>('/groups/', { method: 'POST', body })
@@ -98,6 +99,22 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
               <span className="block text-xs text-muted-foreground">
                 Tajriba uchun nazorat guruhida o'chiring: talabalar AI maslahati, AI bahosi, AI chat va AI tahlilini
                 ko'rmaydi (baho avtomatik tekshiruv bilan qo'yiladi). O'qituvchiga AI tahlili ko'rinaveradi.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              checked={inStudy}
+              onChange={(event) => setInStudy(event.target.checked)}
+            />
+            <span>
+              Tadqiqotga kiradi
+              <span className="block text-xs text-muted-foreground">
+                Tajriba tahlili, ER jarayoni statistikasi, kompetentlik solishtiruvi va tadqiqot eksportiga faqat
+                belgilangan guruhlar kiradi. Sinov va o'quv guruhlarini belgilamang. Birorta guruh belgilanmagan
+                bo'lsa, barcha guruhlar olinadi.
               </span>
             </span>
           </label>
@@ -182,6 +199,7 @@ export function GroupsPage() {
               <TableHead>Guruh</TableHead>
               <TableHead>O'qituvchilar</TableHead>
               <TableHead>AI</TableHead>
+              <TableHead>Tadqiqot</TableHead>
               <TableHead className="text-right">Talabalar</TableHead>
               <TableHead className="text-right">Amallar</TableHead>
             </TableRow>
@@ -196,6 +214,13 @@ export function GroupsPage() {
                     <Badge variant="outline">Yoqilgan</Badge>
                   ) : (
                     <Badge className="bg-amber-100 text-amber-800">O'chirilgan</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {group.in_study ? (
+                    <Badge variant="outline">Kiradi</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{group.student_count}</TableCell>

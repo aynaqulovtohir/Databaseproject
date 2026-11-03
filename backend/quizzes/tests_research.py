@@ -664,6 +664,58 @@ class ExperimentTests(ResearchBase):
         self.assertEqual(self.client.get("/api/experiment/").data["cohorts"]["experimental"]["students"], 0)
 
 
+class ResearchGroupsTests(ResearchBase):
+    """Sinov guruhi «tadqiqotga kiradi» deb belgilanmasa, tajriba tahliliga aralashmaydi."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher = User.objects.create_user("rg_teacher", role=User.Role.TEACHER)
+        cls.ai_group = StudentGroup.objects.create(name="RG-tajriba", ai_enabled=True)
+        cls.control_group = StudentGroup.objects.create(name="RG-nazorat", ai_enabled=False)
+        cls.trial_group = StudentGroup.objects.create(name="RG-sinov", ai_enabled=True)
+        cls.pre = Quiz.objects.create(kind=Quiz.Kind.PRE, title="Kirish", author=cls.teacher)
+        cls.post = Quiz.objects.create(kind=Quiz.Kind.POST, title="Chiqish", author=cls.teacher)
+        groups = (cls.ai_group, cls.control_group, cls.trial_group)
+        for group in groups:
+            group.teachers.add(cls.teacher)
+        for quiz in (cls.pre, cls.post):
+            quiz.groups.add(*groups)
+        for prefix, group in (("ra", cls.ai_group), ("rc", cls.control_group), ("rs", cls.trial_group)):
+            for index in range(4):
+                student = cls.make_student(f"{prefix}{index}", group)
+                cls.submit(cls.pre, student, {}, score=40 + index, max_score=100)
+                if prefix != "rs":
+                    cls.submit(cls.post, student, {}, score=60 + index, max_score=100)
+        # Sinov guruhida faqat kirish testini topshirganlar: tahlilga kirsa, tashlab ketish 4 ta ko'rinadi
+
+    def experiment(self):
+        self.client.force_authenticate(self.teacher)
+        response = self.client.get("/api/experiment/")
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_without_marks_all_groups_are_used(self):
+        data = self.experiment()
+        self.assertEqual(data["students"], 12)
+        self.assertEqual(data["cohorts"]["experimental"]["dropped"], 4)
+
+    def test_only_marked_groups_are_used(self):
+        StudentGroup.objects.filter(pk__in=[self.ai_group.pk, self.control_group.pk]).update(in_study=True)
+        data = self.experiment()
+        self.assertEqual(data["students"], 8)
+        self.assertEqual(data["cohorts"]["experimental"]["dropped"], 0)
+        self.assertEqual(data["cohorts"]["experimental"]["groups"], 1)
+
+    def test_admin_can_mark_group(self):
+        admin = User.objects.create_user("rg_admin", role=User.Role.ADMIN)
+        self.client.force_authenticate(admin)
+        response = self.client.patch(f"/api/groups/{self.ai_group.pk}/", {"in_study": True}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["in_study"])
+        self.ai_group.refresh_from_db()
+        self.assertTrue(self.ai_group.in_study)
+
+
 class ParallelFormsTests(ResearchBase):
     """Kutilgan qiymatlar: statsmodels ttost_ind(usevar="unequal"), scipy pearsonr."""
 

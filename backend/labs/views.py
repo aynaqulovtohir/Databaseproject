@@ -452,10 +452,10 @@ class LabViewSet(viewsets.ModelViewSet):
             labs = labs.filter(pk__in=lab_ids)
         from quizzes.views import visible_quizzes
 
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
-        response = HttpResponse(build_export(labs, visible_quizzes(request.user), allowed_groups(request.user)), content_type="application/zip")
+        response = HttpResponse(build_export(labs, visible_quizzes(request.user), research_groups(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
@@ -1243,11 +1243,11 @@ class ErProcessStatisticsView(APIView):
 
     def get(self, request):
         from .process_stats import build
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         if request.user.is_student:
             raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
-        groups = allowed_groups(request.user)
+        groups = research_groups(request.user)
         group_id, lab_id = request.query_params.get("group"), request.query_params.get("lab")
         if group_id:
             if not group_id.isdigit():
@@ -1268,11 +1268,11 @@ class LabAnalysisView(APIView):
 
     def get(self, request):
         from .psychometrics import analyse, lab_queryset
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         if request.user.is_student:
             raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
-        groups = allowed_groups(request.user)
+        groups = research_groups(request.user)
         group_id = request.query_params.get("group")
         if group_id:
             if not group_id.isdigit():
