@@ -23,3 +23,4 @@ node_modules/
 
 # Texnik tekshiruv: sintetik hisoblar parollari bor
 research/texnik-tekshiruv/*.json
+!research/texnik-tekshiruv/natijalar/*.log

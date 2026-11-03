@@ -1,0 +1,70 @@
+[10:00:37] fs_01: Dilnoza Karimova kirdi
+[10:00:37] fs_02: Jasur Toshmatov kirdi
+[10:00:38] fs_03: Madina Yusupova kirdi
+[10:00:38] fs_04: Sardor Rahimov kirdi
+[10:00:39] fs_05: Nilufar Abdullayeva kirdi
+[10:00:39] fs_06: Bekzod Ergashev kirdi
+[10:00:40] fs_07: Shahnoza Mirzayeva kirdi
+[10:00:40] fs_08: Otabek Qodirov kirdi
+[10:00:41] fs_09: Zarina Nazarova kirdi
+[10:00:41] fs_10: Javohir Islomov kirdi
+[10:00:42] fs_11: Malika Sobirova kirdi
+[10:00:42] fs_12: Sherzod Usmonov kirdi
+[10:00:44] fs_06: murabbiyga savol: HTTP 201
+[10:00:48] fs_01: 1-darajali maslahat: HTTP 200
+[10:00:49] fs_02: murabbiyga savol: HTTP 201
+[10:00:49] fs_03: 1-darajali maslahat: HTTP 200
+[10:00:50] fs_05: 1-darajali maslahat: HTTP 200
+[10:00:51] fs_06: qayta tekshirish: moslik None → None
+[10:00:52] fs_08: 1-darajali maslahat: HTTP 200
+[10:00:52] fs_09: 1-darajali maslahat: HTTP 200
+[10:00:53] fs_10: 1-darajali maslahat: HTTP 200
+[10:00:53] fs_11: 1-darajali maslahat: HTTP 200
+[10:00:53] fs_06: o'quv lab topshirildi: 40 (ai)
+[10:00:54] fs_12: 1-darajali maslahat: HTTP 200
+[10:00:54] fs_01: qayta tekshirish: moslik None → None
+[10:00:57] fs_01: o'quv lab topshirildi: 45 (ai)
+[10:00:57] fs_04: qayta tekshirish: moslik None → None
+[10:01:00] fs_04: o'quv lab topshirildi: 45 (ai)
+[10:01:02] fs_08: qayta tekshirish: moslik None → None
+[10:01:02] fs_09: qayta tekshirish: moslik None → None
+[10:01:02] fs_02: qayta tekshirish: moslik None → None
+[10:01:02] fs_07: o'quv lab topshirildi: 40 (ai)
+[10:01:02] fs_03: qayta tekshirish: moslik None → None
+[10:01:03] fs_05: qayta tekshirish: moslik None → None
+[10:01:03] fs_12: qayta tekshirish: moslik None → None
+[10:01:04] fs_02: o'quv lab topshirildi: 45 (ai)
+[10:01:04] fs_08: o'quv lab topshirildi: 50 (ai)
+[10:01:04] fs_09: o'quv lab topshirildi: 45 (ai)
+[10:01:06] fs_05: o'quv lab topshirildi: 45 (ai)
+[10:01:06] fs_10: qayta tekshirish: moslik None → None
+[10:01:06] fs_11: qayta tekshirish: moslik None → None
+[10:01:07] fs_04: imtihon topshirildi: 28 (auto), tuzatilgan ko'rsatildi: False
+[10:01:07] fs_04: SUS topshirildi (10/10)
+[10:01:13] fs_06: imtihon topshirildi: 37 (auto), tuzatilgan ko'rsatildi: False
+[10:01:13] fs_06: SUS topshirildi (10/10)
+[10:01:17] fs_09: imtihon topshirig'ini topshirmadi
+[10:01:18] fs_09: SUS topshirildi (10/10)
+[10:01:18] fs_10: o'quv lab topshirildi: 100 (auto)
+[10:01:20] fs_01: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[10:01:20] fs_01: SUS topshirildi (10/10)
+[10:01:22] fs_07: imtihon topshirildi: 45 (auto), tuzatilgan ko'rsatildi: False
+[10:01:22] fs_07: SUS topshirildi (10/10)
+[10:01:31] fs_02: imtihon topshirildi: 41 (auto), tuzatilgan ko'rsatildi: False
+[10:01:31] fs_02: SUS topshirildi (10/10)
+[10:01:34] fs_12: o'quv lab topshirildi: 52 (auto)
+[10:01:34] fs_08: imtihon topshirildi: 52 (auto), tuzatilgan ko'rsatildi: False
+[10:01:34] fs_08: SUS topshirildi (10/10)
+[10:01:38] fs_05: imtihon topshirildi: 59 (auto), tuzatilgan ko'rsatildi: False
+[10:01:38] fs_05: SUS topshirildi (10/10)
+[10:01:42] fs_11: o'quv lab topshirildi: 48 (auto)
+[10:01:44] fs_10: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[10:01:44] fs_10: SUS topshirildi (10/10)
+[10:01:53] fs_12: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[10:01:53] fs_12: SUS topshirildi (10/10)
+[10:02:01] fs_11: imtihon topshirildi: 44 (auto), tuzatilgan ko'rsatildi: False
+[10:02:01] fs_11: SUS topshirildi (9/10)
+[10:03:04] fs_03: o'quv lab topshirildi: 59 (auto)
+[10:03:23] fs_03: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[10:03:23] fs_03: SUS topshirildi (10/10)
+HTTP holatlari: {200: 252}
