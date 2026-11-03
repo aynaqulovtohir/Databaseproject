@@ -92,6 +92,9 @@ class Lab(models.Model):
     # Tranzaksiya laboratoriyasi: talaba kodi (BEGIN ... COMMIT) ikki sessiyada bir vaqtda bajariladi va natija
     # ketma-ket bajarilgandagiga teng bo'lishi kerak (yo'qolgan yangilanish, "tekshir-keyin-bajar" poygasi)
     concurrent = models.BooleanField("ikki sessiyada bir vaqtda tekshiriladi", default=False)
+    # O'lchov topshiriqlari (labs/measure_labs.py): topshirishda talaba qarorlarini yozma asoslaydi. Baholovchi uni
+    # rubrikaning «qarorlarni asoslash» mezoni bo'yicha baholaydi (ko'r baholashda ko'rinadi)
+    ask_justification = models.BooleanField("yozma asoslash so'raladi", default=False)
     # Yaxlitlik cheklovlari laboratoriyasi (labs/probes.py): talaba kodidan keyin har bir sinov alohida tranzaksiyada
     # bajariladi. "attack" — noto'g'ri ma'lumot, cheklov uni rad etishi kerak; "valid" — to'g'ri ma'lumot, qabul
     # qilinishi kerak. [{"id", "title", "kind", "sql", "hidden"}]; yashirin sinovning nomi va SQL'i talabaga ko'rinmaydi
@@ -205,6 +208,8 @@ class LabAttempt(models.Model):
     # Talaba tekshirishdan oldin o'z javobiga qanchalik ishonganini belgilaydi (1-5; ixtiyoriy). Natija bilan
     # solishtirib, o'z bilimini baholash aniqligi (kalibrlash) hisoblanadi — labs/calibration.py
     confidence = models.PositiveSmallIntegerField("ishonch (1-5)", null=True, blank=True)
+    # Topshirishdagi yozma asoslash (faqat Lab.ask_justification bo'lsa): rubrikaning «qarorlarni asoslash» mezoni
+    justification = models.TextField("yozma asoslash", blank=True, max_length=2000)
     # To'g'ri yechimdan keyin talaba o'z so'zlari bilan tushuntiradi (self-explanation); AI mosligini baholaydi.
     # Bahoga ta'sir qilmaydi: o'qituvchi tasodifan yoki ko'chirib topilgan javoblarni ko'rishi uchun
     self_explanation = models.TextField("talabaning tushuntirishi", blank=True, max_length=3000)

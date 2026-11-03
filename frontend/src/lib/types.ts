@@ -322,6 +322,8 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** O'lchov topshirig'i: topshirishda talaba qarorlarini yozma asoslaydi */
+  ask_justification?: boolean
   /** Yaxlitlik cheklovlari laboratoriyasi: barcha sinovlar. Faqat admin va o'qituvchiga */
   probes?: LabProbe[]
   /** Talaba uchun: ko'rinadigan sinovlar va yashirinlari soni */
@@ -824,6 +826,8 @@ export interface BlindReviewItem {
   lab: Pick<Lab, 'id' | 'title' | 'kind' | 'description' | 'setup_sql' | 'solution_sql' | 'reference_diagram'>
   code: string
   diagram: ErDiagram | null
+  /** Talabaning yozma asoslashi (o'lchov topshiriqlarida; bo'lmasa — bo'sh) */
+  justification: string
   is_correct: boolean
   check: { error: { message: string; tip?: string } | null; differences: string[] }
 }

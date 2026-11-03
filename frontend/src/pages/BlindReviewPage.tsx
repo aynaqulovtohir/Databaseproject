@@ -76,6 +76,12 @@ function ReviewForm({ item, onSaved }: { item: BlindReviewItem; onSaved: () => v
           <div className="grid min-w-0 content-start gap-2">
             <h3 className="text-sm font-medium">Talaba ishi</h3>
             {item.diagram ? <ErEditor value={item.diagram} /> : <SqlCode code={item.code || '(bo\'sh)'} />}
+            {item.justification ? (
+              <div className="grid gap-1 rounded-md border p-2">
+                <span className="text-xs font-medium text-muted-foreground">Talabaning yozma asoslashi</span>
+                <p className="text-sm whitespace-pre-wrap">{item.justification}</p>
+              </div>
+            ) : null}
             <p className="flex items-center gap-1.5 text-sm">
               {item.is_correct ? (
                 <>

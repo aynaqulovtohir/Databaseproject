@@ -8,6 +8,7 @@ import { ErEditor, ErFixLegend } from '@/components/ErEditor'
 import { AiAdvice, GradeCard } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { api, apiFetch, errorMessage, fieldErrors } from '@/lib/api'
 import { useConfidence } from '@/lib/confidence'
 import { cleanDiagram, EMPTY_DIAGRAM, snapshotDiagram } from '@/lib/er'
@@ -98,7 +99,11 @@ interface ErLabRunnerProps {
   onDiagramChange?: (diagram: ErDiagram) => void
   /** true bo'lsa, chizish jarayoni yoziladi (talaba uchun; o'qituvchi uni «Jarayon» oynasida ko'radi) */
   record?: boolean
+  /** true bo'lsa, topshirishda yozma asoslash maydoni ko'rinadi (o'lchov topshiriqlari) */
+  askJustification?: boolean
 }
+
+const JUSTIFICATION_MAX = 2000
 
 const SNAPSHOT_INTERVAL_MS = 10_000
 
@@ -147,17 +152,24 @@ export function ErLabRunner({
   onResult,
   onDiagramChange,
   record = false,
+  askJustification = false,
 }: ErLabRunnerProps) {
   const [diagram, setDiagram] = useState<ErDiagram>(initialDiagram ?? EMPTY_DIAGRAM)
   useErRecorder(labId, diagram, record)
   const [fieldError, setFieldError] = useState<string | null>(null)
+  const [justification, setJustification] = useState('')
   const confidence = useConfidence()
+  const withJustification = gradable && askJustification
 
   const mutation = useMutation({
     mutationFn: ({ mode, level }: { mode: RunMode; level: number | null }) =>
       api<LabRunResult>(`/labs/${labId}/${mode}/`, {
         method: 'POST',
-        body: { diagram: cleanDiagram(diagram), ...confidence.body(level) },
+        body: {
+          diagram: cleanDiagram(diagram),
+          ...confidence.body(level),
+          ...(mode === 'submit' && withJustification ? { justification } : {}),
+        },
       }),
     onSuccess: (result, { level }) => {
       if (gradable) confidence.record(level, result.is_correct)
@@ -198,6 +210,24 @@ export function ErLabRunner({
         </p>
       ) : null}
       {gradable ? <ConfidencePicker value={confidence.value} onChange={confidence.setValue} note={confidence.note} /> : null}
+      {withJustification ? (
+        <div className="grid gap-1.5">
+          <label htmlFor={`justification-${labId}`} className="text-sm font-medium">
+            Qarorlaringizni asoslang
+          </label>
+          <p className="text-xs text-muted-foreground">
+            2–3 gap: qaysi tushunchani alohida obyekt qildingiz va nega? Ko'p-ko'p bog'lanishni qanday ifodaladingiz?
+            Topshirishda yuboriladi va baholanadi.
+          </p>
+          <Textarea
+            id={`justification-${labId}`}
+            className="min-h-24"
+            maxLength={JUSTIFICATION_MAX}
+            value={justification}
+            onChange={(event) => setJustification(event.target.value)}
+          />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => run('run')}>
           {running ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}

@@ -893,6 +893,7 @@ function StudentView({ lab }: { lab: Lab }) {
                 initialFix={progress.last_fix}
                 gradable
                 record
+                askJustification={lab.ask_justification}
                 onResult={(result, diagram) => handleResult(result, { diagram })}
                 onDiagramChange={(diagram) => (work.current = { diagram })}
               />
