@@ -47,6 +47,12 @@ Maqolada bu savol **RQ4** bo'ladi.
 7. **Auditoriya:** kompyuterlar, brauzer va internetni tekshiring. Hamma bitta IP manzildan kirsa ham login
    cheklovi endi xalaqit bermaydi.
 
+> **Mashqdan saboq (2026-yil 3-noyabr, 12 ta sintetik hisob).** Bir vaqtda topshirilganda Gemini 4 ta AI
+> baholash so'roviga 503 (server band) qaytardi. Platforma xatoni ko'rsatmay avtomatik bahoga o'tdi, natijada
+> AI guruhida baho manbasi aralashdi (8 ta AI, 4 ta avtomatik). Talabalarni o'quv laboratoriyasini bir vaqtda
+> emas, tayyor bo'lganda topshirishga undang va hisobotdagi baho manbasi ulushini maqolada ko'rsating. AI'siz
+> imtihon topshirig'iga bu ta'sir qilmaydi (baho har doim avtomatik).
+
 ## 4. SUS tarjimasini tekshirish (mashg'ulotdan oldin)
 
 Rasmiy tasdiqlangan o'zbekcha SUS yo'q. Matn `backend/quizzes/sus_bank.py` faylida.
@@ -99,10 +105,23 @@ Platformada matnli javob turi yo'q, shuning uchun bu savollar qog'ozda yoki onla
 | O'lchov | Manba | Qanday olinadi |
 |---|---|---|
 | **SUS bali (asosiy)** | Platformadagi SUS so'rovnomasi | `python manage.py sus_report --quiz <id> --group FS-2026 --consented` |
-| Topshiriq bajarilishi | Kuzatuv varag'i (9-bo'lim) | Har bir T uchun: 2 — mustaqil, 1 — yordam bilan, 0 — bajarmadi; vaqti |
+| Topshiriq bajarilishi | Loglar va kuzatuv varag'i (9-bo'lim) | `usability_report` (pastda) loglardan 2/0 ni beradi; kuzatuvchi "yordam bilan" (1) va vaqtni qo'shadi |
 | Interfeys muammolari | Kuzatuv varag'i va ochiq javoblar | Tavsif, qaysi T, nechta talabada; og'irligi Nielsen shkalasida (0–4) |
-| Log to'liqligi | Tadqiqot eksporti (`er_jarayon` fayllari) | Kamida 5 oraliq holati bor va jarayoni tiklangan ER ishlari ulushi |
-| AI ishlatilishi | Tadqiqot eksporti (`ai_foydalanish.csv`) | Talaba boshiga murojaatlar soni va turi |
+| Log to'liqligi | `usability_report` | ER ishlari ulushi, ikki ta'rifda (pastda) |
+| AI ishlatilishi | `usability_report`, tadqiqot eksporti (`ai_foydalanish.csv`) | AI'dan foydalangan talabalar, maslahatlar va murabbiyga savollar soni; o'quv laboratoriyasi baho manbasi (AI / avtomatik) |
+
+Loglardan olinadigan hisobot:
+
+```
+python manage.py usability_report --group FS-2026 --learn-lab <id> --exam-lab <id> --sus <id>
+```
+
+`--names` bilan talabalar ism-familiyasi chiqadi (faqat o'qituvchi uchun), aks holda taxallus (FS-01, …).
+
+**Log to'liqligi ta'rifi (sinovdan oldin bittasini tanlang):**
+- (a) ER ishida kamida 5 oraliq holat. Mashqda kichik va tez chizilgan diagrammalar bu shartga yetmadi.
+- (b) Jarayon tiklanadi: kamida bitta oraliq holat bor va topshirishdan oldingi oxirgi holat topshirilgan diagrammaga
+  teng. **Tavsiya etiladi**, chunki u log haqiqatan to'liq ekanini tekshiradi, diagramma hajmiga bog'liq emas.
 | Server xatolari | `sh loyiha.sh log` (yoki server logi) | Mashg'ulot vaqtidagi HTTP 5xx soni |
 
 ## 7. Tahlil va oldindan belgilangan mezonlar
