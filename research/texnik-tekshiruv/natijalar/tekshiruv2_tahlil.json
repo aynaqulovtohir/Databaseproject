@@ -1,0 +1,3015 @@
+{
+ "izoh": "2-texnik tekshiruv (sintetik). ER jarayoni faqat imtihon rejimidagi uchta o'lchov topshirig'i bo'yicha.",
+ "guruhlar": [
+  "SIM2-Nazorat-A",
+  "SIM2-Nazorat-B",
+  "SIM2-Tajriba-A",
+  "SIM2-Tajriba-B"
+ ],
+ "tajriba_tahlili": {
+  "consent_required": true,
+  "students": 20,
+  "excluded_no_consent": 0,
+  "quizzes": {
+   "pre": 2,
+   "post": 2,
+   "delayed": 2
+  },
+  "alpha": 0.05,
+  "primary": {
+   "outcome": "ancova",
+   "label": "Chiqish testi, kirish testini hisobga olgan holda (ANCOVA: chiqish ~ guruh + kirish)"
+  },
+  "cohorts": {
+   "experimental": {
+    "label": "Tajriba (AI yoqilgan)",
+    "students": 10,
+    "dropped": 0,
+    "groups": 2,
+    "pre": {
+     "n": 10,
+     "mean": 57.48,
+     "sd": 20.82
+    },
+    "post": {
+     "n": 10,
+     "mean": 64.65,
+     "sd": 23.38
+    },
+    "delayed": {
+     "n": 10,
+     "mean": 59.98,
+     "sd": 24.71
+    },
+    "delayed_missing": 0,
+    "gain": {
+     "class": 0.169,
+     "level": "past",
+     "individual": {
+      "n": 10,
+      "mean": 0.2,
+      "sd": 0.35
+     },
+     "excluded_full_pre": 0
+    },
+    "ceiling": {
+     "students": 0,
+     "share": 0.0,
+     "warning": false
+    },
+    "pre_post": {
+     "test": "paired_t",
+     "label": "Juftlangan t-testi",
+     "reason": "Farqlar taqsimoti normal.",
+     "statistic": {
+      "name": "t",
+      "value": 1.892,
+      "df": 9
+     },
+     "p": 0.091,
+     "significant": false,
+     "effect": {
+      "name": "d_z",
+      "value": 0.598,
+      "label": "o'rta"
+     },
+     "normality": {
+      "w": 0.969,
+      "p": 0.8784,
+      "normal": true
+     }
+    },
+    "post_delayed": {
+     "test": "paired_t",
+     "label": "Juftlangan t-testi",
+     "reason": "Farqlar taqsimoti normal.",
+     "statistic": {
+      "name": "t",
+      "value": -1.194,
+      "df": 9
+     },
+     "p": 0.263,
+     "significant": false,
+     "effect": {
+      "name": "d_z",
+      "value": -0.378,
+      "label": "kichik"
+     },
+     "normality": {
+      "w": 0.923,
+      "p": 0.3805,
+      "normal": true
+     }
+    }
+   },
+   "control": {
+    "label": "Nazorat",
+    "students": 10,
+    "dropped": 0,
+    "groups": 2,
+    "pre": {
+     "n": 10,
+     "mean": 57.48,
+     "sd": 22.12
+    },
+    "post": {
+     "n": 10,
+     "mean": 57.15,
+     "sd": 22.75
+    },
+    "delayed": {
+     "n": 10,
+     "mean": 54.49,
+     "sd": 26.23
+    },
+    "delayed_missing": 0,
+    "gain": {
+     "class": -0.008,
+     "level": "past",
+     "individual": {
+      "n": 10,
+      "mean": -0.12,
+      "sd": 0.57
+     },
+     "excluded_full_pre": 0
+    },
+    "ceiling": {
+     "students": 0,
+     "share": 0.0,
+     "warning": false
+    },
+    "pre_post": {
+     "test": "wilcoxon",
+     "label": "Uilkokson ishorali ranglar testi",
+     "reason": "Farqlar taqsimoti normal emas yoki tekshirib bo'lmadi: parametrsiz mezon.",
+     "statistic": {
+      "name": "z",
+      "value": 0.834
+     },
+     "p": 0.4045,
+     "significant": false,
+     "effect": {
+      "name": "r",
+      "value": 0.278,
+      "label": "kichik"
+     },
+     "normality": {
+      "w": 0.749,
+      "p": 0.0035,
+      "normal": false
+     }
+    },
+    "post_delayed": {
+     "test": "paired_t",
+     "label": "Juftlangan t-testi",
+     "reason": "Farqlar taqsimoti normal.",
+     "statistic": {
+      "name": "t",
+      "value": -0.455,
+      "df": 9
+     },
+     "p": 0.6599,
+     "significant": false,
+     "effect": {
+      "name": "d_z",
+      "value": -0.144,
+      "label": "juda kichik"
+     },
+     "normality": {
+      "w": 0.92,
+      "p": 0.3545,
+      "normal": true
+     }
+    }
+   }
+  },
+  "baseline": {
+   "test": "student",
+   "label": "Styudent t-testi",
+   "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+   "statistic": {
+    "name": "t",
+    "value": 0.0,
+    "df": 18
+   },
+   "p": 1.0,
+   "significant": false,
+   "effect": {
+    "name": "d",
+    "value": 0.0,
+    "label": "juda kichik"
+   },
+   "cohens_d": 0.0,
+   "estimate": {
+    "name": "O'rtachalar farqi",
+    "value": 0.0,
+    "ci": [
+     -20.181,
+     20.181
+    ],
+    "approximate": false
+   },
+   "hedges_g": {
+    "value": 0.0,
+    "ci": [
+     -0.88,
+     0.88
+    ]
+   },
+   "assumptions": {
+    "normality": {
+     "experimental": {
+      "w": 0.909,
+      "p": 0.2735,
+      "normal": true
+     },
+     "control": {
+      "w": 0.954,
+      "p": 0.7157,
+      "normal": true
+     }
+    },
+    "levene": {
+     "f": 0.004,
+     "p": 0.9503,
+     "equal": true
+    }
+   }
+  },
+  "comparisons": {
+   "post": {
+    "test": "student",
+    "label": "Styudent t-testi",
+    "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+    "statistic": {
+     "name": "t",
+     "value": 0.727,
+     "df": 18
+    },
+    "p": 0.4766,
+    "significant": false,
+    "effect": {
+     "name": "d",
+     "value": 0.325,
+     "label": "kichik"
+    },
+    "cohens_d": 0.325,
+    "estimate": {
+     "name": "O'rtachalar farqi",
+     "value": 7.5,
+     "ci": [
+      -14.173,
+      29.173
+     ],
+     "approximate": false
+    },
+    "hedges_g": {
+     "value": 0.311,
+     "ci": [
+      -0.57,
+      1.19
+     ]
+    },
+    "assumptions": {
+     "normality": {
+      "experimental": {
+       "w": 0.908,
+       "p": 0.2668,
+       "normal": true
+      },
+      "control": {
+       "w": 0.967,
+       "p": 0.8664,
+       "normal": true
+      }
+     },
+     "levene": {
+      "f": 0.073,
+      "p": 0.7894,
+      "equal": true
+     }
+    },
+    "p_holm": 1.0,
+    "significant_holm": false
+   },
+   "gain": {
+    "test": "mann_whitney",
+    "label": "Mann–Uitni U testi",
+    "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+    "statistic": {
+     "name": "U",
+     "value": 62.0,
+     "z": 0.908
+    },
+    "p": 0.364,
+    "significant": false,
+    "effect": {
+     "name": "r",
+     "value": 0.203,
+     "label": "kichik"
+    },
+    "cohens_d": 0.683,
+    "estimate": {
+     "name": "Xodjes–Leman siljishi",
+     "value": 0.196,
+     "ci": [
+      -0.12,
+      0.638
+     ],
+     "approximate": false
+    },
+    "hedges_g": {
+     "value": 0.654,
+     "ci": [
+      -0.25,
+      1.55
+     ]
+    },
+    "assumptions": {
+     "normality": {
+      "experimental": {
+       "w": 0.971,
+       "p": 0.8982,
+       "normal": true
+      },
+      "control": {
+       "w": 0.741,
+       "p": 0.0028,
+       "normal": false
+      }
+     },
+     "levene": {
+      "f": 0.291,
+      "p": 0.5962,
+      "equal": true
+     }
+    },
+    "p_holm": 1.0,
+    "significant_holm": false
+   },
+   "delayed": {
+    "test": "student",
+    "label": "Styudent t-testi",
+    "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+    "statistic": {
+     "name": "t",
+     "value": 0.482,
+     "df": 18
+    },
+    "p": 0.6357,
+    "significant": false,
+    "effect": {
+     "name": "d",
+     "value": 0.215,
+     "label": "kichik"
+    },
+    "cohens_d": 0.215,
+    "estimate": {
+     "name": "O'rtachalar farqi",
+     "value": 5.49,
+     "ci": [
+      -18.449,
+      29.429
+     ],
+     "approximate": false
+    },
+    "hedges_g": {
+     "value": 0.206,
+     "ci": [
+      -0.67,
+      1.09
+     ]
+    },
+    "assumptions": {
+     "normality": {
+      "experimental": {
+       "w": 0.977,
+       "p": 0.9504,
+       "normal": true
+      },
+      "control": {
+       "w": 0.896,
+       "p": 0.1962,
+       "normal": true
+      }
+     },
+     "levene": {
+      "f": 0.012,
+      "p": 0.9128,
+      "equal": true
+     }
+    },
+    "p_holm": 1.0,
+    "significant_holm": false
+   }
+  },
+  "ancova": {
+   "primary": true,
+   "f": 1.115,
+   "df1": 1,
+   "df2": 17,
+   "p": 0.3057,
+   "significant": false,
+   "partial_eta2": 0.062,
+   "effect_label": "o'rta",
+   "adjusted_means": {
+    "experimental": 64.65,
+    "control": 57.15
+   },
+   "adjusted_diff": 7.5,
+   "adjusted_diff_ci": [
+    -7.48,
+    22.48
+   ],
+   "hedges_g": {
+    "value": 0.311,
+    "ci": [
+     -0.31,
+     0.93
+    ]
+   },
+   "slopes": {
+    "f": 0.8,
+    "p": 0.3843,
+    "parallel": true
+   }
+  },
+  "power": {
+   "observed_d": 0.325,
+   "achieved": 0.112,
+   "required_per_group_observed": 150,
+   "required_per_group_medium": 64,
+   "target": 0.8,
+   "alpha": 0.05,
+   "approximate": true
+  },
+  "clustering": {
+   "groups": {
+    "experimental": 2,
+    "control": 2
+   },
+   "confounded": false,
+   "icc": {
+    "value": 0.0,
+    "f": 0.561,
+    "p": 0.6487,
+    "clusters": 4,
+    "mean_size": 5.0,
+    "design_effect": 1.0,
+    "effective_n": 20.0
+   }
+  },
+  "forms": {
+   "margin": 10,
+   "item_gap": 0.15,
+   "alpha": 0.05,
+   "by_kind": [
+    {
+     "kind": "pre",
+     "label": "Kirish testi",
+     "A": {
+      "n": 10,
+      "mean": 59.15,
+      "sd": 21.77
+     },
+     "B": {
+      "n": 10,
+      "mean": 55.81,
+      "sd": 21.04
+     },
+     "difference": {
+      "test": "student",
+      "label": "Styudent t-testi",
+      "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+      "statistic": {
+       "name": "t",
+       "value": 0.349,
+       "df": 18
+      },
+      "p": 0.7312,
+      "significant": false,
+      "effect": {
+       "name": "d",
+       "value": 0.156,
+       "label": "juda kichik"
+      },
+      "cohens_d": 0.156,
+      "estimate": {
+       "name": "O'rtachalar farqi",
+       "value": 3.34,
+       "ci": [
+        -16.773,
+        23.453
+       ],
+       "approximate": false
+      },
+      "hedges_g": {
+       "value": 0.149,
+       "ci": [
+        -0.73,
+        1.03
+       ]
+      },
+      "assumptions": {
+       "normality": {
+        "experimental": {
+         "w": 0.962,
+         "p": 0.805,
+         "normal": true
+        },
+        "control": {
+         "w": 0.915,
+         "p": 0.3139,
+         "normal": true
+        }
+       },
+       "levene": {
+        "f": 0.131,
+        "p": 0.7219,
+        "equal": true
+       }
+      }
+     },
+     "equivalence": {
+      "diff": 3.34,
+      "margin": 10,
+      "ci": [
+       -13.26,
+       19.94
+      ],
+      "p": 0.2478,
+      "equivalent": false
+     }
+    },
+    {
+     "kind": "post",
+     "label": "Chiqish testi",
+     "A": {
+      "n": 10,
+      "mean": 62.48,
+      "sd": 22.04
+     },
+     "B": {
+      "n": 10,
+      "mean": 59.32,
+      "sd": 24.58
+     },
+     "difference": {
+      "test": "student",
+      "label": "Styudent t-testi",
+      "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+      "statistic": {
+       "name": "t",
+       "value": 0.303,
+       "df": 18
+      },
+      "p": 0.7656,
+      "significant": false,
+      "effect": {
+       "name": "d",
+       "value": 0.135,
+       "label": "juda kichik"
+      },
+      "cohens_d": 0.135,
+      "estimate": {
+       "name": "O'rtachalar farqi",
+       "value": 3.16,
+       "ci": [
+        -18.773,
+        25.093
+       ],
+       "approximate": false
+      },
+      "hedges_g": {
+       "value": 0.13,
+       "ci": [
+        -0.75,
+        1.01
+       ]
+      },
+      "assumptions": {
+       "normality": {
+        "experimental": {
+         "w": 0.951,
+         "p": 0.6839,
+         "normal": true
+        },
+        "control": {
+         "w": 0.931,
+         "p": 0.4609,
+         "normal": true
+        }
+       },
+       "levene": {
+        "f": 0.058,
+        "p": 0.812,
+        "equal": true
+       }
+      }
+     },
+     "equivalence": {
+      "diff": 3.16,
+      "margin": 10,
+      "ci": [
+       -14.95,
+       21.27
+      ],
+      "p": 0.2604,
+      "equivalent": false
+     }
+    },
+    {
+     "kind": "delayed",
+     "label": "Kechiktirilgan test",
+     "A": {
+      "n": 10,
+      "mean": 59.98,
+      "sd": 27.07
+     },
+     "B": {
+      "n": 10,
+      "mean": 54.49,
+      "sd": 23.78
+     },
+     "difference": {
+      "test": "student",
+      "label": "Styudent t-testi",
+      "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+      "statistic": {
+       "name": "t",
+       "value": 0.482,
+       "df": 18
+      },
+      "p": 0.6357,
+      "significant": false,
+      "effect": {
+       "name": "d",
+       "value": 0.215,
+       "label": "kichik"
+      },
+      "cohens_d": 0.215,
+      "estimate": {
+       "name": "O'rtachalar farqi",
+       "value": 5.49,
+       "ci": [
+        -18.449,
+        29.429
+       ],
+       "approximate": false
+      },
+      "hedges_g": {
+       "value": 0.206,
+       "ci": [
+        -0.67,
+        1.09
+       ]
+      },
+      "assumptions": {
+       "normality": {
+        "experimental": {
+         "w": 0.924,
+         "p": 0.3901,
+         "normal": true
+        },
+        "control": {
+         "w": 0.948,
+         "p": 0.6447,
+         "normal": true
+        }
+       },
+       "levene": {
+        "f": 0.028,
+        "p": 0.8686,
+        "equal": true
+       }
+      }
+     },
+     "equivalence": {
+      "diff": 5.49,
+      "margin": 10,
+      "ci": [
+       -14.29,
+       25.27
+      ],
+      "p": 0.3485,
+      "equivalent": false
+     }
+    }
+   ],
+   "reliability": null,
+   "items": [
+    {
+     "order": 1,
+     "A": 0.7,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 2,
+     "A": 0.6,
+     "B": 0.3,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 3,
+     "A": 0.7,
+     "B": 0.8,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 4,
+     "A": 0.5,
+     "B": 0.7,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 5,
+     "A": 0.6,
+     "B": 0.4,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 6,
+     "A": 0.6,
+     "B": 0.7,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 7,
+     "A": 0.7,
+     "B": 0.4,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 8,
+     "A": 0.4,
+     "B": 0.7,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 9,
+     "A": 0.7,
+     "B": 0.7,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 10,
+     "A": 0.7,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 11,
+     "A": 0.5,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 12,
+     "A": 0.4,
+     "B": 0.3,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 13,
+     "A": 0.5,
+     "B": 0.7,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 14,
+     "A": 0.6,
+     "B": 0.4,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 15,
+     "A": 0.9,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 16,
+     "A": 0.8,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 17,
+     "A": 0.4,
+     "B": 0.5,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 18,
+     "A": 0.3,
+     "B": 0.6,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    },
+    {
+     "order": 19,
+     "A": 0.73,
+     "B": 0.67,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": false
+    },
+    {
+     "order": 20,
+     "A": 0.5,
+     "B": 0.8,
+     "n_A": 10,
+     "n_B": 10,
+     "gap": true
+    }
+   ],
+   "same_form": 0,
+   "without_form": 0
+  },
+  "external_ai": {
+   "threshold": 4,
+   "answered": 20,
+   "cohorts": {
+    "experimental": {
+     "n": 10,
+     "mean": 4.1,
+     "sd": 0.66,
+     "heavy": 8,
+     "heavy_share": 0.8
+    },
+    "control": {
+     "n": 10,
+     "mean": 3.75,
+     "sd": 0.82,
+     "heavy": 5,
+     "heavy_share": 0.5
+    }
+   },
+   "comparison": {
+    "test": "student",
+    "label": "Styudent t-testi",
+    "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+    "statistic": {
+     "name": "t",
+     "value": 1.049,
+     "df": 18
+    },
+    "p": 0.3082,
+    "significant": false,
+    "effect": {
+     "name": "d",
+     "value": 0.469,
+     "label": "kichik"
+    },
+    "cohens_d": 0.469,
+    "estimate": {
+     "name": "O'rtachalar farqi",
+     "value": 0.35,
+     "ci": [
+      -0.351,
+      1.051
+     ],
+     "approximate": false
+    },
+    "hedges_g": {
+     "value": 0.449,
+     "ci": [
+      -0.44,
+      1.34
+     ]
+    },
+    "assumptions": {
+     "normality": {
+      "experimental": {
+       "w": 0.858,
+       "p": 0.0727,
+       "normal": true
+      },
+      "control": {
+       "w": 0.931,
+       "p": 0.4582,
+       "normal": true
+      }
+     },
+     "levene": {
+      "f": 0.574,
+      "p": 0.4583,
+      "equal": true
+     }
+    }
+   },
+   "sensitivity": null
+  },
+  "attrition": {
+   "post": {
+    "cohorts": {
+     "experimental": {
+      "label": "Tajriba (AI yoqilgan)",
+      "started": 10,
+      "lost": 0,
+      "rate": 0.0
+     },
+     "control": {
+      "label": "Nazorat",
+      "started": 10,
+      "lost": 0,
+      "rate": 0.0
+     }
+    },
+    "overall": 0.0,
+    "differential": 0.0,
+    "level": "past",
+    "test": null,
+    "baseline": null
+   },
+   "delayed": {
+    "cohorts": {
+     "experimental": {
+      "label": "Tajriba (AI yoqilgan)",
+      "started": 10,
+      "lost": 0,
+      "rate": 0.0
+     },
+     "control": {
+      "label": "Nazorat",
+      "started": 10,
+      "lost": 0,
+      "rate": 0.0
+     }
+    },
+    "overall": 0.0,
+    "differential": 0.0,
+    "level": "past",
+    "test": null,
+    "baseline": null
+   }
+  },
+  "fidelity": {
+   "target": 0.8,
+   "cohorts": {
+    "experimental": {
+     "label": "Tajriba (AI yoqilgan)",
+     "students": 10,
+     "no_window": 0,
+     "users": 0,
+     "uptake": 0.0,
+     "dose": {
+      "n": 10,
+      "mean": 0.0,
+      "sd": 0.0,
+      "median": 0.0
+     },
+     "sources": {
+      "hints": 0,
+      "actions": 0,
+      "chat": 0
+     },
+     "changed_condition": 0
+    },
+    "control": {
+     "label": "Nazorat",
+     "students": 10,
+     "no_window": 0,
+     "users": 0,
+     "uptake": 0.0,
+     "dose": {
+      "n": 10,
+      "mean": 0.0,
+      "sd": 0.0,
+      "median": 0.0
+     },
+     "sources": {
+      "hints": 0,
+      "actions": 0,
+      "chat": 0
+     },
+     "changed_condition": 0
+    }
+   },
+   "dose_response": null,
+   "per_protocol": null
+  },
+  "conclusions": [
+   "Tajriba boshida guruhlar kirish testi bo'yicha teng bo'lgan (Styudent t-testi, p = 1.000).",
+   "Asosiy gipoteza (oldindan belgilangan): kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi ahamiyatli emas: F(1, 17) = 1.115, p = 0.306, qisman η² = 0.062 (o'rta).",
+   "Tuzatilgan farq (tajriba − nazorat): 7.5 ball, 95% CI [-7.48; 22.48], Xedjes g = 0.311, 95% CI [-0.31; 0.93].",
+   "Ikkilamchi: chiqish testida tajriba guruhi o'rtachasi 64.65%, nazorat guruhiniki 57.15%: statistik ahamiyatli farq yo'q (Styudent t-testi, p = 0.477, Xolm bo'yicha p = 1.000, d = 0.325 — kichik effekt, o'rtachalar farqi = 7.5, 95% CI [-14.173; 29.173]).",
+   "Hake o'sishi: tajriba guruhida ⟨g⟩ = 0.169 (past), nazorat guruhida ⟨g⟩ = -0.008 (past).",
+   "Klasterlash: guruhlararo ICC = 0.0, dizayn effekti 1.0, samarali talabalar soni ≈ 20.0. ICC 0.05 dan katta bo'lsa, ko'p darajali model (guruh — tasodifiy effekt) bilan tekshiring (qayta hisoblash skripti). Ishonch oraliqlari klasterlashni hisobga olmaydi: ICC katta bo'lsa, ular haqiqatdagidan tor.",
+   "Statistik quvvat past (11%): kuzatilgan effektni ishonchli aniqlash uchun har bir guruhda taxminan 150 ta talaba kerak (hozir 10 va 10).",
+   "Aralashuvning bajarilishi: tajriba guruhidagi 10 ta talabadan 0 tasi (0%) kirish va chiqish testlari orasida platformadagi AI dan foydalangan (mediana 0 ta murojaat).",
+   "Diqqat: AI dan foydalanganlar 80% dan kam — \"AI yoqilgan\" guruh AI ni to'liq ishlatmagan, shuning uchun asosiy tahlil AI imkoniyati effektini o'lchaydi, AI ning o'zi effektini kam ko'rsatishi mumkin.",
+   "Parallel variantlar ekvivalentligi isbotlanmadi (kirish testi, TOST, ±10 foiz punkti, p = 0.248): pilot sinovda variantlarni tenglashtiring yoki variantni kovariata sifatida hisobga oling.",
+   "Parallel variantlar ekvivalentligi isbotlanmadi (chiqish testi, TOST, ±10 foiz punkti, p = 0.260): pilot sinovda variantlarni tenglashtiring yoki variantni kovariata sifatida hisobga oling.",
+   "Parallel variantlar ekvivalentligi isbotlanmadi (kechiktirilgan test, TOST, ±10 foiz punkti, p = 0.348): pilot sinovda variantlarni tenglashtiring yoki variantni kovariata sifatida hisobga oling.",
+   "Qiyinligi variantlar orasida 15% dan ko'p farq qiladigan juft savollar: 1, 2, 4, 5, 7, 8, 10, 13, 14, 15, 16, 18, 20.",
+   "Tashqi AI vositalari: nazorat guruhida 5 ta talaba (ulushi 0.5) ulardan ko'p foydalanganini bildirgan (o'rtacha ≥ 4) — bu AI effektini kamaytirib ko'rsatishi mumkin."
+  ]
+ },
+ "er_jarayoni": {
+  "SIM2 kirish ER: ER-model 1. Universitet: talaba, guruh va fan": {
+   "labs": [
+    {
+     "id": 96,
+     "title": "SIM2 kirish ER: ER-model 1. Universitet: talaba, guruh va fan"
+    },
+    {
+     "id": 97,
+     "title": "SIM2 chiqish ER: ER-model 2. Kutubxona"
+    },
+    {
+     "id": 98,
+     "title": "SIM2 kechiktirilgan ER: ER-model 3. Shifoxona: 1:1, 1:N va M:N bog'lanishlar"
+    },
+    {
+     "id": 99,
+     "title": "SIM2 o'quv ER (imtihonsiz): ER-model 2. Kutubxona"
+    }
+   ],
+   "works": 20,
+   "students": 20,
+   "cohorts": {
+    "experimental": "Tajriba (AI yoqilgan)",
+    "control": "Nazorat"
+   },
+   "strategies": {
+    "items": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar",
+      "count": 5,
+      "share": 0.25,
+      "mean_grade": 61.8,
+      "solved_rate": 0.2,
+      "by_cohort": {
+       "experimental": 3,
+       "control": 2
+      }
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)",
+      "count": 3,
+      "share": 0.15,
+      "mean_grade": 69.0,
+      "solved_rate": 0.333,
+      "by_cohort": {
+       "experimental": 1,
+       "control": 2
+      }
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish",
+      "count": 4,
+      "share": 0.2,
+      "mean_grade": 38.2,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 2,
+       "control": 2
+      }
+     },
+     {
+      "strategy": "aniqlanmadi",
+      "label": "Aniqlanmadi (hodisalar kam)",
+      "count": 8,
+      "share": 0.4,
+      "mean_grade": 37.6,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 4,
+       "control": 4
+      }
+     }
+    ],
+    "solved_test": {
+     "chi2": 1.44,
+     "df": 2,
+     "p": 0.4868,
+     "significant": false,
+     "cramers_v": 0.346,
+     "effect_label": "o'rta",
+     "reliable": false
+    },
+    "grade_test": {
+     "h": 7.478,
+     "df": 2,
+     "p": 0.0238,
+     "significant": true,
+     "epsilon2": 0.68,
+     "effect_label": "katta"
+    },
+    "cohort_test": {
+     "chi2": 0.533,
+     "df": 2,
+     "p": 0.7659,
+     "significant": false,
+     "cramers_v": 0.211,
+     "effect_label": "kichik",
+     "reliable": false
+    }
+   },
+   "cohort_comparison": {
+    "curves": {
+     "experimental": {
+      "n": 10,
+      "points": [
+       0.414,
+       0.414,
+       0.414,
+       0.414,
+       0.442,
+       0.489,
+       0.519,
+       0.544,
+       0.544,
+       0.641,
+       0.664,
+       0.689,
+       0.72,
+       0.72,
+       0.725,
+       0.716,
+       0.723,
+       0.745,
+       0.753,
+       0.753,
+       0.753
+      ]
+     },
+     "control": {
+      "n": 10,
+      "points": [
+       0.467,
+       0.467,
+       0.467,
+       0.461,
+       0.495,
+       0.519,
+       0.539,
+       0.564,
+       0.572,
+       0.616,
+       0.636,
+       0.655,
+       0.677,
+       0.712,
+       0.717,
+       0.713,
+       0.719,
+       0.728,
+       0.732,
+       0.732,
+       0.732
+      ]
+     }
+    },
+    "comparisons": [
+     {
+      "metric": "active_minutes",
+      "label": "Faol vaqt (daqiqa)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.26
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.26
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": 0.0,
+        "df": 18
+       },
+       "p": 1.0,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": 0.0,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.0,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": 0.0,
+        "ci": [
+         -0.091,
+         0.091
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.0,
+        "ci": [
+         -0.88,
+         0.88
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.892,
+          "p": 0.177,
+          "normal": true
+         },
+         "control": {
+          "w": 0.89,
+          "p": 0.1716,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.36,
+         "p": 0.556,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "checks",
+      "label": "Tekshiruvlar soni",
+      "experimental": {
+       "n": 10,
+       "mean": 3.4
+      },
+      "control": {
+       "n": 10,
+       "mean": 3.3
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 54.0,
+        "z": 0.326
+       },
+       "p": 0.7444,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.073,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.051,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -1.0,
+         1.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.048,
+        "ci": [
+         -0.83,
+         0.93
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.684,
+          "p": 0.0006,
+          "normal": false
+         },
+         "control": {
+          "w": 0.663,
+          "p": 0.0003,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.019,
+         "p": 0.8917,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "churn",
+      "label": "Qaytarish ulushi (o'chirilgan / qo'shilgan)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.08
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.06
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 51.0,
+        "z": 0.108
+       },
+       "p": 0.9136,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.024,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.131,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         0.0,
+         0.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.125,
+        "ci": [
+         -0.75,
+         1.0
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.509,
+          "p": 0.0,
+          "normal": false
+         },
+         "control": {
+          "w": 0.532,
+          "p": 0.0,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.086,
+         "p": 0.773,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_relationship_minutes",
+      "label": "Birinchi bog'lanishgacha (daqiqa)",
+      "experimental": {
+       "n": 8,
+       "mean": 0.175
+      },
+      "control": {
+       "n": 9,
+       "mean": 0.144
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 47.0,
+        "z": 1.24
+       },
+       "p": 0.2151,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.301,
+        "label": "o'rta"
+       },
+       "cohens_d": 0.613,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         0.0,
+         0.1
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.582,
+        "ci": [
+         -0.39,
+         1.55
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.566,
+          "p": 0.0001,
+          "normal": false
+         },
+         "control": {
+          "w": 0.655,
+          "p": 0.0004,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.645,
+         "p": 0.4343,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "entities_first_share",
+      "label": "Obyektlarning bog'lanishdan oldin chizilgan ulushi",
+      "experimental": {
+       "n": 10,
+       "mean": 0.917
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.85
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 62.0,
+        "z": 1.034
+       },
+       "p": 0.3012,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.231,
+        "label": "kichik"
+       },
+       "cohens_d": 0.447,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         0.0,
+         0.25
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.428,
+        "ci": [
+         -0.46,
+         1.31
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.642,
+          "p": 0.0002,
+          "normal": false
+         },
+         "control": {
+          "w": 0.731,
+          "p": 0.0021,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 2.206,
+         "p": 0.1548,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_check_ratio",
+      "label": "Birinchi tekshiruvdagi moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.477
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.581
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": -1.158,
+        "df": 18
+       },
+       "p": 0.2622,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": -0.518,
+        "label": "o'rta"
+       },
+       "cohens_d": -0.518,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": -0.104,
+        "ci": [
+         -0.292,
+         0.084
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.496,
+        "ci": [
+         -1.39,
+         0.39
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.896,
+          "p": 0.2001,
+          "normal": true
+         },
+         "control": {
+          "w": 0.969,
+          "p": 0.8823,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.088,
+         "p": 0.7702,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "final_ratio",
+      "label": "Yakuniy moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.753
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.732
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": 0.241,
+        "df": 18
+       },
+       "p": 0.8124,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": 0.108,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.108,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": 0.02,
+        "ci": [
+         -0.158,
+         0.198
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.103,
+        "ci": [
+         -0.77,
+         0.98
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.895,
+          "p": 0.1919,
+          "normal": true
+         },
+         "control": {
+          "w": 0.947,
+          "p": 0.6292,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.001,
+         "p": 0.9736,
+         "equal": true
+        }
+       }
+      }
+     }
+    ]
+   },
+   "transitions": {
+    "strategies": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar"
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)"
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish"
+     }
+    ],
+    "students": 0,
+    "matrix": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   "conclusions": [
+    "Eng ko'p uchragan strategiya — «Avval obyektlar, keyin bog'lanishlar» (5 ta ish, 42%).",
+    "Strategiyalar bo'yicha baholar ahamiyatli farq qiladi (Kraskel–Uollis H = 7.478, p = 0.024, ε² = 0.68).",
+    "Tajriba va nazorat guruhlarida strategiyalar taqsimoti statistik ahamiyatli farq qilmaydi (χ² = 0.533, p = 0.766, Kramer V = 0.211). Diqqat: kataklardagi kutilgan son 5 dan kam, natija taxminiy."
+   ]
+  },
+  "SIM2 chiqish ER: ER-model 2. Kutubxona": {
+   "labs": [
+    {
+     "id": 96,
+     "title": "SIM2 kirish ER: ER-model 1. Universitet: talaba, guruh va fan"
+    },
+    {
+     "id": 97,
+     "title": "SIM2 chiqish ER: ER-model 2. Kutubxona"
+    },
+    {
+     "id": 98,
+     "title": "SIM2 kechiktirilgan ER: ER-model 3. Shifoxona: 1:1, 1:N va M:N bog'lanishlar"
+    },
+    {
+     "id": 99,
+     "title": "SIM2 o'quv ER (imtihonsiz): ER-model 2. Kutubxona"
+    }
+   ],
+   "works": 20,
+   "students": 20,
+   "cohorts": {
+    "experimental": "Tajriba (AI yoqilgan)",
+    "control": "Nazorat"
+   },
+   "strategies": {
+    "items": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar",
+      "count": 8,
+      "share": 0.4,
+      "mean_grade": 59.8,
+      "solved_rate": 0.25,
+      "by_cohort": {
+       "experimental": 3,
+       "control": 5
+      }
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)",
+      "count": 6,
+      "share": 0.3,
+      "mean_grade": 53.2,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 3,
+       "control": 3
+      }
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish",
+      "count": 3,
+      "share": 0.15,
+      "mean_grade": 48.0,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 2,
+       "control": 1
+      }
+     },
+     {
+      "strategy": "aniqlanmadi",
+      "label": "Aniqlanmadi (hodisalar kam)",
+      "count": 3,
+      "share": 0.15,
+      "mean_grade": 35.7,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 2,
+       "control": 1
+      }
+     }
+    ],
+    "solved_test": {
+     "chi2": 2.55,
+     "df": 2,
+     "p": 0.2794,
+     "significant": false,
+     "cramers_v": 0.387,
+     "effect_label": "o'rta",
+     "reliable": false
+    },
+    "grade_test": {
+     "h": 0.151,
+     "df": 2,
+     "p": 0.9274,
+     "significant": false,
+     "epsilon2": 0.009,
+     "effect_label": "juda kichik"
+    },
+    "cohort_test": {
+     "chi2": 0.777,
+     "df": 2,
+     "p": 0.678,
+     "significant": false,
+     "cramers_v": 0.214,
+     "effect_label": "kichik",
+     "reliable": false
+    }
+   },
+   "cohort_comparison": {
+    "curves": {
+     "experimental": {
+      "n": 10,
+      "points": [
+       0.391,
+       0.391,
+       0.393,
+       0.5,
+       0.53,
+       0.534,
+       0.583,
+       0.583,
+       0.599,
+       0.658,
+       0.673,
+       0.699,
+       0.718,
+       0.726,
+       0.736,
+       0.769,
+       0.773,
+       0.785,
+       0.801,
+       0.805,
+       0.805
+      ]
+     },
+     "control": {
+      "n": 10,
+      "points": [
+       0.394,
+       0.394,
+       0.408,
+       0.466,
+       0.563,
+       0.563,
+       0.599,
+       0.605,
+       0.625,
+       0.681,
+       0.678,
+       0.676,
+       0.717,
+       0.73,
+       0.757,
+       0.773,
+       0.778,
+       0.794,
+       0.803,
+       0.806,
+       0.806
+      ]
+     }
+    },
+    "comparisons": [
+     {
+      "metric": "active_minutes",
+      "label": "Faol vaqt (daqiqa)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.41
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.37
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 58.0,
+        "z": 0.64
+       },
+       "p": 0.5223,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.143,
+        "label": "kichik"
+       },
+       "cohens_d": 0.229,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -0.1,
+         0.1
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.219,
+        "ci": [
+         -0.66,
+         1.1
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.887,
+          "p": 0.1583,
+          "normal": true
+         },
+         "control": {
+          "w": 0.794,
+          "p": 0.0122,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.472,
+         "p": 0.5008,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "checks",
+      "label": "Tekshiruvlar soni",
+      "experimental": {
+       "n": 10,
+       "mean": 3.4
+      },
+      "control": {
+       "n": 10,
+       "mean": 3.1
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 49.0,
+        "z": -0.083
+       },
+       "p": 0.9339,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.019,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.174,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -1.0,
+         1.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.167,
+        "ci": [
+         -0.71,
+         1.05
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.684,
+          "p": 0.0006,
+          "normal": false
+         },
+         "control": {
+          "w": 0.616,
+          "p": 0.0001,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.63,
+         "p": 0.4376,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "churn",
+      "label": "Qaytarish ulushi (o'chirilgan / qo'shilgan)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.066
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.033
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 55.0,
+        "z": 0.608
+       },
+       "p": 0.5432,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.136,
+        "label": "kichik"
+       },
+       "cohens_d": 0.266,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         0.0,
+         0.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.255,
+        "ci": [
+         -0.63,
+         1.14
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.53,
+          "p": 0.0,
+          "normal": false
+         },
+         "control": {
+          "w": 0.366,
+          "p": 0.0,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.354,
+         "p": 0.559,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_relationship_minutes",
+      "label": "Birinchi bog'lanishgacha (daqiqa)",
+      "experimental": {
+       "n": 9,
+       "mean": 0.156
+      },
+      "control": {
+       "n": 9,
+       "mean": 0.156
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 40.5,
+        "z": 0.0
+       },
+       "p": 1.0,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.0,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.0,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -0.1,
+         0.1
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.0,
+        "ci": [
+         -0.92,
+         0.92
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.655,
+          "p": 0.0004,
+          "normal": false
+         },
+         "control": {
+          "w": 0.655,
+          "p": 0.0004,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.0,
+         "p": 1.0,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "entities_first_share",
+      "label": "Obyektlarning bog'lanishdan oldin chizilgan ulushi",
+      "experimental": {
+       "n": 10,
+       "mean": 0.716
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.795
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 42.5,
+        "z": -0.627
+       },
+       "p": 0.531,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.14,
+        "label": "kichik"
+       },
+       "cohens_d": -0.27,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -0.5,
+         0.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.259,
+        "ci": [
+         -1.14,
+         0.62
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.765,
+          "p": 0.0055,
+          "normal": false
+         },
+         "control": {
+          "w": 0.743,
+          "p": 0.003,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.751,
+         "p": 0.3975,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_check_ratio",
+      "label": "Birinchi tekshiruvdagi moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.57
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.556
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": 0.167,
+        "df": 18
+       },
+       "p": 0.8689,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": 0.075,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.075,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": 0.014,
+        "ci": [
+         -0.163,
+         0.191
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.072,
+        "ci": [
+         -0.81,
+         0.95
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.972,
+          "p": 0.9064,
+          "normal": true
+         },
+         "control": {
+          "w": 0.965,
+          "p": 0.8395,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.002,
+         "p": 0.9628,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "final_ratio",
+      "label": "Yakuniy moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.805
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.806
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": -0.009,
+        "df": 18
+       },
+       "p": 0.993,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": -0.004,
+        "label": "juda kichik"
+       },
+       "cohens_d": -0.004,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": -0.001,
+        "ci": [
+         -0.165,
+         0.164
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.004,
+        "ci": [
+         -0.88,
+         0.87
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.901,
+          "p": 0.2245,
+          "normal": true
+         },
+         "control": {
+          "w": 0.877,
+          "p": 0.1204,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.042,
+         "p": 0.8392,
+         "equal": true
+        }
+       }
+      }
+     }
+    ]
+   },
+   "transitions": {
+    "strategies": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar"
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)"
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish"
+     }
+    ],
+    "students": 0,
+    "matrix": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   "conclusions": [
+    "Eng ko'p uchragan strategiya — «Avval obyektlar, keyin bog'lanishlar» (8 ta ish, 47%).",
+    "Strategiyalar bo'yicha baholar statistik ahamiyatli farq qilmaydi (Kraskel–Uollis H = 0.151, p = 0.927, ε² = 0.009).",
+    "Tajriba va nazorat guruhlarida strategiyalar taqsimoti statistik ahamiyatli farq qilmaydi (χ² = 0.777, p = 0.678, Kramer V = 0.214). Diqqat: kataklardagi kutilgan son 5 dan kam, natija taxminiy."
+   ]
+  },
+  "SIM2 kechiktirilgan ER: ER-model 3. Shifoxona: 1:1, 1:N va M:N bog'lanishlar": {
+   "labs": [
+    {
+     "id": 96,
+     "title": "SIM2 kirish ER: ER-model 1. Universitet: talaba, guruh va fan"
+    },
+    {
+     "id": 97,
+     "title": "SIM2 chiqish ER: ER-model 2. Kutubxona"
+    },
+    {
+     "id": 98,
+     "title": "SIM2 kechiktirilgan ER: ER-model 3. Shifoxona: 1:1, 1:N va M:N bog'lanishlar"
+    },
+    {
+     "id": 99,
+     "title": "SIM2 o'quv ER (imtihonsiz): ER-model 2. Kutubxona"
+    }
+   ],
+   "works": 20,
+   "students": 20,
+   "cohorts": {
+    "experimental": "Tajriba (AI yoqilgan)",
+    "control": "Nazorat"
+   },
+   "strategies": {
+    "items": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar",
+      "count": 5,
+      "share": 0.25,
+      "mean_grade": 62.4,
+      "solved_rate": 0.2,
+      "by_cohort": {
+       "experimental": 2,
+       "control": 3
+      }
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)",
+      "count": 6,
+      "share": 0.3,
+      "mean_grade": 48.8,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 3,
+       "control": 3
+      }
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish",
+      "count": 4,
+      "share": 0.2,
+      "mean_grade": 45.5,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 2,
+       "control": 2
+      }
+     },
+     {
+      "strategy": "aniqlanmadi",
+      "label": "Aniqlanmadi (hodisalar kam)",
+      "count": 5,
+      "share": 0.25,
+      "mean_grade": 27.2,
+      "solved_rate": 0.0,
+      "by_cohort": {
+       "experimental": 3,
+       "control": 2
+      }
+     }
+    ],
+    "solved_test": {
+     "chi2": 2.143,
+     "df": 2,
+     "p": 0.3425,
+     "significant": false,
+     "cramers_v": 0.378,
+     "effect_label": "o'rta",
+     "reliable": false
+    },
+    "grade_test": {
+     "h": 1.245,
+     "df": 2,
+     "p": 0.5367,
+     "significant": false,
+     "epsilon2": 0.089,
+     "effect_label": "o'rta"
+    },
+    "cohort_test": {
+     "chi2": 0.134,
+     "df": 2,
+     "p": 0.9352,
+     "significant": false,
+     "cramers_v": 0.094,
+     "effect_label": "juda kichik",
+     "reliable": false
+    }
+   },
+   "cohort_comparison": {
+    "curves": {
+     "experimental": {
+      "n": 10,
+      "points": [
+       0.268,
+       0.268,
+       0.332,
+       0.366,
+       0.389,
+       0.429,
+       0.47,
+       0.491,
+       0.491,
+       0.56,
+       0.601,
+       0.603,
+       0.642,
+       0.646,
+       0.657,
+       0.672,
+       0.692,
+       0.694,
+       0.707,
+       0.721,
+       0.721
+      ]
+     },
+     "control": {
+      "n": 10,
+      "points": [
+       0.288,
+       0.288,
+       0.347,
+       0.391,
+       0.425,
+       0.483,
+       0.524,
+       0.55,
+       0.558,
+       0.583,
+       0.638,
+       0.642,
+       0.656,
+       0.671,
+       0.68,
+       0.695,
+       0.711,
+       0.735,
+       0.74,
+       0.751,
+       0.751
+      ]
+     }
+    },
+    "comparisons": [
+     {
+      "metric": "active_minutes",
+      "label": "Faol vaqt (daqiqa)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.42
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.4
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": 0.238,
+        "df": 18
+       },
+       "p": 0.8146,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": 0.106,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.106,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": 0.02,
+        "ci": [
+         -0.157,
+         0.197
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.102,
+        "ci": [
+         -0.78,
+         0.98
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.893,
+          "p": 0.1849,
+          "normal": true
+         },
+         "control": {
+          "w": 0.887,
+          "p": 0.1576,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.533,
+         "p": 0.4746,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "checks",
+      "label": "Tekshiruvlar soni",
+      "experimental": {
+       "n": 10,
+       "mean": 3.4
+      },
+      "control": {
+       "n": 10,
+       "mean": 3.3
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 54.0,
+        "z": 0.326
+       },
+       "p": 0.7444,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.073,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.051,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -1.0,
+         1.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.048,
+        "ci": [
+         -0.83,
+         0.93
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.684,
+          "p": 0.0006,
+          "normal": false
+         },
+         "control": {
+          "w": 0.663,
+          "p": 0.0003,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.019,
+         "p": 0.8917,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "churn",
+      "label": "Qaytarish ulushi (o'chirilgan / qo'shilgan)",
+      "experimental": {
+       "n": 10,
+       "mean": 0.071
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.033
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 52.0,
+        "z": 0.216
+       },
+       "p": 0.8288,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.048,
+        "label": "juda kichik"
+       },
+       "cohens_d": 0.315,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         0.0,
+         0.0
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": 0.302,
+        "ci": [
+         -0.58,
+         1.18
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.535,
+          "p": 0.0,
+          "normal": false
+         },
+         "control": {
+          "w": 0.532,
+          "p": 0.0,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.496,
+         "p": 0.4903,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_relationship_minutes",
+      "label": "Birinchi bog'lanishgacha (daqiqa)",
+      "experimental": {
+       "n": 8,
+       "mean": 0.175
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.2
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 33.0,
+        "z": -0.661
+       },
+       "p": 0.5086,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.156,
+        "label": "kichik"
+       },
+       "cohens_d": -0.295,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -0.1,
+         0.1
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.281,
+        "ci": [
+         -1.22,
+         0.65
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.782,
+          "p": 0.0185,
+          "normal": false
+         },
+         "control": {
+          "w": 0.832,
+          "p": 0.0352,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.41,
+         "p": 0.5309,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "entities_first_share",
+      "label": "Obyektlarning bog'lanishdan oldin chizilgan ulushi",
+      "experimental": {
+       "n": 10,
+       "mean": 0.763
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.765
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 51.0,
+        "z": 0.083
+       },
+       "p": 0.9339,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.019,
+        "label": "juda kichik"
+       },
+       "cohens_d": -0.006,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.0,
+        "ci": [
+         -0.267,
+         0.25
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.006,
+        "ci": [
+         -0.88,
+         0.87
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.694,
+          "p": 0.0007,
+          "normal": false
+         },
+         "control": {
+          "w": 0.806,
+          "p": 0.0171,
+          "normal": false
+         }
+        },
+        "levene": {
+         "f": 0.0,
+         "p": 0.9879,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "first_check_ratio",
+      "label": "Birinchi tekshiruvdagi moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.482
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.493
+      },
+      "test": {
+       "test": "student",
+       "label": "Styudent t-testi",
+       "reason": "Ikkala guruhda taqsimot normal va dispersiyalar teng.",
+       "statistic": {
+        "name": "t",
+        "value": -0.114,
+        "df": 18
+       },
+       "p": 0.9103,
+       "significant": false,
+       "effect": {
+        "name": "d",
+        "value": -0.051,
+        "label": "juda kichik"
+       },
+       "cohens_d": -0.051,
+       "estimate": {
+        "name": "O'rtachalar farqi",
+        "value": -0.011,
+        "ci": [
+         -0.219,
+         0.196
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.049,
+        "ci": [
+         -0.93,
+         0.83
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.889,
+          "p": 0.1668,
+          "normal": true
+         },
+         "control": {
+          "w": 0.917,
+          "p": 0.3352,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 0.04,
+         "p": 0.8447,
+         "equal": true
+        }
+       }
+      }
+     },
+     {
+      "metric": "final_ratio",
+      "label": "Yakuniy moslik",
+      "experimental": {
+       "n": 10,
+       "mean": 0.721
+      },
+      "control": {
+       "n": 10,
+       "mean": 0.751
+      },
+      "test": {
+       "test": "mann_whitney",
+       "label": "Mann–Uitni U testi",
+       "reason": "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.",
+       "statistic": {
+        "name": "U",
+        "value": 52.0,
+        "z": 0.152
+       },
+       "p": 0.8794,
+       "significant": false,
+       "effect": {
+        "name": "r",
+        "value": 0.034,
+        "label": "juda kichik"
+       },
+       "cohens_d": -0.133,
+       "estimate": {
+        "name": "Xodjes–Leman siljishi",
+        "value": 0.001,
+        "ci": [
+         -0.31,
+         0.161
+        ],
+        "approximate": false
+       },
+       "hedges_g": {
+        "value": -0.128,
+        "ci": [
+         -1.0,
+         0.75
+        ]
+       },
+       "assumptions": {
+        "normality": {
+         "experimental": {
+          "w": 0.824,
+          "p": 0.0283,
+          "normal": false
+         },
+         "control": {
+          "w": 0.88,
+          "p": 0.1288,
+          "normal": true
+         }
+        },
+        "levene": {
+         "f": 3.82,
+         "p": 0.0664,
+         "equal": true
+        }
+       }
+      }
+     }
+    ]
+   },
+   "transitions": {
+    "strategies": [
+     {
+      "strategy": "avval_obyektlar",
+      "label": "Avval obyektlar, keyin bog'lanishlar"
+     },
+     {
+      "strategy": "aralash",
+      "label": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)"
+     },
+     {
+      "strategy": "sinab_korish",
+      "label": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish"
+     }
+    ],
+    "students": 0,
+    "matrix": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   "conclusions": [
+    "Eng ko'p uchragan strategiya — «Obyekt va bog'lanishlar aralash (bosqichma-bosqich)» (6 ta ish, 40%).",
+    "Strategiyalar bo'yicha baholar statistik ahamiyatli farq qilmaydi (Kraskel–Uollis H = 1.245, p = 0.537, ε² = 0.089).",
+    "Tajriba va nazorat guruhlarida strategiyalar taqsimoti statistik ahamiyatli farq qilmaydi (χ² = 0.134, p = 0.935, Kramer V = 0.094). Diqqat: kataklardagi kutilgan son 5 dan kam, natija taxminiy."
+   ]
+  }
+ }
+}
