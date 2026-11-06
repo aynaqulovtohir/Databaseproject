@@ -1425,6 +1425,7 @@ export interface ExperimentAnalysis {
     hedges_g: { value: number; ci: [number, number] } | null
     slopes: { f: number; p: number; parallel: boolean } | null
   } | null
+  ancova_unavailable: string | null
   power: {
     observed_d: number | null
     achieved: number | null

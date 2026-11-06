@@ -536,6 +536,10 @@ def _solve(matrix, vector):
     return [rows[index][size] / rows[index][index] for index in range(size)]
 
 
+# Qoldiqlar yig'indisi umumiy dispersiyaning shu ulushidan kichik bo'lsa, model aniq mos kelgan hisoblanadi
+SSE_EPSILON = 1e-12
+
+
 def _ols_sse(columns, y):
     """Eng kichik kvadratlar: qoldiq kvadratlar yig'indisi va koeffitsiyentlar (birinchi ustun — 1 lar)."""
     k = len(columns)
@@ -556,23 +560,43 @@ def ancova(groups):
     uning ishonch oralig'i, regressiya chiziqlari parallelligi (guruh × kirish o'zaro ta'siri; p < 0.05 bo'lsa ANCOVA
     sharti buzilgan). Xedjes g — tuzatilgan farq / chiqish testining birlashgan SD si (WWC usuli).
     """
+    return ancova_with_reason(groups)[0]
+
+
+ANCOVA_MIN_N = 5
+
+
+def ancova_with_reason(groups):
+    """ancova() bilan bir xil, lekin (natija, sabab) qaytaradi: natija None bo'lsa, sabab — nima uchun hisoblanmagani
+    (o'zbekcha matn), aks holda sabab None. Tahlil bo'sh natijani jim qaytarmasligi uchun."""
     names = list(groups)
-    if len(names) != 2 or any(len(groups[name]) < 2 for name in names):
-        return None
+    if len(names) != 2:
+        return None, f"ANCOVA uchun 2 ta guruh kerak, {len(names)} ta berildi."
+    small = [name for name in names if len(groups[name]) < 2]
+    if small:
+        return None, "Guruhlardan birida kirish va chiqish natijasi bor talabalar 2 tadan kam."
     pre = [x for name in names for x, _ in groups[name]]
     post = [y for name in names for _, y in groups[name]]
     group = [1.0 if index < len(groups[names[0]]) else 0.0 for index in range(len(pre))]
     n = len(pre)
-    if n < 5:
-        return None
+    if n < ANCOVA_MIN_N:
+        return None, f"Kuzatuvlar soni {n} ta: ANCOVA uchun kamida {ANCOVA_MIN_N} ta kerak."
     ones = [1.0] * n
     sse_full, beta = _ols_sse([ones, group, pre], post)
     sse_reduced, _ = _ols_sse([ones, pre], post)
     interaction = [g * x for g, x in zip(group, pre)]
     sse_interaction, _ = _ols_sse([ones, group, pre, interaction], post)
     sse_group_on_pre, _ = _ols_sse([ones, pre], group)
-    if sse_full is None or sse_reduced is None or sse_full <= 0:
-        return None
+    if sse_full is None or sse_reduced is None:
+        return None, (
+            "Regressiya modelini qurib bo'lmadi: kirish testi natijalari hammada bir xil yoki guruh bilan to'liq "
+            "bog'liq (masalan, bir guruhda hamma 0, ikkinchisida hamma 100)."
+        )
+    if sse_full <= SSE_EPSILON * max(1.0, sum((y - _mean(post)) ** 2 for y in post)):
+        return None, (
+            "Model ma'lumotga aniq mos keldi (qoldiqlar yig'indisi 0): xatolik dispersiyasi nol bo'lgani uchun F va p "
+            "aniqlanmaydi. Bu odatda sun'iy yoki juda kam xilma-xil ballarda bo'ladi."
+        )
     df_error = n - 3
     ss_group = max(0.0, sse_reduced - sse_full)
     f = ss_group / (sse_full / df_error)
@@ -608,7 +632,7 @@ def ancova(groups):
         "adjusted_diff_ci": ci,
         "hedges_g": hedges_g,
         "slopes_homogeneity": slopes,
-    }
+    }, None
 
 
 def required_n_per_group(d, alpha=ALPHA, power=0.8):

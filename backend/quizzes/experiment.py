@@ -40,6 +40,7 @@ from competence.stats import (
     ALPHA,
     achieved_power,
     ancova,
+    ancova_with_reason,
     chi_square,
     describe,
     fisher_exact,
@@ -513,7 +514,9 @@ def analyse(quizzes, groups):
     baseline = comparisons["pre"]
     apply_holm([comparisons[key] for key in SECONDARY])
 
-    covariance = ancova({cohort: [(row["pre"], row["post"]) for row in completers[cohort]] for cohort in COHORTS})
+    covariance, ancova_reason = ancova_with_reason(
+        {cohort: [(row["pre"], row["post"]) for row in completers[cohort]] for cohort in COHORTS}
+    )
     ancova_result = None
     if covariance:
         slopes = covariance["slopes_homogeneity"]
@@ -562,13 +565,14 @@ def analyse(quizzes, groups):
         "baseline": baseline,
         "comparisons": {key: comparisons[key] for key in ("post", "gain", "delayed")},
         "ancova": ancova_result,
+        "ancova_unavailable": ancova_reason,
         "power": power,
         "clustering": clustering,
         "forms": forms,
         "external_ai": external,
         "attrition": attrition,
         "fidelity": treatment,
-        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering)
+        "conclusions": conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering, ancova_reason)
         + fidelity.conclusions(treatment)
         + attrition_conclusions(attrition)
         + parallel_forms.conclusions(forms)
@@ -602,7 +606,7 @@ def _secondary_text(test):
     return f"{_p_text(test['p'])}, Xolm bo'yicha p = {test['p_holm']:.3f}"
 
 
-def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering=None):
+def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering=None, ancova_reason=None):
     """Dissertatsiya matniga mos qisqa xulosalar (o'zbekcha). Avval asosiy gipoteza, keyin ikkilamchi natijalar."""
     lines = []
     if min(n1, n2) < MIN_GROUP:
@@ -631,6 +635,8 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, cl
             )
         if ancova_result["slopes"] and not ancova_result["slopes"]["parallel"]:
             lines.append("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling.")
+    elif ancova_reason:
+        lines.append(f"Asosiy gipoteza (ANCOVA) hisoblanmadi: {ancova_reason}")
     post = comparisons["post"]
     if post:
         exp, ctrl = cohorts["experimental"]["post"]["mean"], cohorts["control"]["post"]["mean"]

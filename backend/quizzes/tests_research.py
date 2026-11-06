@@ -104,6 +104,24 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertAlmostEqual(result["hedges_g"]["ci"][0], 0.498791740171934, places=8)
         self.assertAlmostEqual(result["hedges_g"]["ci"][1], 1.1124049889532734, places=8)
 
+    def test_ancova_reports_why_it_is_unavailable(self):
+        ok, reason = stats.ancova_with_reason({"e": list(zip(AI_PRE, AI_POST)), "c": list(zip(C_PRE, C_POST))})
+        self.assertIsNotNone(ok)
+        self.assertIsNone(reason)
+        cases = {
+            "2 tadan kam": {"e": [(10, 20)], "c": [(10, 20), (20, 30), (30, 40)]},
+            "kamida 5": {"e": [(10, 20), (20, 30)], "c": [(10, 20), (20, 35)]},
+            "qurib bo'lmadi": {"e": [(50, 60), (50, 70), (50, 80)], "c": [(50, 40), (50, 45), (50, 50)]},
+            # chiqish = kirish + 10 (tajriba) va kirish (nazorat): qoldiq yo'q
+            "aniq mos": {"e": [(10, 20), (20, 30), (40, 50)], "c": [(10, 10), (30, 30), (50, 50)]},
+        }
+        for expected, groups in cases.items():
+            with self.subTest(expected):
+                result, reason = stats.ancova_with_reason(groups)
+                self.assertIsNone(result)
+                self.assertIn(expected, reason)
+                self.assertIsNone(stats.ancova(groups))
+
     def test_hodges_lehmann(self):
         # Kutilgan chegaralar: scipy.stats.mannwhitneyu(a − δ, b, asymptotic, use_continuity=False) p ≥ 0.05 bo'lgan δ lar
         a, b = [12, 15, 9, 20, 35, 14, 11, 13, 50, 10], [22, 31, 18, 40, 28, 25, 19, 60, 33]
@@ -650,6 +668,7 @@ class ExperimentTests(ResearchBase):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
         self.assertIsNone(result["baseline"])
         self.assertIsNone(result["ancova"])
+        self.assertIn("2 tadan kam", result["ancova_unavailable"])
         self.assertIn("kamida 3", result["conclusions"][0])
 
     def test_api(self):
