@@ -104,6 +104,24 @@ class StatsReferenceTests(SimpleTestCase):
         self.assertAlmostEqual(result["hedges_g"]["ci"][0], 0.498791740171934, places=8)
         self.assertAlmostEqual(result["hedges_g"]["ci"][1], 1.1124049889532734, places=8)
 
+    def test_ancova_reports_why_it_is_unavailable(self):
+        ok, reason = stats.ancova_with_reason({"e": list(zip(AI_PRE, AI_POST)), "c": list(zip(C_PRE, C_POST))})
+        self.assertIsNotNone(ok)
+        self.assertIsNone(reason)
+        cases = {
+            "2 tadan kam": {"e": [(10, 20)], "c": [(10, 20), (20, 30), (30, 40)]},
+            "kamida 5": {"e": [(10, 20), (20, 30)], "c": [(10, 20), (20, 35)]},
+            "qurib bo'lmadi": {"e": [(50, 60), (50, 70), (50, 80)], "c": [(50, 40), (50, 45), (50, 50)]},
+            # chiqish = kirish + 10 (tajriba) va kirish (nazorat): qoldiq yo'q
+            "aniq mos": {"e": [(10, 20), (20, 30), (40, 50)], "c": [(10, 10), (30, 30), (50, 50)]},
+        }
+        for expected, groups in cases.items():
+            with self.subTest(expected):
+                result, reason = stats.ancova_with_reason(groups)
+                self.assertIsNone(result)
+                self.assertIn(expected, reason)
+                self.assertIsNone(stats.ancova(groups))
+
     def test_hodges_lehmann(self):
         # Kutilgan chegaralar: scipy.stats.mannwhitneyu(a − δ, b, asymptotic, use_continuity=False) p ≥ 0.05 bo'lgan δ lar
         a, b = [12, 15, 9, 20, 35, 14, 11, 13, 50, 10], [22, 31, 18, 40, 28, 25, 19, 60, 33]
@@ -650,6 +668,7 @@ class ExperimentTests(ResearchBase):
         result = analyse_experiment(Quiz.objects.filter(author=self.teacher), [self.ai_group])
         self.assertIsNone(result["baseline"])
         self.assertIsNone(result["ancova"])
+        self.assertIn("2 tadan kam", result["ancova_unavailable"])
         self.assertIn("kamida 3", result["conclusions"][0])
 
     def test_api(self):
@@ -662,6 +681,58 @@ class ExperimentTests(ResearchBase):
         # Boshqa o'qituvchi bu testlar va guruhlarni ko'rmaydi
         self.client.force_authenticate(User.objects.create_user("e_other", role=User.Role.TEACHER))
         self.assertEqual(self.client.get("/api/experiment/").data["cohorts"]["experimental"]["students"], 0)
+
+
+class ResearchGroupsTests(ResearchBase):
+    """Sinov guruhi «tadqiqotga kiradi» deb belgilanmasa, tajriba tahliliga aralashmaydi."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher = User.objects.create_user("rg_teacher", role=User.Role.TEACHER)
+        cls.ai_group = StudentGroup.objects.create(name="RG-tajriba", ai_enabled=True)
+        cls.control_group = StudentGroup.objects.create(name="RG-nazorat", ai_enabled=False)
+        cls.trial_group = StudentGroup.objects.create(name="RG-sinov", ai_enabled=True)
+        cls.pre = Quiz.objects.create(kind=Quiz.Kind.PRE, title="Kirish", author=cls.teacher)
+        cls.post = Quiz.objects.create(kind=Quiz.Kind.POST, title="Chiqish", author=cls.teacher)
+        groups = (cls.ai_group, cls.control_group, cls.trial_group)
+        for group in groups:
+            group.teachers.add(cls.teacher)
+        for quiz in (cls.pre, cls.post):
+            quiz.groups.add(*groups)
+        for prefix, group in (("ra", cls.ai_group), ("rc", cls.control_group), ("rs", cls.trial_group)):
+            for index in range(4):
+                student = cls.make_student(f"{prefix}{index}", group)
+                cls.submit(cls.pre, student, {}, score=40 + index, max_score=100)
+                if prefix != "rs":
+                    cls.submit(cls.post, student, {}, score=60 + index, max_score=100)
+        # Sinov guruhida faqat kirish testini topshirganlar: tahlilga kirsa, tashlab ketish 4 ta ko'rinadi
+
+    def experiment(self):
+        self.client.force_authenticate(self.teacher)
+        response = self.client.get("/api/experiment/")
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_without_marks_all_groups_are_used(self):
+        data = self.experiment()
+        self.assertEqual(data["students"], 12)
+        self.assertEqual(data["cohorts"]["experimental"]["dropped"], 4)
+
+    def test_only_marked_groups_are_used(self):
+        StudentGroup.objects.filter(pk__in=[self.ai_group.pk, self.control_group.pk]).update(in_study=True)
+        data = self.experiment()
+        self.assertEqual(data["students"], 8)
+        self.assertEqual(data["cohorts"]["experimental"]["dropped"], 0)
+        self.assertEqual(data["cohorts"]["experimental"]["groups"], 1)
+
+    def test_admin_can_mark_group(self):
+        admin = User.objects.create_user("rg_admin", role=User.Role.ADMIN)
+        self.client.force_authenticate(admin)
+        response = self.client.patch(f"/api/groups/{self.ai_group.pk}/", {"in_study": True}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["in_study"])
+        self.ai_group.refresh_from_db()
+        self.assertTrue(self.ai_group.in_study)
 
 
 class ParallelFormsTests(ResearchBase):

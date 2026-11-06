@@ -1,0 +1,32 @@
+Guruh: FS-MASHQ, talabalar: 12
+Talaba                   T1 T2 T3 T4 T5 T6 T7  holatlar(o'quv/imt)  maslahat+savol  baho  daq.
+FS-01                     2  0  2  2  2  2  2         3/7          1+0            ai    0.3
+FS-02                     2  2  2  2  2  2  2         7/8          0+1            ai    0.4
+FS-03                     2  2  2  2  2  2  2         7/6          1+0            auto  0.4
+FS-04                     2  2  2  0  2  2  2         6/2          0+0            ai    0.3
+FS-05                     2  2  2  2  2  2  2         7/10         1+0            ai    0.4
+FS-06                     2  0  2  2  2  2  2         3/6          0+1            ai    0.2
+FS-07                     2  2  0  0  2  2  2         6/6          0+0            ai    0.3
+FS-08                     2  2  2  2  2  2  2         6/9          1+0            ai    0.4
+FS-09                     2  2  2  2  2  0  2         6/4          1+0            ai    0.4
+FS-10                     2  2  2  2  2  2  2         7/8          1+0            auto  0.4
+FS-11                     2  2  2  2  2  2  0         7/6          1+0            auto  0.4
+FS-12                     2  2  2  2  2  2  2         6/6          1+0            auto  0.4
+
+Mustaqil bajarganlar (loglar bo'yicha):
+  T1: 12/12 (100%)
+  T2: 10/12 (83%)
+  T3: 11/12 (92%)
+  T4: 10/12 (83%)
+  T5: 12/12 (100%)
+  T6: 11/12 (92%)
+  T7: 11/12 (92%)
+
+Log to'liqligi (24 ta ER ishi):
+  (a) kamida 5 oraliq holat: 20/24 (83%)
+  (b) jarayon topshirilgan diagrammagacha tiklanadi: 23/24 (96%)
+
+AI: 10/12 talaba foydalandi; maslahatlar 8, murabbiyga savollar 2
+O'quv laboratoriyasi baho manbasi: {'ai': 8, 'auto': 4}
+
+Eslatma: 'yordam bilan' (1) va vaqt kuzatuv varag'idan qo'shiladi.

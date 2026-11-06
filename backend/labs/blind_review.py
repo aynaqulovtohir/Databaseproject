@@ -59,6 +59,8 @@ def item_payload(grade):
         },
         "code": attempt.sql_code,
         "diagram": attempt.diagram,
+        # Rubrikaning «qarorlarni asoslash» mezoni uchun (faqat Lab.ask_justification bo'lsa to'ldiriladi)
+        "justification": attempt.justification,
         "is_correct": attempt.is_correct,
         "check": {"error": feedback.get("error"), "differences": feedback.get("differences") or []},
     }

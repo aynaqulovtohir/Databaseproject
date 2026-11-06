@@ -234,7 +234,22 @@ class LabViewSet(viewsets.ModelViewSet):
         return value
 
     @staticmethod
-    def save_attempt(lab, student, payload, result, is_submission=False, confidence=None):
+    def justification(request, lab):
+        """Topshirishdagi yozma asoslash: faqat laboratoriya so'rasa (Lab.ask_justification), aks holda e'tiborsiz."""
+        if not lab.ask_justification:
+            return ""
+        value = request.data.get("justification", "")
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise ValidationError({"justification": "Asoslash matn bo'lishi kerak."})
+        value = value.strip()
+        if len(value) > 2000:
+            raise ValidationError({"justification": "Asoslash 2000 belgidan oshmasligi kerak."})
+        return value
+
+    @staticmethod
+    def save_attempt(lab, student, payload, result, is_submission=False, confidence=None, justification=""):
         return LabAttempt.objects.create(
             lab=lab,
             student=student,
@@ -246,6 +261,7 @@ class LabViewSet(viewsets.ModelViewSet):
             is_submission=is_submission,
             ai_enabled=student.ai_allowed,
             confidence=confidence,
+            justification=justification,
         )
 
     @action(
@@ -348,11 +364,14 @@ class LabViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Baholashga faqat talaba topshira oladi.")
         lab = self.get_object()
         confidence = self.confidence(request)
+        justification = self.justification(request, lab)
         result, payload = self.check(request, lab)
         if payload is None:
             return result
 
-        attempt = self.save_attempt(lab, request.user, payload, result, is_submission=True, confidence=confidence)
+        attempt = self.save_attempt(
+            lab, request.user, payload, result, is_submission=True, confidence=confidence, justification=justification
+        )
         if lab.probes:
             score, comment = auto_grade_probes(attempt, result["ratio"])
             source = LabGrade.Source.AUTO
@@ -452,10 +471,10 @@ class LabViewSet(viewsets.ModelViewSet):
             labs = labs.filter(pk__in=lab_ids)
         from quizzes.views import visible_quizzes
 
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         filename = f"laboratoriya-tadqiqot-{timezone.localdate():%Y-%m-%d}.zip"
-        response = HttpResponse(build_export(labs, visible_quizzes(request.user), allowed_groups(request.user)), content_type="application/zip")
+        response = HttpResponse(build_export(labs, visible_quizzes(request.user), research_groups(request.user)), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
@@ -1243,11 +1262,11 @@ class ErProcessStatisticsView(APIView):
 
     def get(self, request):
         from .process_stats import build
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         if request.user.is_student:
             raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
-        groups = allowed_groups(request.user)
+        groups = research_groups(request.user)
         group_id, lab_id = request.query_params.get("group"), request.query_params.get("lab")
         if group_id:
             if not group_id.isdigit():
@@ -1268,11 +1287,11 @@ class LabAnalysisView(APIView):
 
     def get(self, request):
         from .psychometrics import analyse, lab_queryset
-        from .statistics import allowed_groups
+        from .statistics import research_groups
 
         if request.user.is_student:
             raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
-        groups = allowed_groups(request.user)
+        groups = research_groups(request.user)
         group_id = request.query_params.get("group")
         if group_id:
             if not group_id.isdigit():

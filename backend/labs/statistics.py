@@ -111,6 +111,17 @@ def allowed_groups(user):
     return groups.order_by("name")
 
 
+def research_groups(user):
+    """Tadqiqot tahlillariga kiradigan guruhlar: ruxsat etilganlar ichidan «tadqiqotga kiradi» deb belgilanganlari.
+
+    Birorta guruh belgilanmagan bo'lsa — ruxsat etilgan barcha guruhlar (oldingi xatti-harakat), shunda belgilashdan
+    oldin ham tahlil ishlaydi. Belgilangandan keyin sinov va o'quv guruhlari tashlab ketish va o'rtachalarni buzmaydi.
+    """
+    groups = allowed_groups(user)
+    marked = groups.filter(in_study=True)
+    return marked if marked.exists() else groups
+
+
 def build_statistics(user, group=None):
     groups = list(allowed_groups(user) if group is None else [group])
     labs_qs = Lab.objects.all() if user.is_admin else Lab.objects.filter(author=user)

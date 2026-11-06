@@ -450,7 +450,9 @@ export function ExperimentCard() {
                 </div>
               </div>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">Ma'lumot kam: ikkala guruhda kirish va chiqish natijalari kerak.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {data.ancova_unavailable ?? "Ma'lumot kam: ikkala guruhda kirish va chiqish natijalari kerak."}
+              </p>
             )}
           </div>
           <div className="rounded-xl border bg-card p-4">

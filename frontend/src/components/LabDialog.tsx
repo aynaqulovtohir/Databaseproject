@@ -20,7 +20,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabCheckQuery, LabKind, LabProbe } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'ask_justification', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -76,6 +76,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planQuery, setPlanQuery] = useState(lab?.plan_query ?? '')
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
+  const [askJustification, setAskJustification] = useState(lab?.ask_justification ?? false)
   const [probes, setProbes] = useState<LabProbe[]>(lab?.probes ?? [])
   const [checkQueries, setCheckQueries] = useState<LabCheckQuery[]>(lab?.check_queries ?? [])
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
@@ -96,6 +97,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             ...common,
             kind,
             setup_sql: setupSql,
+            ask_justification: askJustification,
             // Berilgan baza bo'lsa, namunani server shu bazadan hosil qiladi
             ...(setupSql.trim() ? {} : { reference_diagram: cleanDiagram(referenceDiagram) }),
           }
@@ -233,6 +235,21 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   {...SQL_PROPS}
                 />
               </FormField>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4"
+                  checked={askJustification}
+                  onChange={(event) => setAskJustification(event.target.checked)}
+                />
+                <span>
+                  Topshirishda yozma asoslash so'ralsin (o'lchov topshirig'i)
+                  <span className="block text-xs text-muted-foreground">
+                    Talaba diagramma bilan birga qarorlarini 2–3 gapda asoslaydi; matn ko'r baholashda ko'rinadi va
+                    rubrikaning «qarorlarni asoslash» mezoni bo'yicha baholanadi.
+                  </span>
+                </span>
+              </label>
               {setupSql.trim() ? null : (
                 <div className="grid gap-1.5">
                   <span className="text-sm font-medium">Namunaviy ER-diagramma</span>

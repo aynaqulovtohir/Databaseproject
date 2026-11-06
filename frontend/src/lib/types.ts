@@ -76,6 +76,8 @@ export interface Group {
   teachers: number[]
   /** Tajriba: false bo'lsa, guruh talabalariga AI yordamchisi ko'rsatilmaydi */
   ai_enabled: boolean
+  /** Tadqiqot tahlillariga kiradimi (sinov va o'quv guruhlari kirmaydi) */
+  in_study: boolean
   student_count: number
   created_at: string
 }
@@ -320,6 +322,8 @@ export interface Lab {
   plan_forbidden?: string
   /** Tranzaksiya laboratoriyasi: kod ikki sessiyada bir vaqtda tekshiriladi */
   concurrent?: boolean
+  /** O'lchov topshirig'i: topshirishda talaba qarorlarini yozma asoslaydi */
+  ask_justification?: boolean
   /** Yaxlitlik cheklovlari laboratoriyasi: barcha sinovlar. Faqat admin va o'qituvchiga */
   probes?: LabProbe[]
   /** Talaba uchun: ko'rinadigan sinovlar va yashirinlari soni */
@@ -822,6 +826,8 @@ export interface BlindReviewItem {
   lab: Pick<Lab, 'id' | 'title' | 'kind' | 'description' | 'setup_sql' | 'solution_sql' | 'reference_diagram'>
   code: string
   diagram: ErDiagram | null
+  /** Talabaning yozma asoslashi (o'lchov topshiriqlarida; bo'lmasa — bo'sh) */
+  justification: string
   is_correct: boolean
   check: { error: { message: string; tip?: string } | null; differences: string[] }
 }
@@ -1419,6 +1425,7 @@ export interface ExperimentAnalysis {
     hedges_g: { value: number; ci: [number, number] } | null
     slopes: { f: number; p: number; parallel: boolean } | null
   } | null
+  ancova_unavailable: string | null
   power: {
     observed_d: number | null
     achieved: number | null

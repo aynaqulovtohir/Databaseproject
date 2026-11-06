@@ -1,0 +1,1 @@
+40 ta login, 4.2 s; holatlar: {200: 40}

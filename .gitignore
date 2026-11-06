@@ -20,3 +20,7 @@ node_modules/
 .vscode/
 .DS_Store
 /backups/
+
+# Texnik tekshiruv: sintetik hisoblar parollari bor
+research/texnik-tekshiruv/*.json
+!research/texnik-tekshiruv/natijalar/*.log

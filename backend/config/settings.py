@@ -115,9 +115,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    # Bitta IP manzildan login'ga urinishlar soni
     "DEFAULT_THROTTLE_RATES": {
+        # Bitta login nomiga urinishlar soni (parolni sinab topishdan himoya)
         "login": "5/min",
+        # Bitta IP manzildan barcha loginlarga: auditoriyada 40 talaba bitta tashqi IP orqali kiradi
+        "login_ip": "120/min",
         # Bitta foydalanuvchi laboratoriyada kodni ishga tushirish soni
         "lab_run": "30/min",
         # Erkin sinash (tekshirilmaydi, urinish hisoblanmaydi)

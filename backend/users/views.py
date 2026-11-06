@@ -15,6 +15,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from . import consent, tokens
 from .models import StudentGroup, User
 from .permissions import IsAdmin
+from .throttles import LoginIPThrottle, LoginUsernameThrottle
 from .serializers import (
     ChangePasswordSerializer,
     MeSerializer,
@@ -59,8 +60,8 @@ class LoginView(TokenObtainPairView):
     """
 
     serializer_class = LoginSerializer
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "login"
+    # Login nomi bo'yicha (parolni sinab topish) va IP bo'yicha keng chegara (auditoriya NAT orqali kiradi)
+    throttle_classes = [LoginUsernameThrottle, LoginIPThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

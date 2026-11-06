@@ -25,7 +25,7 @@ class StudentGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentGroup
-        fields = ["id", "name", "teachers", "ai_enabled", "student_count", "created_at"]
+        fields = ["id", "name", "teachers", "ai_enabled", "in_study", "student_count", "created_at"]
         read_only_fields = ["id", "created_at"]
 
 

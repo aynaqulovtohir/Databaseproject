@@ -1,0 +1,12 @@
+sim2_na1: tekshirish HTTP 200, ai_available=False, ai_explain=False
+  maslahat         HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
+  murabbiy         HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
+  AI buyurtmachi   HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shart
+  o`qish tavsiyasi HTTP 201, AI ishlatilganmi: False
+  tushuntirish     HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
+sim2_na2: tekshirish HTTP 200, ai_available=False, ai_explain=False
+  maslahat         HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
+  murabbiy         HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
+  AI buyurtmachi   HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shart
+  o`qish tavsiyasi HTTP 201, AI ishlatilganmi: False
+  tushuntirish     HTTP 403  {'detail': "Guruhingizda AI yordamchisi o'chirilgan."}
