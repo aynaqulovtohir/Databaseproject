@@ -32,18 +32,21 @@ from .models import Component, Indicator
 
 STAGES = {"initial": "Tajriba boshida", "final": "Tajriba oxirida", "delayed": "Tajribadan keyin"}
 STAGE_QUIZZES = {"initial": "initial_quizzes", "final": "final_quizzes", "delayed": "delayed_quizzes"}
-LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori"}
+LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori", "creative": "Ijodiy-amaliy"}
 # Umumiy daraja (komponentlar o'rtachasi) chegaralari; komponentlarniki admin panelda sozlanadi
 OVERALL_MEDIUM_FROM = 40
 OVERALL_HIGH_FROM = 70
+OVERALL_CREATIVE_FROM = 85
 EXPLANATION_VALUES = {"ok": 1.0, "partial": 0.5, "wrong": 0.0}
 # O'zaro baholash ko'rsatkichlari shundan kam baholash (yoki muallif belgilagan izoh) bo'lsa hisoblanmaydi
 MIN_PEER_REVIEWS = 2
 
 
-def level(score, medium_from, high_from):
+def level(score, medium_from, high_from, creative_from=None):
     if score is None:
         return None
+    if creative_from is not None and score >= creative_from:
+        return "creative"
     if score >= high_from:
         return "high"
     return "medium" if score >= medium_from else "low"
@@ -224,11 +227,11 @@ def student_profile(components, student, data):
                 total += indicator.weight * value
                 weights += indicator.weight
         score = total / weights if weights else None
-        result[component.pk] = {"score": _round(score), "level": level(score, component.medium_from, component.high_from)}
+        result[component.pk] = {"score": _round(score), "level": level(score, component.medium_from, component.high_from, component.creative_from)}
         if score is not None:
             measured.append(score)
     overall = _mean(measured)
-    return result, {"score": _round(overall), "level": level(overall, OVERALL_MEDIUM_FROM, OVERALL_HIGH_FROM)}
+    return result, {"score": _round(overall), "level": level(overall, OVERALL_MEDIUM_FROM, OVERALL_HIGH_FROM, OVERALL_CREATIVE_FROM)}
 
 
 def distribution(levels):
@@ -301,6 +304,7 @@ def model_payload(components):
                 "description": component.description,
                 "medium_from": component.medium_from,
                 "high_from": component.high_from,
+                "creative_from": component.creative_from,
                 # Komponent shu kesimlarda o'lchanadi; kesimlar to'plami har xil bo'lsa, umumiy ball taqqoslanmaydi
                 "stages": [stage for stage in STAGES if any(stage in item["stages"] for item in indicators)],
                 "indicators": indicators,

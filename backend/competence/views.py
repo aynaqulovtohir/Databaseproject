@@ -9,6 +9,7 @@ from labs.statistics import allowed_groups, research_groups
 
 from .services import (
     LEVELS,
+    OVERALL_CREATIVE_FROM,
     OVERALL_HIGH_FROM,
     OVERALL_MEDIUM_FROM,
     STAGES,
@@ -36,7 +37,11 @@ class CompetenceModelView(StaffView):
                 "components": model_payload(load_model()),
                 "stages": [{"key": key, "label": label} for key, label in STAGES.items()],
                 "levels": [{"key": key, "label": label} for key, label in LEVELS.items()],
-                "overall_thresholds": {"medium_from": OVERALL_MEDIUM_FROM, "high_from": OVERALL_HIGH_FROM},
+                "overall_thresholds": {
+                    "medium_from": OVERALL_MEDIUM_FROM,
+                    "high_from": OVERALL_HIGH_FROM,
+                    "creative_from": OVERALL_CREATIVE_FROM,
+                },
             }
         )
 

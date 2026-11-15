@@ -24,12 +24,28 @@ class LevelTests(SimpleTestCase):
         self.assertEqual(level(70, 40, 70), "high")
         self.assertIsNone(level(None, 40, 70))
 
+    def test_creative_boundary(self):
+        self.assertEqual(level(84.9, 40, 70, 85), "high")
+        self.assertEqual(level(85, 40, 70, 85), "creative")
+        self.assertEqual(level(100, 40, 70, 85), "creative")
+
+
+class ComponentCleanTests(SimpleTestCase):
+    def test_creative_must_exceed_high(self):
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            Component(name="X", medium_from=40, high_from=70, creative_from=70).clean()
+        Component(name="X", medium_from=40, high_from=70, creative_from=85).clean()
+
 
 class CompetenceTests(BaseTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.component = Component.objects.create(name="Kognitiv", order=1, medium_from=40, high_from=70)
+        # creative_from=100: bu testlar guruhlarni solishtirish mexanizmini uch daraja bilan tekshiradi;
+        # to'rtinchi (ijodiy-amaliy) daraja chegarasi LevelTests.test_creative_boundary va ComponentCleanTests da
+        cls.component = Component.objects.create(name="Kognitiv", order=1, medium_from=40, high_from=70, creative_from=100)
         cls.pre = cls.make_quiz(Quiz.Kind.PRE, "Kirish")
         cls.post = cls.make_quiz(Quiz.Kind.POST, "Chiqish")
         cls.quiz_indicator = Indicator.objects.create(component=cls.component, name="Test", source=Indicator.Source.QUIZ)
@@ -78,7 +94,7 @@ class CompetenceTests(BaseTestCase):
         # Topshirmagan talaba past daraja emas, o'lchanmagan
         self.assertEqual(self.score(final, self.student_a2), {"score": None, "level": None})
         distribution = summary["components"][0]["distribution"]
-        self.assertEqual(distribution["counts"], {"low": 0, "medium": 0, "high": 1})
+        self.assertEqual(distribution["counts"], {"low": 0, "medium": 0, "high": 1, "creative": 0})
         self.assertEqual((distribution["measured"], distribution["unmeasured"]), (1, 1))
 
     def test_unsubmitted_attempt_is_not_counted(self):
@@ -277,7 +293,7 @@ class EfficiencyTests(CompetenceTests):
         row = next(item for item in data["rows"] if item["key"] == str(self.component.pk))
         final = row["stages"]["final"]
         self.assertEqual(final["describe"]["experimental"], {"n": 2, "mean": 85.0, "sd": 7.07})
-        self.assertEqual(final["levels"], {"experimental": [0, 0, 2], "control": [0, 2, 0]})
+        self.assertEqual(final["levels"], {"experimental": [0, 0, 2, 0], "control": [0, 2, 0, 0]})
         self.assertEqual(final["efficiency_ratio"], 1.7)
         self.assertLess(final["chi_square"]["p"], 0.05)
         self.assertFalse(final["chi_square"]["reliable"])  # 4 talaba: kutilgan sonlar 5 dan kam

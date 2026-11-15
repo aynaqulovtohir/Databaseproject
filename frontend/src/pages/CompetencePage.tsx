@@ -24,11 +24,12 @@ import type {
 } from '@/lib/types'
 
 // Darajalar tartibli: bitta ko'k tusning pog'onalari (index.css dagi --level-* tokenlari, ikkala mavzu uchun tekshirilgan)
-const LEVEL_ORDER: CompetenceLevel[] = ['low', 'medium', 'high']
+const LEVEL_ORDER: CompetenceLevel[] = ['low', 'medium', 'high', 'creative']
 const LEVEL_COLORS: Record<CompetenceLevel, string> = {
   low: 'var(--level-low)',
   medium: 'var(--level-medium)',
   high: 'var(--level-high)',
+  creative: 'var(--level-creative)',
 }
 const STAGE_LABELS: Record<CompetenceStage, string> = {
   initial: 'Tajriba boshida',
@@ -116,7 +117,7 @@ function ModelCard({ model }: { model: CompetenceModel }) {
             <summary className="flex cursor-pointer flex-wrap items-center gap-2 text-sm font-medium select-none">
               {component.name}
               <span className="font-normal text-muted-foreground">
-                · past &lt; {component.medium_from}% ≤ o'rta &lt; {component.high_from}% ≤ yuqori
+                · past &lt; {component.medium_from}% ≤ o'rta &lt; {component.high_from}% ≤ yuqori &lt; {component.creative_from}% ≤ ijodiy-amaliy
               </span>
             </summary>
             {component.description ? <p className="mt-2 text-sm text-muted-foreground">{component.description}</p> : null}

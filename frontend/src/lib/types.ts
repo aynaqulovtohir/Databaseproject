@@ -978,7 +978,7 @@ export interface LabMistakesReport {
 
 // Kompetentlik modeli (competence ilovasi)
 export type CompetenceStage = 'initial' | 'final' | 'delayed'
-export type CompetenceLevel = 'low' | 'medium' | 'high'
+export type CompetenceLevel = 'low' | 'medium' | 'high' | 'creative'
 
 export interface CompetenceIndicator {
   id: number
@@ -997,6 +997,7 @@ export interface CompetenceComponent {
   description: string
   medium_from: number
   high_from: number
+  creative_from: number
   stages: CompetenceStage[]
   indicators: CompetenceIndicator[]
 }
@@ -1005,7 +1006,7 @@ export interface CompetenceModel {
   components: CompetenceComponent[]
   stages: { key: CompetenceStage; label: string }[]
   levels: { key: CompetenceLevel; label: string }[]
-  overall_thresholds: { medium_from: number; high_from: number }
+  overall_thresholds: { medium_from: number; high_from: number; creative_from: number }
 }
 
 export interface CompetenceScore {
