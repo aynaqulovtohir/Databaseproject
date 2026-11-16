@@ -95,6 +95,10 @@ class Lab(models.Model):
     # O'lchov topshiriqlari (labs/measure_labs.py): topshirishda talaba qarorlarini yozma asoslaydi. Baholovchi uni
     # rubrikaning «qarorlarni asoslash» mezoni bo'yicha baholaydi (ko'r baholashda ko'rinadi)
     ask_justification = models.BooleanField("yozma asoslash so'raladi", default=False)
+    # «Xatoni top» mashqi: talabaga tayyor, lekin xatoli yechim beriladi (SQL'da — starter_sql, ER va normallashtirishda —
+    # shartdagi xatoli diagramma yoki dekompozitsiya), u xatoni topib to'g'ri yechimni quradi. Kompetentlikning
+    # «xatoni top» ko'rsatkichi (competence, source=find_error) shu belgili laboratoriyalardan hisoblanadi
+    find_error = models.BooleanField("«xatoni top» mashqi", default=False)
     # Yaxlitlik cheklovlari laboratoriyasi (labs/probes.py): talaba kodidan keyin har bir sinov alohida tranzaksiyada
     # bajariladi. "attack" — noto'g'ri ma'lumot, cheklov uni rad etishi kerak; "valid" — to'g'ri ma'lumot, qabul
     # qilinishi kerak. [{"id", "title", "kind", "sql", "hidden"}]; yashirin sinovning nomi va SQL'i talabaga ko'rinmaydi
@@ -128,6 +132,11 @@ class Lab(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_find_error(self):
+        """«Xatoni top» mashqi: o'qituvchi belgilagan yoki talabaga xatoli boshlang'ich kod berilgan."""
+        return self.find_error or bool(self.starter_sql.strip())
 
     def clean(self):
         from django.core.exceptions import ValidationError

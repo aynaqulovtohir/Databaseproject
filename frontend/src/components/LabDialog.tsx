@@ -20,7 +20,7 @@ import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabCheckQuery, LabKind, LabProbe } from '@/lib/types'
 
-const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'ask_justification', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
+const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'ask_justification', 'find_error', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
 
 const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
@@ -77,6 +77,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   const [planForbidden, setPlanForbidden] = useState(lab?.plan_forbidden ?? 'Seq Scan')
   const [concurrent, setConcurrent] = useState(lab?.concurrent ?? false)
   const [askJustification, setAskJustification] = useState(lab?.ask_justification ?? false)
+  const [findError, setFindError] = useState(lab?.find_error ?? false)
   const [probes, setProbes] = useState<LabProbe[]>(lab?.probes ?? [])
   const [checkQueries, setCheckQueries] = useState<LabCheckQuery[]>(lab?.check_queries ?? [])
   const [starterSql, setStarterSql] = useState(lab?.starter_sql ?? '')
@@ -90,7 +91,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const common = { title: title.trim(), description, theory, topic, level: level ? Number(level) : null, groups: groupIds }
+      const common = { title: title.trim(), description, theory, topic, level: level ? Number(level) : null, find_error: findError, groups: groupIds }
       const body =
         kind === 'er'
           ? {
@@ -509,6 +510,22 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               ))}
             </select>
           </FormField>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              checked={findError}
+              onChange={(event) => setFindError(event.target.checked)}
+            />
+            <span>
+              «Xatoni top» mashqi
+              <span className="block text-xs text-muted-foreground">
+                Shartda talabaga tayyor, lekin xatoli yechim (diagramma, dekompozitsiya yoki kod) beriladi. Natijasi
+                kompetentlikning «xatoni top» ko'rsatkichiga kiradi. Boshlang'ich kodi bor SQL laboratoriyasi
+                avtomatik shunday hisoblanadi.
+              </span>
+            </span>
+          </label>
           <FormField id="lab_groups" label="Guruhlar" error={errors.groups}>
             <CheckList
               idPrefix="lab-group"

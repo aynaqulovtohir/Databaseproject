@@ -1,4 +1,4 @@
-"""Namunaviy kompetentlik modelini yaratadi: 5 komponent va ularning ko'rsatkichlari.
+"""Dissertatsiyadagi kompetentlik modelini yaratadi: 4 komponent, ularning ko'rsatkichlari va 4 daraja.
 
 Ishga tushirish:
     python manage.py seed_competence_model [--replace]
@@ -18,17 +18,16 @@ from ...models import Component, Indicator
 S = Indicator.Source
 DESIGN_TOPICS = ["er", "design", "norm", "er_sql"]
 
+# Dissertatsiyadagi model (1.1-paragraf, 2.1-paragrafning 2.3-jadvali): to'rt komponent va to'rt daraja.
+# Motivatsion va ijtimoiy (kommunikativ) komponentlar muallif qarori bilan modelga kiritilmagan.
+# Vaznlar: loyihalash laboratoriyalari amaliy-loyihaviy komponentning asosiy ko'rsatkichi (2), qolganlari 1;
+# ular ekspert baholash natijasida admin panelda aniqlashtiriladi.
+LEVELS = {"medium_from": 40, "high_from": 70, "creative_from": 85}
+
 MODEL = [
     {
-        "name": "Motivatsion-qadriyatli",
-        "description": "Ma'lumotlar bazasini loyihalashga qiziqish, uning kasbiy ahamiyatini anglash va o'z kuchiga ishonch.",
-        "indicators": [
-            {"name": "So'rovnomadagi munosabat (Likert)", "source": S.SURVEY, "initial": [], "final": [Quiz.Kind.SURVEY]},
-        ],
-    },
-    {
         "name": "Kognitiv",
-        "description": "Konseptual model, kalitlar, bog'lanishlar, normallashtirish va cheklovlar bo'yicha bilimlar.",
+        "description": "ER-model, relyatsion model, kalitlar, bog'lanishlar, normallashtirish, cheklovlar va SQL bo'yicha bilimlar.",
         "indicators": [
             {
                 "name": "Kirish, chiqish va kechiktirilgan test natijasi",
@@ -40,8 +39,8 @@ MODEL = [
         ],
     },
     {
-        "name": "Faoliyatli (amaliy)",
-        "description": "ER-model tuzish, jadvallarni loyihalash, normallashtirish va SQL bilan amalga oshirish ko'nikmalari.",
+        "name": "Amaliy-loyihaviy",
+        "description": "Predmet sohasini tahlil qilish, konseptual model va relyatsion sxema tuzish, normallashtirish va SQL bilan amalga oshirish.",
         "indicators": [
             {"name": "Loyihalash laboratoriyalari: yechilgan ulushi", "source": S.LABS, "topics": DESIGN_TOPICS, "weight": 2},
             {"name": "Barcha mavzular bo'yicha o'zlashtirish (BKT)", "source": S.MASTERY},
@@ -50,26 +49,26 @@ MODEL = [
         ],
     },
     {
-        "name": "Refleksiv",
-        "description": "O'z yechimini tushuntira olish, xatolarini tahlil qilish va o'z faoliyatini baholash.",
+        "name": "Metakognitiv",
+        "description": "O'z loyihalash faoliyatini kuzatish va boshqarish: o'z bilimini to'g'ri baholash va yordamga o'rinli murojaat qilish.",
         "indicators": [
-            {"name": "Yechimni o'z so'zlari bilan tushuntirish sifati", "source": S.EXPLANATION, "topics": DESIGN_TOPICS},
             {"name": "O'z bilimini baholash aniqligi (ishonch va natija)", "source": S.CALIBRATION},
-            {"name": "Hamkasb ishini baholash aniqligi", "source": S.PEER_ACCURACY},
+            {"name": "Yordamsiz yechish (maslahat so'ramasdan)", "source": S.INDEPENDENCE, "topics": DESIGN_TOPICS},
         ],
     },
     {
-        "name": "Kommunikativ-hamkorlik",
-        "description": "Hamkasbining loyihasini tahlil qilib, asoslangan va foydali fikr bildira olish.",
+        "name": "Refleksiv-baholash",
+        "description": "Yechimni asoslash, xatoni topish va tuzatish, boshqa loyihaning sifatini baholash.",
         "indicators": [
-            {"name": "Izohlar foydaliligi (hamkasblar bahosi)", "source": S.PEER_HELPFUL},
+            {"name": "Yechimni o'z so'zlari bilan tushuntirish sifati", "source": S.EXPLANATION, "topics": DESIGN_TOPICS},
+            {"name": "«Xatoni top» mashqlari: yechilgan ulushi", "source": S.FIND_ERROR},
+            {"name": "Hamkasb ishini baholash aniqligi", "source": S.PEER_ACCURACY},
         ],
     },
 ]
 
-
 class Command(BaseCommand):
-    help = "Namunaviy kompetentlik modelini (5 komponent) yaratadi va testlarni turiga qarab bog'laydi"
+    help = "Dissertatsiyadagi kompetentlik modelini (4 komponent, 4 daraja) yaratadi va testlarni turiga qarab bog'laydi"
 
     def add_arguments(self, parser):
         parser.add_argument("--replace", action="store_true", help="Bor modelni o'chirib, qayta yaratish")
@@ -81,7 +80,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             Component.objects.all().delete()
             for order, item in enumerate(MODEL, start=1):
-                component = Component.objects.create(name=item["name"], description=item["description"], order=order)
+                component = Component.objects.create(name=item["name"], description=item["description"], order=order, **LEVELS)
                 for indicator_order, data in enumerate(item["indicators"], start=1):
                     indicator = Indicator.objects.create(
                         component=component,
@@ -97,10 +96,10 @@ class Command(BaseCommand):
                         indicator.final_quizzes.add(*quizzes_by_kind[kind])
                     for kind in data.get("delayed", []):
                         indicator.delayed_quizzes.add(*quizzes_by_kind[kind])
-        linked = {kind: len(quizzes_by_kind[kind]) for kind in (Quiz.Kind.PRE, Quiz.Kind.POST, Quiz.Kind.DELAYED, Quiz.Kind.SURVEY)}
+        linked = {kind: len(quizzes_by_kind[kind]) for kind in (Quiz.Kind.PRE, Quiz.Kind.POST, Quiz.Kind.DELAYED)}
         self.stdout.write(
             self.style.SUCCESS(
                 f"Yaratildi: {len(MODEL)} komponent. Bog'langan testlar: kirish — {linked['pre']}, "
-                f"chiqish — {linked['post']}, kechiktirilgan — {linked['delayed']}, so'rovnoma — {linked['survey']}."
+                f"chiqish — {linked['post']}, kechiktirilgan — {linked['delayed']}."
             )
         )

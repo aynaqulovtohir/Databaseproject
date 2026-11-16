@@ -324,6 +324,8 @@ export interface Lab {
   concurrent?: boolean
   /** O'lchov topshirig'i: topshirishda talaba qarorlarini yozma asoslaydi */
   ask_justification?: boolean
+  /** «Xatoni top» mashqi: talabaga xatoli yechim beriladi (kompetentlikning «xatoni top» ko'rsatkichi) */
+  find_error?: boolean
   /** Yaxlitlik cheklovlari laboratoriyasi: barcha sinovlar. Faqat admin va o'qituvchiga */
   probes?: LabProbe[]
   /** Talaba uchun: ko'rinadigan sinovlar va yashirinlari soni */

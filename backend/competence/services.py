@@ -103,7 +103,7 @@ class Data:
                     if group.pk in group_ids:
                         self.labs_by_group[group.pk].append(lab)
             for attempt in LabAttempt.objects.filter(student_id__in=student_ids).only(
-                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "created_at"
+                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "ai_hint_level", "rule_hint_at", "created_at"
             ).order_by("id"):
                 self.attempts_by_student[attempt.student_id].append(attempt)
 
@@ -200,6 +200,12 @@ def indicator_value(indicator, student, data):
         result = calibration(attempts)
         return result["score"] if result else None
     solved = {attempt.lab_id for attempt in attempts if attempt.is_correct}
+    if source == Indicator.Source.FIND_ERROR:
+        # Faqat «xatoni top» mashqlari; berilmagan bo'lsa — o'lchanmaydi
+        find_error = {lab.pk for lab in labs if lab.is_find_error}
+        return 100 * len(solved & find_error) / len(find_error) if find_error else None
+    if source == Indicator.Source.INDEPENDENCE:
+        return independence(attempts)
     if source == Indicator.Source.LABS:
         return 100 * len(solved) / len(labs)
     if source == Indicator.Source.MASTERY:
@@ -213,6 +219,32 @@ def indicator_value(indicator, student, data):
         if attempt.is_correct and attempt.explanation_verdict:
             best[attempt.lab_id] = max(best[attempt.lab_id], EXPLANATION_VALUES.get(attempt.explanation_verdict, 0.0))
     return 100 * sum(best[lab_id] for lab_id in solved) / len(solved)
+
+
+def used_help(attempt):
+    """Urinishdan keyin yordam so'ralganmi: AI maslahati (tajriba guruhi) yoki tayyor tushuntirish (nazorat guruhi)."""
+    return attempt.ai_hint_level > 0 or attempt.rule_hint_at is not None
+
+
+def independence(attempts):
+    """Yechilgan laboratoriyalardan birinchi to'g'ri urinishgacha yordam so'ramasdan yechilganlari ulushi (0-100).
+
+    Ikkala guruhda bir xil o'lchanadi: yordam faqat so'rov bilan beriladi, farq — uning manbasida (AI yoki tayyor
+    qoida). Yechilmagan laboratoriya hisobga olinmaydi: bu ko'rsatkich muvaffaqiyatni emas, mustaqillikni o'lchaydi.
+    """
+    by_lab = defaultdict(list)
+    for attempt in attempts:
+        by_lab[attempt.lab_id].append(attempt)
+    solved = alone = 0
+    for items in by_lab.values():
+        items.sort(key=lambda attempt: (attempt.created_at, attempt.pk))
+        first = next((index for index, attempt in enumerate(items) if attempt.is_correct), None)
+        if first is None:
+            continue
+        solved += 1
+        if not any(used_help(attempt) for attempt in items[:first]):
+            alone += 1
+    return 100 * alone / solved if solved else None
 
 
 def student_profile(components, student, data):

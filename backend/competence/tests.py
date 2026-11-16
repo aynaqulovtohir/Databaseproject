@@ -5,7 +5,7 @@ from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
-from labs.models import LabAttempt
+from labs.models import Lab, LabAttempt
 from labs.tests import BaseTestCase
 from quizzes.models import Choice, Question, Quiz, QuizAttempt
 from users.models import User
@@ -115,6 +115,45 @@ class CompetenceTests(BaseTestCase):
         self.assertEqual(self.score(initial, self.student_a1)["score"], 20.0)
         labs.delete()
 
+    def test_find_error_indicator_counts_only_find_error_labs(self):
+        indicator = Indicator.objects.create(component=self.component, name="Xatoni top", source=Indicator.Source.FIND_ERROR)
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
+        final, _ = self.report("final")
+        # «Xatoni top» mashqi berilmagan: o'lchanmaydi (oddiy laboratoriya hisobga olinmaydi)
+        self.assertIsNone(self.score(final, self.student_a1)["score"])
+        Lab.objects.filter(pk=self.lab.pk).update(starter_sql="SELECT 2")  # xatoli boshlang'ich kod — avtomatik
+        final, _ = self.report("final")
+        self.assertEqual(self.score(final, self.student_a1)["score"], 100.0)
+        self.assertEqual(self.score(final, self.student_a2)["score"], 0.0)
+        Lab.objects.filter(pk=self.lab.pk).update(starter_sql="", find_error=True)  # ER/norm: o'qituvchi belgilaydi
+        final, _ = self.report("final")
+        self.assertEqual(self.score(final, self.student_a1)["score"], 100.0)
+        indicator.delete()
+
+    def test_independence_counts_labs_solved_without_requested_help(self):
+        indicator = Indicator.objects.create(component=self.component, name="Mustaqillik", source=Indicator.Source.INDEPENDENCE)
+        second = Lab.objects.create(title="Ikkinchi", description="-", solution_sql="SELECT 1", author=self.teacher_a)
+        second.groups.add(self.group_a)
+        third = Lab.objects.create(title="Uchinchi", description="-", solution_sql="SELECT 1", author=self.teacher_a)
+        third.groups.add(self.group_a)
+        # 1-laboratoriya: yordamsiz yechilgan
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
+        # 2-laboratoriya: xato urinishdan keyin AI maslahati so'ralgan, so'ng yechilgan
+        LabAttempt.objects.create(lab=second, student=self.student_a1, sql_code="SELECT 0", is_correct=False, ai_hint_level=1)
+        LabAttempt.objects.create(lab=second, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
+        # 3-laboratoriya: yechilmagan — hisobga olinmaydi
+        LabAttempt.objects.create(lab=third, student=self.student_a1, sql_code="SELECT 0", is_correct=False)
+        final, _ = self.report("final")
+        self.assertEqual(self.score(final, self.student_a1)["score"], 50.0)
+        # Nazorat guruhidagi tayyor tushuntirish ham yordam hisoblanadi
+        LabAttempt.objects.filter(lab=self.lab, student=self.student_a1).update(rule_hint_at=timezone.now(), is_correct=False)
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
+        final, _ = self.report("final")
+        self.assertEqual(self.score(final, self.student_a1)["score"], 0.0)
+        # Hech narsa yechmagan talaba — o'lchanmagan
+        self.assertIsNone(self.score(final, self.student_a2)["score"])
+        indicator.delete()
+
     def test_labs_indicator_filters_topics(self):
         Indicator.objects.create(component=self.component, name="ER", source=Indicator.Source.LABS, topics=["er"])
         LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
@@ -223,13 +262,24 @@ class SeedCommandTests(BaseTestCase):
     def test_seed_creates_model_and_links_quizzes(self):
         pre = Quiz.objects.create(kind=Quiz.Kind.PRE, title="Kirish", author=self.teacher_a)
         call_command("seed_competence_model", stdout=StringIO())
-        self.assertEqual(Component.objects.count(), 5)
+        self.assertEqual(Component.objects.count(), 4)
         quiz_indicator = Indicator.objects.get(source=Indicator.Source.QUIZ)
         self.assertEqual(list(quiz_indicator.initial_quizzes.all()), [pre])
         with self.assertRaises(CommandError):
             call_command("seed_competence_model", stdout=StringIO())
         call_command("seed_competence_model", "--replace", stdout=StringIO())
-        self.assertEqual(Component.objects.count(), 5)
+        self.assertEqual(Component.objects.count(), 4)
+        # Dissertatsiyadagi model: to'rt komponent va to'rt daraja (40 / 70 / 85)
+        self.assertEqual(
+            list(Component.objects.order_by("order").values_list("name", "medium_from", "high_from", "creative_from")),
+            [
+                ("Kognitiv", 40, 70, 85),
+                ("Amaliy-loyihaviy", 40, 70, 85),
+                ("Metakognitiv", 40, 70, 85),
+                ("Refleksiv-baholash", 40, 70, 85),
+            ],
+        )
+        self.assertFalse(Indicator.objects.filter(source__in=[Indicator.Source.SURVEY, Indicator.Source.PEER_HELPFUL]).exists())
         self.assertTrue(User.objects.filter(pk=self.teacher_a.pk).exists())
 
 
