@@ -21,6 +21,7 @@ from users.models import User
 
 from .access import visible_labs
 from .exam import AI, VIEW, WORK, ensure_exam, exam_active
+from .rule_hints import rule_hints
 from .sequence import ensure_unlocked, lock_map
 from .advice import (
     MAX_HINT_LEVEL,
@@ -280,13 +281,14 @@ class LabViewSet(viewsets.ModelViewSet):
             return result
 
         result["attempt_id"] = None
-        result["ai_available"] = result["ai_explain"] = False
+        result["ai_available"] = result["ai_explain"] = result["rule_hint_available"] = False
         if request.user.is_student:
             attempt = self.save_attempt(lab, request.user, payload, result, confidence=confidence)
             result["attempt_id"] = attempt.pk
             ai_left = not exam_active(lab) and ai_usable(request.user) and ai_advice_left(request.user) > 0
             result["ai_available"] = not result["is_correct"] and ai_left
             result["ai_explain"] = result["is_correct"] and ai_left
+            result["rule_hint_available"] = rule_hint_available(lab, request.user, result["is_correct"])
         return Response(result)
 
     @action(
@@ -402,6 +404,7 @@ class LabViewSet(viewsets.ModelViewSet):
         ai_left = not exam_active(lab) and ai_usable(request.user) and ai_advice_left(request.user) > 0
         result["ai_available"] = not result["is_correct"] and ai_left
         result["ai_explain"] = result["is_correct"] and ai_left
+        result["rule_hint_available"] = rule_hint_available(lab, request.user, result["is_correct"])
         if exam_active(lab) and "fix" in result:
             # Tuzatilgan diagramma imtihon tugagach ko'rsatiladi (saqlanadi, o'qituvchi ko'radi)
             result["fix"] = None
@@ -825,6 +828,34 @@ class LabViewSet(viewsets.ModelViewSet):
                 ],
             }
         )
+
+
+def rule_hint_available(lab, user, is_correct):
+    """Nazorat guruhi talabasiga xato urinishdan keyin tayyor tushuntirish taklif qilinadimi (imtihondan tashqari)."""
+    return user.is_student and not user.ai_allowed and not is_correct and not exam_active(lab)
+
+
+class LabAttemptRuleHintView(APIView):
+    """Nazorat guruhi uchun: xato urinishdagi farqlar turi bo'yicha tayyor (AI'siz) tushuntirish.
+
+    Tajriba guruhidagi AI maslahati kabi talaba so'raganda beriladi va imtihon paytida o'chiriladi — shunda
+    ikkala guruh teng hajmdagi teskari aloqa oladi, farq faqat uning manbasida (AI yoki tayyor qoida) bo'ladi.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        attempt = get_object_or_404(LabAttempt.objects.select_related("lab__module"), pk=pk, student=request.user)
+        ensure_unlocked(request.user, attempt.lab)
+        ensure_exam(request.user, attempt.lab, AI)
+        if attempt.is_correct:
+            raise ValidationError({"detail": "Bu urinish to'g'ri: tushuntirish kerak emas."})
+        if request.user.ai_allowed:
+            raise PermissionDenied("Guruhingizda AI maslahati ishlaydi: tayyor tushuntirish nazorat guruhi uchun.")
+        if attempt.rule_hint_at is None:
+            attempt.rule_hint_at = timezone.now()
+            attempt.save(update_fields=["rule_hint_at"])
+        return Response({"hints": rule_hints(attempt)})
 
 
 class LabAttemptAdviceView(APIView):

@@ -474,6 +474,8 @@ export interface LabRunResult {
   /** Faqat talabada: saqlangan urinish id'si */
   attempt_id: number | null
   ai_available: boolean
+  /** Nazorat guruhida (AI o'chirilgan) xato natijada: xato turi bo'yicha tayyor tushuntirishni so'rash mumkin */
+  rule_hint_available?: boolean
   /** To'g'ri natijada: talaba yechimini tushuntirib, AI bahosini olishi mumkin */
   ai_explain?: boolean
   /** Faqat baholashga topshirilganda: shu topshirishning bahosi va eng yuqori baho */

@@ -5,6 +5,7 @@ from .views import (
     AIQualityView,
     ErProcessStatisticsView,
     LabAttemptAdviceView,
+    LabAttemptRuleHintView,
     LabAttemptExplainView,
     LabAnalysisView,
     LabChatView,
@@ -25,6 +26,7 @@ router.register("lab-modules", LabModuleViewSet, basename="lab-module")
 # Urinish manzili router'dan oldin turishi shart ("attempts" id deb o'qilmasligi uchun)
 urlpatterns = [
     path("labs/attempts/<int:pk>/advice/", LabAttemptAdviceView.as_view(), name="lab-attempt-advice"),
+    path("labs/attempts/<int:pk>/rule-hint/", LabAttemptRuleHintView.as_view(), name="lab-attempt-rule-hint"),
     path("labs/attempts/<int:pk>/explain/", LabAttemptExplainView.as_view(), name="lab-attempt-explain"),
     path("labs/<int:pk>/chat/", LabChatView.as_view(), name="lab-chat"),
     path("labs/<int:pk>/study-advice/", LabStudyAdviceView.as_view(), name="lab-study-advice"),

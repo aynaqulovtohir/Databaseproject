@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 
 import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { FormField } from '@/components/FormField'
-import { AiAdvice, GradeCard } from '@/components/LabRunner'
+import { AiAdvice, GradeCard, RuleHint } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -190,6 +190,7 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
                 ))}
               </ul>
               {result.ai_available && result.attempt_id ? <AiAdvice attemptId={result.attempt_id} /> : null}
+              {result.rule_hint_available && result.attempt_id ? <RuleHint attemptId={result.attempt_id} /> : null}
             </div>
           )}
         </div>

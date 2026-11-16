@@ -198,6 +198,9 @@ class LabAttempt(models.Model):
     ai_hint_level = models.PositiveSmallIntegerField("olingan maslahat darajasi", default=0)
     # AI maslahati so'ralgan vaqt (kunlik limitni hisoblash uchun)
     ai_requested_at = models.DateTimeField("AI maslahati so'ralgan vaqti", null=True, blank=True)
+    # Nazorat guruhi (AI o'chirilgan) talabasi xato turi bo'yicha tayyor tushuntirishni so'ragan vaqt (birinchi marta):
+    # yordamga tayanishni ikkala guruhda bir xil o'lchash uchun (tajriba guruhida bunga ai_hint_level mos keladi)
+    rule_hint_at = models.DateTimeField("tayyor tushuntirish so'ralgan vaqti", null=True, blank=True)
     # Shu urinish uchun maslahat yoki baho bergan AI modellari (aniq versiya nomi; zaxira modelga o'tilgan bo'lsa,
     # o'sha model): tadqiqot natijasini qaysi model bilan olinganini ko'rsatish va takrorlash uchun
     ai_models = models.JSONField("AI modellari", default=list, blank=True)

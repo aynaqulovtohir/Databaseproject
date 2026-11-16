@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Award, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Send, Sparkles } from 'lucide-react'
+import { Award, BookOpen, CircleCheck, CircleX, FlaskConical, Lightbulb, Loader2, Play, Send, Sparkles } from 'lucide-react'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
@@ -77,13 +77,18 @@ interface AdviceResponse {
 
 const HINT_TITLES = ['Yo\'naltiruvchi savol', 'Tushuncha', 'Aniq ko\'rsatma']
 
-/** Bosqichma-bosqich AI maslahati: 1-daraja o'zi so'raladi, keyingisini talaba tugma bilan oladi. */
+/**
+ * Bosqichma-bosqich AI maslahati: har bir daraja (1-daraja ham) faqat talaba tugmani bosganda so'raladi.
+ * Nazorat guruhidagi tayyor tushuntirish ham so'rov bilan beriladi (RuleHint) — ikki guruh teng sharoitda bo'ladi.
+ */
 export function AiAdvice({ attemptId }: { attemptId: number }) {
   const queryClient = useQueryClient()
   const key = ['lab-advice', attemptId]
+  // Kesh orqali o'qiladi; so'rovni faqat tugma yuboradi (enabled: false)
   const advice = useQuery({
     queryKey: key,
     queryFn: () => api<AdviceResponse>(`/labs/attempts/${attemptId}/advice/`, { method: 'POST' }),
+    enabled: false,
     staleTime: Infinity,
     retry: false,
   })
@@ -100,13 +105,17 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
         <Sparkles className="size-4" aria-hidden="true" />
         AI maslahati
       </div>
-      {advice.isPending ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          Maslahat tayyorlanmoqda…
-        </p>
-      ) : advice.isError ? (
-        <p className="text-sm text-muted-foreground">{errorMessage(advice.error)}</p>
+      {!advice.data ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-self-start"
+          disabled={more.isPending}
+          onClick={() => more.mutate(1)}
+        >
+          {more.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Lightbulb aria-hidden="true" />}
+          Maslahat olish (1/3)
+        </Button>
       ) : (
         <>
           {advice.data.hints.map((hint, index) => (
@@ -130,6 +139,48 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
             </Button>
           ) : null}
         </>
+      )}
+    </div>
+  )
+}
+
+interface RuleHintResponse {
+  hints: { problem: string; explanation: string }[]
+}
+
+/** Nazorat guruhi uchun: xato turi bo'yicha tayyor (AI'siz) tushuntirish, talaba so'raganda. */
+export function RuleHint({ attemptId }: { attemptId: number }) {
+  const hint = useMutation({
+    mutationFn: () => api<RuleHintResponse>(`/labs/attempts/${attemptId}/rule-hint/`, { method: 'POST' }),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  return (
+    <div className="grid gap-2 rounded-lg border bg-background p-3">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+        <BookOpen className="size-4" aria-hidden="true" />
+        Tushuntirish
+      </div>
+      {hint.data ? (
+        <ul className="grid gap-2">
+          {hint.data.hints.map((item, index) => (
+            <li key={index} className="text-sm text-foreground">
+              {item.problem ? <span className="text-xs font-medium text-muted-foreground">{item.problem}</span> : null}
+              <p className="whitespace-pre-wrap">{item.explanation}</p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-self-start"
+          disabled={hint.isPending}
+          onClick={() => hint.mutate()}
+        >
+          {hint.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Lightbulb aria-hidden="true" />}
+          Tushuntirish olish
+        </Button>
       )}
     </div>
   )
@@ -274,6 +325,7 @@ function Verdict({ result }: { result: LabRunResult }) {
       ) : null}
       {error?.tip ? <ErrorTip tip={error.tip} /> : null}
       {result.ai_available && result.attempt_id ? <AiAdvice attemptId={result.attempt_id} /> : null}
+      {result.rule_hint_available && result.attempt_id ? <RuleHint attemptId={result.attempt_id} /> : null}
     </div>
   )
 }
