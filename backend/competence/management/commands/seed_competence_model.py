@@ -20,6 +20,8 @@ DESIGN_TOPICS = ["er", "design", "norm", "er_sql"]
 
 # Dissertatsiyadagi model (1.1-paragraf, 2.1-paragrafning 2.3-jadvali): to'rt komponent va to'rt daraja.
 # Motivatsion va ijtimoiy (kommunikativ) komponentlar muallif qarori bilan modelga kiritilmagan.
+# Laboratoriya ko'rsatkichlari loyihalash mavzulari (DESIGN_TOPICS) bilan cheklangan: model ma'lumotlar bazasini
+# LOYIHALASH kompetentligini o'lchaydi (SELECT, indeks, tranzaksiya va h.k. kursning boshqa qismi).
 # Vaznlar: loyihalash laboratoriyalari amaliy-loyihaviy komponentning asosiy ko'rsatkichi (2), qolganlari 1;
 # ular ekspert baholash natijasida admin panelda aniqlashtiriladi.
 LEVELS = {"medium_from": 40, "high_from": 70, "creative_from": 85}
@@ -43,7 +45,7 @@ MODEL = [
         "description": "Predmet sohasini tahlil qilish, konseptual model va relyatsion sxema tuzish, normallashtirish va SQL bilan amalga oshirish.",
         "indicators": [
             {"name": "Loyihalash laboratoriyalari: yechilgan ulushi", "source": S.LABS, "topics": DESIGN_TOPICS, "weight": 2},
-            {"name": "Barcha mavzular bo'yicha o'zlashtirish (BKT)", "source": S.MASTERY},
+            {"name": "Loyihalash mavzulari bo'yicha o'zlashtirish (BKT)", "source": S.MASTERY, "topics": DESIGN_TOPICS},
             {"name": "Loyiha topshiriqlari bo'yicha o'qituvchi bahosi", "source": S.GRADES},
             {"name": "Buyurtmachi talablarini aniqlash (qamrov)", "source": S.INTERVIEW},
         ],
@@ -61,7 +63,7 @@ MODEL = [
         "description": "Yechimni asoslash, xatoni topish va tuzatish, boshqa loyihaning sifatini baholash.",
         "indicators": [
             {"name": "Yechimni o'z so'zlari bilan tushuntirish sifati", "source": S.EXPLANATION, "topics": DESIGN_TOPICS},
-            {"name": "«Xatoni top» mashqlari: yechilgan ulushi", "source": S.FIND_ERROR},
+            {"name": "«Xatoni top» mashqlari: yechilgan ulushi", "source": S.FIND_ERROR, "topics": DESIGN_TOPICS},
             {"name": "Hamkasb ishini baholash aniqligi", "source": S.PEER_ACCURACY},
         ],
     },

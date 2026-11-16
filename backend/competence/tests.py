@@ -280,6 +280,9 @@ class SeedCommandTests(BaseTestCase):
             ],
         )
         self.assertFalse(Indicator.objects.filter(source__in=[Indicator.Source.SURVEY, Indicator.Source.PEER_HELPFUL]).exists())
+        # Laboratoriya ko'rsatkichlari faqat loyihalash mavzularini oladi (dissertatsiya mavzusi doirasi)
+        for source in (Indicator.Source.LABS, Indicator.Source.MASTERY, Indicator.Source.INDEPENDENCE, Indicator.Source.FIND_ERROR):
+            self.assertEqual(Indicator.objects.get(source=source).topics, ["er", "design", "norm", "er_sql"])
         self.assertTrue(User.objects.filter(pk=self.teacher_a.pk).exists())
 
 
