@@ -56,6 +56,10 @@ MODEL = [
         "indicators": [
             {"name": "O'z bilimini baholash aniqligi (ishonch va natija)", "source": S.CALIBRATION},
             {"name": "Yordamsiz yechish (maslahat so'ramasdan)", "source": S.INDEPENDENCE, "topics": DESIGN_TOPICS},
+            # Rejalashtirish jihati: kirish va chiqish kesimlaridagi metakognitiv so'rovnoma (dissertatsiya, III bob).
+            # Testlar avtomatik bog'lanmaydi: platformadagi boshqa so'rovnomalar (SUS, laboratoriya haqida) boshqa narsani
+            # o'lchaydi. Metakognitiv so'rovnoma yaratilgach, admin panelda tajriba boshi va oxiri kesimlariga bog'lanadi
+            {"name": "Faoliyatni rejalashtirish (metakognitiv so'rovnoma)", "source": S.SURVEY},
         ],
     },
     {

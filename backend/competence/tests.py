@@ -279,7 +279,11 @@ class SeedCommandTests(BaseTestCase):
                 ("Refleksiv-baholash", 40, 70, 85),
             ],
         )
-        self.assertFalse(Indicator.objects.filter(source__in=[Indicator.Source.SURVEY, Indicator.Source.PEER_HELPFUL]).exists())
+        self.assertFalse(Indicator.objects.filter(source=Indicator.Source.PEER_HELPFUL).exists())
+        # Yagona so'rovnoma ko'rsatkichi — metakognitiv rejalashtirish; mavjud so'rovnomalar unga bog'lanmaydi
+        survey = Indicator.objects.get(source=Indicator.Source.SURVEY)
+        self.assertEqual(survey.component.name, "Metakognitiv")
+        self.assertFalse(survey.initial_quizzes.exists() or survey.final_quizzes.exists())
         # Laboratoriya ko'rsatkichlari faqat loyihalash mavzularini oladi (dissertatsiya mavzusi doirasi)
         for source in (Indicator.Source.LABS, Indicator.Source.MASTERY, Indicator.Source.INDEPENDENCE, Indicator.Source.FIND_ERROR):
             self.assertEqual(Indicator.objects.get(source=source).topics, ["er", "design", "norm", "er_sql"])
