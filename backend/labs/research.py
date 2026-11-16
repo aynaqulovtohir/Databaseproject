@@ -207,6 +207,7 @@ ATTEMPT_COLUMNS = [
     "xato_turlari",
     "ai_maslahat",
     "maslahat_darajasi",
+    "tayyor_tushuntirish",
     "kod_qatorlari",
     "kod_belgilari",
     "ishonch",
@@ -283,6 +284,8 @@ ai_maslahat                 talaba shu urinish uchun AI maslahatini olganmi: 1 /
 maslahat_darajasi           olingan eng batafsil maslahat darajasi: 0 — olinmagan, 1 — yo'naltiruvchi
                             savol, 2 — tushuncha nomi, 3 — aniq ko'rsatma (darajalar joriy etilishidan
                             oldingi maslahatlar 3 deb yoziladi, chunki ular darhol batafsil berilgan)
+tayyor_tushuntirish         nazorat guruhida (AI o'chirilgan) talaba shu urinish uchun xato turi bo'yicha
+                            tayyor tushuntirishni so'raganmi: 1 / 0 (tajriba guruhida doim 0)
 kod_qatorlari, kod_belgilari  yozilgan kod hajmi (ER laboratoriyasida 0)
 ishonch                     talaba tekshirishdan oldin belgilagan ishonch (1-5); bo'sh — belgilamagan
 ai_modellari                shu urinishga maslahat yoki baho bergan AI modellari (aniq nomi), «;» bilan
@@ -1111,6 +1114,7 @@ def build_export(labs, quizzes=None, groups=None):
                         ",".join(attempt_categories(attempt)),
                         _flag(attempt.ai_advice),
                         hint_level(attempt),
+                        _flag(attempt.rule_hint_at),
                         len(attempt.sql_code.splitlines()),
                         len(attempt.sql_code),
                         "" if attempt.confidence is None else attempt.confidence,

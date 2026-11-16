@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 
 import { ConfidencePicker } from '@/components/ConfidencePicker'
 import { ErEditor, ErFixLegend } from '@/components/ErEditor'
-import { AiAdvice, GradeCard } from '@/components/LabRunner'
+import { AiAdvice, GradeCard, RuleHint } from '@/components/LabRunner'
 import { SelfExplain } from '@/components/SelfExplain'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -44,6 +44,7 @@ function ErVerdict({ result }: { result: LabRunResult }) {
       </ul>
       {/* Topshirilganda maslahat o'rniga tuzatilgan loyiha va AI tushuntirishi ko'rsatiladi */}
       {result.ai_available && result.attempt_id && !result.grade ? <AiAdvice attemptId={result.attempt_id} /> : null}
+      {result.rule_hint_available && result.attempt_id && !result.grade ? <RuleHint attemptId={result.attempt_id} /> : null}
     </div>
   )
 }

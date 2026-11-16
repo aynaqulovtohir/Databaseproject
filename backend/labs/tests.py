@@ -783,6 +783,7 @@ class ResearchExportTests(BaseTestCase):
         self.assertEqual(rows[1]["xato_turlari"], "natija_ustunlari_soni")
         self.assertEqual([row["ai_maslahat"] for row in rows], ["0", "1", "0"])
         self.assertEqual([row["maslahat_darajasi"] for row in rows], ["0", "2", "0"])
+        self.assertEqual([row["tayyor_tushuntirish"] for row in rows], ["0", "0", "0"])
         self.assertEqual([row["ai_modellari"] for row in rows], ["", "gemini-2.5-flash", ""])
         self.assertEqual(rows[0]["guruh"], "A-guruh")
 
