@@ -1,0 +1,88 @@
+[09:44:57] fs15_01: Dilnoza Karimova kirdi
+[09:44:57] fs15_02: Jasur Toshmatov kirdi
+[09:44:58] fs15_03: Madina Yusupova kirdi
+[09:44:58] fs15_04: Sardor Rahimov kirdi
+[09:44:59] fs15_05: Nilufar Abdullayeva kirdi
+[09:44:59] fs15_06: Bekzod Ergashev kirdi
+[09:45:00] fs15_07: Shahnoza Mirzayeva kirdi
+[09:45:00] fs15_08: Otabek Qodirov kirdi
+[09:45:01] fs15_09: Zarina Nazarova kirdi
+[09:45:01] fs15_10: Javohir Islomov kirdi
+[09:45:02] fs15_11: Malika Sobirova kirdi
+[09:45:02] fs15_12: Sherzod Usmonov kirdi
+[09:45:03] fs15_13: Gulnora Saidova kirdi
+[09:45:03] fs15_14: Rustam Xolmatov kirdi
+[09:45:04] fs15_15: Kamola Turg'unova kirdi
+[09:45:18] fs15_04: qayta tekshirish: moslik None → None
+[09:45:24] fs15_06: murabbiyga savol: HTTP 201
+[09:45:28] fs15_03: 1-darajali maslahat: HTTP 200
+[09:45:31] fs15_06: qayta tekshirish: moslik None → None
+[09:45:32] fs15_10: 1-darajali maslahat: HTTP 200
+[09:45:33] fs15_11: 1-darajali maslahat: HTTP 200
+[09:45:34] fs15_12: 1-darajali maslahat: HTTP 200
+[09:45:34] fs15_13: 1-darajali maslahat: HTTP 200
+[09:45:35] fs15_14: murabbiyga savol: HTTP 201
+[09:45:35] fs15_15: 1-darajali maslahat: HTTP 200
+[09:45:35] fs15_02: murabbiyga savol: HTTP 201
+[09:45:35] fs15_05: 1-darajali maslahat: HTTP 200
+[09:45:36] fs15_08: 1-darajali maslahat: HTTP 200
+[09:45:38] fs15_09: 1-darajali maslahat: HTTP 200
+[09:45:39] fs15_01: 1-darajali maslahat: HTTP 200
+[09:45:41] fs15_03: qayta tekshirish: moslik None → None
+[09:45:42] fs15_07: o'quv lab topshirildi: 45 (ai)
+[09:45:43] fs15_12: qayta tekshirish: moslik None → None
+[09:45:45] fs15_01: qayta tekshirish: moslik None → None
+[09:45:46] fs15_08: qayta tekshirish: moslik None → None
+[09:45:46] fs15_10: qayta tekshirish: moslik None → None
+[09:45:46] fs15_11: qayta tekshirish: moslik None → None
+[09:45:47] fs15_13: qayta tekshirish: moslik None → None
+[09:45:48] fs15_14: qayta tekshirish: moslik None → None
+[09:45:48] fs15_09: qayta tekshirish: moslik None → None
+[09:45:48] fs15_15: qayta tekshirish: moslik None → None
+[09:45:48] fs15_02: qayta tekshirish: moslik None → None
+[09:45:48] fs15_05: qayta tekshirish: moslik None → None
+[09:45:53] fs15_06: o'quv lab topshirildi: 45 (ai)
+[09:46:01] fs15_07: imtihon topshirildi: 45 (auto), tuzatilgan ko'rsatildi: False
+[09:46:01] fs15_07: XATO: 'questions'
+[09:46:03] fs15_03: o'quv lab topshirildi: 55 (ai)
+[09:46:07] fs15_10: o'quv lab topshirildi: 95 (ai)
+[09:46:07] fs15_01: o'quv lab topshirildi: 40 (ai)
+[09:46:08] fs15_08: o'quv lab topshirildi: 50 (ai)
+[09:46:08] fs15_11: o'quv lab topshirildi: 45 (ai)
+[09:46:10] fs15_13: o'quv lab topshirildi: 45 (ai)
+[09:46:10] fs15_09: o'quv lab topshirildi: 45 (ai)
+[09:46:13] fs15_06: imtihon topshirildi: 37 (auto), tuzatilgan ko'rsatildi: False
+[09:46:13] fs15_06: XATO: 'questions'
+[09:46:15] fs15_12: o'quv lab topshirildi: 52 (auto)
+[09:46:16] fs15_05: o'quv lab topshirildi: 59 (auto)
+[09:46:20] fs15_02: o'quv lab topshirildi: 48 (auto)
+[09:46:23] fs15_03: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:46:23] fs15_03: XATO: 'questions'
+[09:46:23] fs15_15: o'quv lab topshirildi: 100 (auto)
+[09:46:24] fs15_09: imtihon topshirig'ini topshirmadi
+[09:46:24] fs15_09: XATO: 'questions'
+[09:46:28] fs15_11: imtihon topshirildi: 44 (auto), tuzatilgan ko'rsatildi: False
+[09:46:28] fs15_11: XATO: 'questions'
+[09:46:30] fs15_01: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:46:30] fs15_01: XATO: 'questions'
+[09:46:33] fs15_10: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:46:33] fs15_10: XATO: 'questions'
+[09:46:35] fs15_12: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:46:35] fs15_12: XATO: 'questions'
+[09:46:36] fs15_13: imtihon topshirildi: 50 (auto), tuzatilgan ko'rsatildi: False
+[09:46:36] fs15_13: XATO: 'questions'
+[09:46:37] fs15_08: imtihon topshirildi: 52 (auto), tuzatilgan ko'rsatildi: False
+[09:46:37] fs15_08: XATO: 'questions'
+[09:46:44] fs15_15: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:46:44] fs15_15: XATO: 'questions'
+[09:46:47] fs15_02: imtihon topshirildi: 41 (auto), tuzatilgan ko'rsatildi: False
+[09:46:47] fs15_02: XATO: 'questions'
+[09:46:50] fs15_05: imtihon topshirildi: 59 (auto), tuzatilgan ko'rsatildi: False
+[09:46:50] fs15_05: XATO: 'questions'
+[09:47:45] fs15_04: o'quv lab topshirildi: 41 (auto)
+[09:47:52] fs15_04: imtihon topshirildi: 28 (auto), tuzatilgan ko'rsatildi: False
+[09:47:52] fs15_04: XATO: 'questions'
+[09:48:14] fs15_14: o'quv lab topshirildi: 42 (auto)
+[09:48:37] fs15_14: imtihon topshirildi: 48 (auto), tuzatilgan ko'rsatildi: False
+[09:48:37] fs15_14: XATO: 'questions'
+HTTP holatlari: {200: 291, 400: 15}

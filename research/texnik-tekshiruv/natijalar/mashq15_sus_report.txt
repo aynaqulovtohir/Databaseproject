@@ -1,0 +1,18 @@
+Platformadan foydalanish qulayligi (SUS) (id 19)
+Topshirgan: 15, to'liqsiz (hisobga olinmadi): 1, hisoblandi: 14
+SUS: M = 71.79, SD = 6.16, Mdn = 72.5, oraliq 65.0–85.0
+95% CI: [68.23; 75.34]
+Baho (Sauro–Lewis): C+; qabul qilinish (Bangor va boshq., 2008): qabul qilinadi
+68 me'yoridan farq: t(13) = 2.301, p = 0.0386
+Cronbach α: -0.68
+Fikrlar bo'yicha o'rtacha (1–5):
+   1 (+) M = 4.4, SD = 0.74, n = 15: Menimcha, bu platformadan tez-tez foydalanishni xohlardim.
+   2 (−) M = 2.2, SD = 1.15, n = 15: Platforma keragidan ortiq murakkab ekan.
+   3 (+) M = 4.07, SD = 0.88, n = 15: Platformadan foydalanish oson deb o'yladim.
+   4 (−) M = 2.0, SD = 0.93, n = 15: Menimcha, bu platformadan foydalanish uchun texnik mutaxassisning yordami kerak bo'ladi.
+   5 (+) M = 4.07, SD = 1.1, n = 15: Platformadagi turli funksiyalar bir-biri bilan yaxshi uyg'unlashgan.
+   6 (−) M = 2.07, SD = 0.96, n = 15: Platformada nomuvofiqliklar juda ko'p deb o'yladim.
+   7 (+) M = 3.4, SD = 1.12, n = 15: Menimcha, ko'pchilik bu platformadan foydalanishni juda tez o'rganib oladi.
+   8 (−) M = 2.2, SD = 0.86, n = 15: Platformadan foydalanish juda noqulay ekan.
+   9 (+) M = 3.6, SD = 1.12, n = 15: Platformadan foydalanganda o'zimni juda ishonchli his qildim.
+  10 (−) M = 2.21, SD = 0.8, n = 14: Bu platformada ishlashni boshlashdan oldin ko'p narsani o'rganishim kerak bo'ldi.
