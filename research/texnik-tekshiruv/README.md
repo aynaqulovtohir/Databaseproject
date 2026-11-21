@@ -21,6 +21,7 @@ chiqish, texnik tekshirish va pilot tadqiqot protokoli (Aynakulov T.T.).
 | `login_sinovi.py` | Bitta IP'dan 40 ta login so'rovi bir vaqtda | 2-jadval |
 | `ai_bloklash_sinovi.py` | Nazorat guruhida AI funksiyalari bloklanishi (AI chaqirilmaydi) | 2-jadval |
 | `mashq_tayyorlash.py`, `mashq_ishga_tushirish.py` | Foydalanish sinovi protsedurasining 12 hisobli mashqi | 4.5 |
+| `yuklama65_tayyorlash.py`, `yuklama65_ishga_tushirish.py` | 65 sintetik hisob («Sintetik 01…65») bir vaqtda T1–T7: Gemini API limitini sinash | 4.5 |
 | `mashq15_tayyorlash.py`, `mashq15_ishga_tushirish.py`, `mashq15_sus_qayta.py` | Xuddi shu mashq 15 hisob bilan (bir mashg'ulotdagi talabalar soni); SUS bosqichini alohida qayta bajarish | 3.7, 4.5 |
 | `natijalar/` | Loglar va platforma tahlil modullarining chiqishi | — |
 
@@ -70,6 +71,12 @@ Mashqda o'quv laboratoriyasidagi AI (maslahat, murabbiy, AI baholash) haqiqatan 
 |---|---|
 | `natijalar/mashq15.log`, `mashq15_usability_report.txt` | 15 hisob bir vaqtda kirdi (HTTP 429 yo'q); 321 so'rov HTTP 200; ataylab o'tkazib yuborilgan 4 topshiriq aniqlandi; AI baholash 6 marta xato qaytardi (4 × HTTP 503, 2 × ulanish xatosi) va avtomatik bahoga o'tdi: o'quv lab baholari 9 AI / 6 AUTO; log to'liqligi (b) 29/30 |
 | `natijalar/mashq15_sus_qayta.log`, `mashq15_sus_report.txt` | T7 birinchi ishga tushirishda 15 marta HTTP 400 («Test hozir yopiq»): umumiy SUS so'rovnomasining ochiq vaqti oldingi sinovda tugagan edi (sozlama xatosi). Vaqt vaqtincha ochilib, T7 qayta bajarildi (30 so'rov HTTP 200) va vaqt qaytarildi. Sintetik SUS qiymatlari talqin qilinmaydi |
+
+## Natijalar (2026-yil 21-noyabr, 65 hisobli sintetik yuklama sinovi)
+
+| Fayl | Asosiy natija |
+|---|---|
+| `natijalar/yuklama65.log`, `yuklama65_usability_report.txt` | 65 hisob 166 soniyada barcha bosqichlarni bajardi (login 429 yo'q, server xatosi yo'q). AIUsage jurnalidagi 128 ta model chaqiruvidan 102 tasi xato bilan tugadi (91 tasi Gemini so'rovlar limiti, 11 tasi HTTP 503): AI baholarning 58/65 tasi avtomatik bahoga o'tdi, maslahat va murabbiy so'rovlarining 44/63 tasi bajarilmadi (talabaga «AI vaqtincha ishlamayapti» ko'rsatildi, HTTP 503). Log to'liqligi (b) 129/130. Xulosa: bir vaqtdagi foydalanuvchilar soni API limiti bilan cheklanadi, mashg'ulotlar bir vaqtda o'tkazilmaydi |
 
 T2 da 2 hisobning mezonga yetmagani (kamida 3 obyekt va 2 bog'lanish) past darajali sintetik hisoblar xulqidan, platforma xatosi emas.
 
