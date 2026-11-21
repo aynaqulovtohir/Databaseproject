@@ -29,7 +29,9 @@ test('yangi talabadan tadqiqotga rozilik so\'raladi, chiqqandan keyin sessiya ti
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   const session = await context.cookies()
-  await page.getByRole('button', { name: 'Chiqish' }).click()
+  // Chiqish profil menyusida (NiceAdmin sarlavhasi)
+  await page.getByRole('button', { name: /^Profil menyusi/ }).click()
+  await page.getByRole('menuitem', { name: 'Chiqish' }).click()
   await expect(page).toHaveURL(/\/login$/)
   await page.goto('/quizzes')
   await expect(page).toHaveURL(/\/login$/)

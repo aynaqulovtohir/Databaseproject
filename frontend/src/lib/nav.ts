@@ -58,3 +58,35 @@ const ROLE_ITEMS: Record<Role, NavItem[]> = {
 export function navItemsFor(role: Role): NavItem[] {
   return [...ROLE_ITEMS[role], ...COMMON_ITEMS]
 }
+
+export interface NavSection {
+  /** Yon menyudagi bo'lim sarlavhasi (NiceAdmin "nav-heading"); bo'sh bo'lsa sarlavhasiz */
+  heading?: string
+  items: NavItem[]
+}
+
+const ADMIN_ITEMS: NavItem[] = [
+  { to: '/users', label: 'Foydalanuvchilar', icon: Users },
+  { to: '/groups', label: 'Guruhlar', icon: UsersRound },
+  { to: '/ai-usage', label: 'AI xarajati', icon: Coins },
+]
+
+/** Yon menyu bo'limlari. navItemsFor bilan bir xil sahifalar, faqat guruhlangan. */
+export function navSectionsFor(role: Role): NavSection[] {
+  const sections: NavSection[] = [
+    { items: [HOME] },
+    { heading: "O'quv jarayoni", items: LEARNING_ITEMS },
+  ]
+  if (role !== 'student') sections.push({ heading: 'Tahlil va tadqiqot', items: STAFF_ITEMS })
+  if (role === 'admin') sections.push({ heading: 'Boshqaruv', items: ADMIN_ITEMS })
+  sections.push({ heading: 'Hisob', items: COMMON_ITEMS })
+  return sections
+}
+
+/** Manzilga mos menyu bandi (ichki sahifalar uchun ham: /labs/5 → Virtual laboratoriya). */
+export function navItemForPath(role: Role, pathname: string): NavItem | undefined {
+  if (pathname.startsWith('/submissions/')) pathname = '/assignments'
+  return navItemsFor(role).find(
+    (item) => item.to !== '/' && (pathname === item.to || pathname.startsWith(`${item.to}/`)),
+  )
+}

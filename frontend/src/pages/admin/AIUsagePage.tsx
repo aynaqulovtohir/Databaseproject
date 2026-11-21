@@ -24,9 +24,9 @@ function formatCost(value: number) {
 function UsageTile({ label, totals, priced }: { label: string; totals: AIUsageTotals; priced: boolean }) {
   const tokens = totals.input_tokens + totals.output_tokens
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-md bg-card p-5 shadow-(--card-shadow) dark:ring-1 dark:ring-foreground/10">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{priced ? formatCost(totals.cost) : formatTokens(tokens)}</div>
+      <div className="mt-1 font-heading text-2xl font-bold text-heading tabular-nums">{priced ? formatCost(totals.cost) : formatTokens(tokens)}</div>
       <div className="mt-1 text-xs text-muted-foreground tabular-nums">
         {priced ? `${formatTokens(tokens)} token · ` : 'token · '}
         {numberFormat.format(totals.requests)} so'rov

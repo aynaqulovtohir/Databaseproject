@@ -1690,3 +1690,42 @@ export interface ErProcessStatistics {
   }
   conclusions: string[]
 }
+
+/** Bosh sahifa (GET /api/dashboard/): rolga qarab ko'rsatkichlar */
+export type DashboardTone = 'primary' | 'success' | 'warning' | 'danger' | 'info'
+
+export interface DashboardCard {
+  key: string
+  label: string
+  value: number | string
+  hint: string
+}
+
+export interface DashboardActivity {
+  kind: 'submission' | 'lab_attempt' | 'quiz_attempt'
+  at: string
+  title: string
+  /** Xodimlar uchun: kim bajargan; talabaga har doim null */
+  actor: string | null
+  status: string
+  tone: DashboardTone
+  link: string
+}
+
+export interface DashboardAlert {
+  tone: DashboardTone
+  title: string
+  text: string
+  at: string
+  link: string
+}
+
+export interface Dashboard {
+  cards: DashboardCard[]
+  chart: {
+    days: string[]
+    series: { submissions: number[]; lab_attempts: number[]; quiz_attempts: number[] }
+  }
+  recent: DashboardActivity[]
+  alerts: DashboardAlert[]
+}
