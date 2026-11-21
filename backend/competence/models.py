@@ -62,7 +62,7 @@ class Indicator(models.Model):
         PEER_ACCURACY = "peer_accuracy", "Hamkasb ishini baholash aniqligi (o'zaro baholash)"
         PEER_HELPFUL = "peer_helpful", "Izohlar foydaliligi (o'zaro baholash)"
         FIND_ERROR = "find_error", "«Xatoni top» mashqlari: yechilgan ulushi"
-        INDEPENDENCE = "independence", "Yordamsiz yechish (maslahat yoki tayyor tushuntirish so'ramasdan)"
+        INDEPENDENCE = "independence", "Yordamsiz yechish (AI maslahati so'ramasdan)"
 
     # Test va so'rovnoma har bir kesimda o'lchanadi (har biriga o'z testi), qolganlari — o'quv jarayoni
     # ma'lumotlari, ular faqat tajriba oxirida bor
@@ -80,7 +80,7 @@ class Indicator(models.Model):
     )
     PEER_SOURCES = (Source.PEER_ACCURACY, Source.PEER_HELPFUL)
     # AI bilan bog'liq: nazorat guruhida (AI o'chirilgan) bu ko'rsatkichlar o'lchanmaydi
-    AI_SOURCES = (Source.EXPLANATION, Source.INTERVIEW)
+    AI_SOURCES = (Source.EXPLANATION, Source.INTERVIEW, Source.INDEPENDENCE)
 
     component = models.ForeignKey(
         Component, verbose_name="komponent", on_delete=models.CASCADE, related_name="indicators"

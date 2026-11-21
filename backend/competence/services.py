@@ -103,7 +103,7 @@ class Data:
                     if group.pk in group_ids:
                         self.labs_by_group[group.pk].append(lab)
             for attempt in LabAttempt.objects.filter(student_id__in=student_ids).only(
-                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "ai_hint_level", "rule_hint_at", "created_at"
+                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "ai_hint_level", "created_at"
             ).order_by("id"):
                 self.attempts_by_student[attempt.student_id].append(attempt)
 
@@ -222,15 +222,15 @@ def indicator_value(indicator, student, data):
 
 
 def used_help(attempt):
-    """Urinishdan keyin yordam so'ralganmi: AI maslahati (tajriba guruhi) yoki tayyor tushuntirish (nazorat guruhi)."""
-    return attempt.ai_hint_level > 0 or attempt.rule_hint_at is not None
+    """Urinishdan keyin AI maslahati so'ralganmi. Nazorat guruhida maslahat so'rab bo'lmaydi (qoidaga asoslangan
+    tavsiya avtomatik beriladi), shuning uchun ko'rsatkich faqat AI yoqilgan guruhda o'lchanadi (AI_SOURCES)."""
+    return attempt.ai_hint_level > 0
 
 
 def independence(attempts):
     """Yechilgan laboratoriyalardan birinchi to'g'ri urinishgacha yordam so'ramasdan yechilganlari ulushi (0-100).
 
-    Ikkala guruhda bir xil o'lchanadi: yordam faqat so'rov bilan beriladi, farq — uning manbasida (AI yoki tayyor
-    qoida). Yechilmagan laboratoriya hisobga olinmaydi: bu ko'rsatkich muvaffaqiyatni emas, mustaqillikni o'lchaydi.
+    Faqat AI yoqilgan guruhda guruhlararo solishtiruvga kirmaydigan ko'rsatkich sifatida ishlatiladi. Yechilmagan laboratoriya hisobga olinmaydi: bu ko'rsatkich muvaffaqiyatni emas, mustaqillikni o'lchaydi.
     """
     by_lab = defaultdict(list)
     for attempt in attempts:

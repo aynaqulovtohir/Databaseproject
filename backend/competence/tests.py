@@ -145,8 +145,8 @@ class CompetenceTests(BaseTestCase):
         LabAttempt.objects.create(lab=third, student=self.student_a1, sql_code="SELECT 0", is_correct=False)
         final, _ = self.report("final")
         self.assertEqual(self.score(final, self.student_a1)["score"], 50.0)
-        # Nazorat guruhidagi tayyor tushuntirish ham yordam hisoblanadi
-        LabAttempt.objects.filter(lab=self.lab, student=self.student_a1).update(rule_hint_at=timezone.now(), is_correct=False)
+        # Birinchi laboratoriyada ham xato urinishdan keyin maslahat so'ralsa — yordamsiz yechilgani qolmaydi
+        LabAttempt.objects.filter(lab=self.lab, student=self.student_a1).update(ai_hint_level=2, is_correct=False)
         LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
         final, _ = self.report("final")
         self.assertEqual(self.score(final, self.student_a1)["score"], 0.0)
