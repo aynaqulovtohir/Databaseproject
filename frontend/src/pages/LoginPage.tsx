@@ -7,7 +7,7 @@ import { FormField } from '@/components/FormField'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -38,21 +38,19 @@ export function LoginPage() {
       <div className="absolute top-3 right-3">
         <AppearanceMenu />
       </div>
+      {/* NiceAdmin "pages-login": logo karta ustida, karta ichida markazlashgan sarlavha */}
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="brand-gradient flex size-12 items-center justify-center rounded-lg text-sidebar">
-            <Database className="size-6" aria-hidden="true" />
+        <div className="mb-6 flex items-center justify-center gap-2">
+          <div className="brand-gradient flex size-9 items-center justify-center rounded-md text-white">
+            <Database className="size-5" aria-hidden="true" />
           </div>
-          <div>
-            <h1 className="text-xl font-normal text-heading">Ma'lumotlar bazasini loyihalash</h1>
-            <p className="text-sm text-muted-foreground">Ta'lim platformasi</p>
-          </div>
+          <span className="font-heading text-[1.625rem] leading-none font-bold text-heading">MB loyihalash</span>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Tizimga kirish</CardTitle>
-            <CardDescription>Login va parolni administratordan olasiz.</CardDescription>
+          <CardHeader className="pt-2 text-center">
+            <h1 className="font-heading text-2xl font-bold text-heading">Tizimga kirish</h1>
+            <CardDescription>Login va parolni kiriting. Ularni administratordan olasiz.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
@@ -85,13 +83,19 @@ export function LoginPage() {
                   onChange={(event) => setPassword(event.target.value)}
                 />
               </FormField>
-              <Button type="submit" className="h-10" disabled={submitting || !username.trim() || !password}>
+              <Button type="submit" className="h-10 w-full" disabled={submitting || !username.trim() || !password}>
                 {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
                 Kirish
               </Button>
             </form>
           </CardContent>
         </Card>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Ma'lumotlar bazasini loyihalash ta'lim platformasi · Dizayn:{' '}
+          <a href="https://bootstrapmade.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            BootstrapMade
+          </a>
+        </p>
       </div>
     </div>
   )

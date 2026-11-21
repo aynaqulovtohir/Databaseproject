@@ -294,7 +294,7 @@ export function ExpertPage() {
     content = (
       <>
         <header className="grid gap-2">
-          <h1 className="text-2xl font-semibold">{page.data.title}</h1>
+          <h1 className="font-heading text-2xl font-semibold text-heading">{page.data.title}</h1>
           <p className="text-sm text-muted-foreground">
             «{page.data.quiz_title}» savollarini ekspert sifatida baholash
             {page.data.closes_at ? ` · ${formatDateTime(page.data.closes_at)} gacha` : ''}

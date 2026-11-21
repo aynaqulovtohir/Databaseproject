@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
+from .dashboard import DashboardView
 from .views import (
     AssignmentViewSet,
     MaterialFileDetailView,
@@ -14,6 +15,7 @@ router.register("assignments", AssignmentViewSet, basename="assignment")
 
 # Fayl manzillari router'dan oldin turishi shart ("files" id deb o'qilmasligi uchun)
 urlpatterns = [
+    path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("materials/files/<int:pk>/", MaterialFileDetailView.as_view(), name="material-file-detail"),
     path(
         "materials/files/<int:pk>/download/",

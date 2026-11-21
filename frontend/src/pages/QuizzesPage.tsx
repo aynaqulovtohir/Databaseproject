@@ -64,7 +64,7 @@ export function QuizzesPage() {
           <li key={quiz.id}>
             <Link
               to={`/quizzes/${quiz.id}`}
-              className="block rounded-xl border bg-card p-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="block rounded-md bg-card p-5 shadow-(--card-shadow) transition-shadow outline-none hover:shadow-[0_0_30px_rgb(1_41_112/20%)] focus-visible:ring-3 focus-visible:ring-ring/50 dark:ring-1 dark:ring-foreground/10"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 className="min-w-0 font-medium">

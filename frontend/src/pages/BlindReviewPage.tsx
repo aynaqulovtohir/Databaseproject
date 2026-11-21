@@ -194,9 +194,9 @@ function ReviewQueue({ labId }: { labId: string }) {
 
 function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-md bg-card p-5 shadow-(--card-shadow) dark:ring-1 dark:ring-foreground/10">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-1 font-heading text-2xl font-bold text-heading tabular-nums">{value}</div>
       {hint ? <div className="mt-1 text-xs text-muted-foreground">{hint}</div> : null}
     </div>
   )
