@@ -32,18 +32,21 @@ from .models import Component, Indicator
 
 STAGES = {"initial": "Tajriba boshida", "final": "Tajriba oxirida", "delayed": "Tajribadan keyin"}
 STAGE_QUIZZES = {"initial": "initial_quizzes", "final": "final_quizzes", "delayed": "delayed_quizzes"}
-LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori"}
+LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori", "creative": "Ijodiy-amaliy"}
 # Umumiy daraja (komponentlar o'rtachasi) chegaralari; komponentlarniki admin panelda sozlanadi
 OVERALL_MEDIUM_FROM = 40
 OVERALL_HIGH_FROM = 70
+OVERALL_CREATIVE_FROM = 85
 EXPLANATION_VALUES = {"ok": 1.0, "partial": 0.5, "wrong": 0.0}
 # O'zaro baholash ko'rsatkichlari shundan kam baholash (yoki muallif belgilagan izoh) bo'lsa hisoblanmaydi
 MIN_PEER_REVIEWS = 2
 
 
-def level(score, medium_from, high_from):
+def level(score, medium_from, high_from, creative_from=None):
     if score is None:
         return None
+    if creative_from is not None and score >= creative_from:
+        return "creative"
     if score >= high_from:
         return "high"
     return "medium" if score >= medium_from else "low"
@@ -100,7 +103,7 @@ class Data:
                     if group.pk in group_ids:
                         self.labs_by_group[group.pk].append(lab)
             for attempt in LabAttempt.objects.filter(student_id__in=student_ids).only(
-                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "created_at"
+                "lab_id", "student_id", "is_correct", "explanation_verdict", "confidence", "ai_hint_level", "created_at"
             ).order_by("id"):
                 self.attempts_by_student[attempt.student_id].append(attempt)
 
@@ -197,6 +200,12 @@ def indicator_value(indicator, student, data):
         result = calibration(attempts)
         return result["score"] if result else None
     solved = {attempt.lab_id for attempt in attempts if attempt.is_correct}
+    if source == Indicator.Source.FIND_ERROR:
+        # Faqat «xatoni top» mashqlari; berilmagan bo'lsa — o'lchanmaydi
+        find_error = {lab.pk for lab in labs if lab.is_find_error}
+        return 100 * len(solved & find_error) / len(find_error) if find_error else None
+    if source == Indicator.Source.INDEPENDENCE:
+        return independence(attempts)
     if source == Indicator.Source.LABS:
         return 100 * len(solved) / len(labs)
     if source == Indicator.Source.MASTERY:
@@ -212,6 +221,32 @@ def indicator_value(indicator, student, data):
     return 100 * sum(best[lab_id] for lab_id in solved) / len(solved)
 
 
+def used_help(attempt):
+    """Urinishdan keyin AI maslahati so'ralganmi. Nazorat guruhida maslahat so'rab bo'lmaydi (qoidaga asoslangan
+    tavsiya avtomatik beriladi), shuning uchun ko'rsatkich faqat AI yoqilgan guruhda o'lchanadi (AI_SOURCES)."""
+    return attempt.ai_hint_level > 0
+
+
+def independence(attempts):
+    """Yechilgan laboratoriyalardan birinchi to'g'ri urinishgacha yordam so'ramasdan yechilganlari ulushi (0-100).
+
+    Faqat AI yoqilgan guruhda guruhlararo solishtiruvga kirmaydigan ko'rsatkich sifatida ishlatiladi. Yechilmagan laboratoriya hisobga olinmaydi: bu ko'rsatkich muvaffaqiyatni emas, mustaqillikni o'lchaydi.
+    """
+    by_lab = defaultdict(list)
+    for attempt in attempts:
+        by_lab[attempt.lab_id].append(attempt)
+    solved = alone = 0
+    for items in by_lab.values():
+        items.sort(key=lambda attempt: (attempt.created_at, attempt.pk))
+        first = next((index for index, attempt in enumerate(items) if attempt.is_correct), None)
+        if first is None:
+            continue
+        solved += 1
+        if not any(used_help(attempt) for attempt in items[:first]):
+            alone += 1
+    return 100 * alone / solved if solved else None
+
+
 def student_profile(components, student, data):
     """{component_id: {"score", "level"}} va umumiy ball/daraja."""
     result = {}
@@ -224,11 +259,11 @@ def student_profile(components, student, data):
                 total += indicator.weight * value
                 weights += indicator.weight
         score = total / weights if weights else None
-        result[component.pk] = {"score": _round(score), "level": level(score, component.medium_from, component.high_from)}
+        result[component.pk] = {"score": _round(score), "level": level(score, component.medium_from, component.high_from, component.creative_from)}
         if score is not None:
             measured.append(score)
     overall = _mean(measured)
-    return result, {"score": _round(overall), "level": level(overall, OVERALL_MEDIUM_FROM, OVERALL_HIGH_FROM)}
+    return result, {"score": _round(overall), "level": level(overall, OVERALL_MEDIUM_FROM, OVERALL_HIGH_FROM, OVERALL_CREATIVE_FROM)}
 
 
 def distribution(levels):
@@ -301,6 +336,7 @@ def model_payload(components):
                 "description": component.description,
                 "medium_from": component.medium_from,
                 "high_from": component.high_from,
+                "creative_from": component.creative_from,
                 # Komponent shu kesimlarda o'lchanadi; kesimlar to'plami har xil bo'lsa, umumiy ball taqqoslanmaydi
                 "stages": [stage for stage in STAGES if any(stage in item["stages"] for item in indicators)],
                 "indicators": indicators,

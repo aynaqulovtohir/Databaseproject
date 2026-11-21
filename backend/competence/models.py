@@ -18,12 +18,16 @@ class Component(models.Model):
     name = models.CharField("nomi", max_length=100)
     description = models.TextField("tavsifi", blank=True, max_length=2000)
     order = models.PositiveSmallIntegerField("tartib raqami", default=0)
-    # Ball [0, medium_from) — past, [medium_from, high_from) — o'rta, [high_from, 100] — yuqori daraja
+    # Ball [0, medium_from) — past, [medium_from, high_from) — o'rta, [high_from, creative_from) — yuqori,
+    # [creative_from, 100] — ijodiy-amaliy daraja
     medium_from = models.PositiveSmallIntegerField(
         "o'rta daraja chegarasi (%)", default=40, validators=[MinValueValidator(1), MaxValueValidator(99)]
     )
     high_from = models.PositiveSmallIntegerField(
-        "yuqori daraja chegarasi (%)", default=70, validators=[MinValueValidator(2), MaxValueValidator(100)]
+        "yuqori daraja chegarasi (%)", default=70, validators=[MinValueValidator(2), MaxValueValidator(99)]
+    )
+    creative_from = models.PositiveSmallIntegerField(
+        "ijodiy-amaliy daraja chegarasi (%)", default=85, validators=[MinValueValidator(3), MaxValueValidator(100)]
     )
 
     class Meta:
@@ -37,6 +41,10 @@ class Component(models.Model):
     def clean(self):
         if self.medium_from is not None and self.high_from is not None and self.medium_from >= self.high_from:
             raise ValidationError({"high_from": "Yuqori daraja chegarasi o'rta daraja chegarasidan katta bo'lishi kerak."})
+        if self.high_from is not None and self.creative_from is not None and self.high_from >= self.creative_from:
+            raise ValidationError(
+                {"creative_from": "Ijodiy-amaliy daraja chegarasi yuqori daraja chegarasidan katta bo'lishi kerak."}
+            )
 
 
 class Indicator(models.Model):
@@ -53,6 +61,8 @@ class Indicator(models.Model):
         CALIBRATION = "calibration", "O'z bilimini baholash aniqligi (ishonch va natija)"
         PEER_ACCURACY = "peer_accuracy", "Hamkasb ishini baholash aniqligi (o'zaro baholash)"
         PEER_HELPFUL = "peer_helpful", "Izohlar foydaliligi (o'zaro baholash)"
+        FIND_ERROR = "find_error", "«Xatoni top» mashqlari: yechilgan ulushi"
+        INDEPENDENCE = "independence", "Yordamsiz yechish (AI maslahati so'ramasdan)"
 
     # Test va so'rovnoma har bir kesimda o'lchanadi (har biriga o'z testi), qolganlari — o'quv jarayoni
     # ma'lumotlari, ular faqat tajriba oxirida bor
@@ -65,10 +75,12 @@ class Indicator(models.Model):
         Source.CALIBRATION,
         Source.PEER_ACCURACY,
         Source.PEER_HELPFUL,
+        Source.FIND_ERROR,
+        Source.INDEPENDENCE,
     )
     PEER_SOURCES = (Source.PEER_ACCURACY, Source.PEER_HELPFUL)
     # AI bilan bog'liq: nazorat guruhida (AI o'chirilgan) bu ko'rsatkichlar o'lchanmaydi
-    AI_SOURCES = (Source.EXPLANATION, Source.INTERVIEW)
+    AI_SOURCES = (Source.EXPLANATION, Source.INTERVIEW, Source.INDEPENDENCE)
 
     component = models.ForeignKey(
         Component, verbose_name="komponent", on_delete=models.CASCADE, related_name="indicators"

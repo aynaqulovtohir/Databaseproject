@@ -12,6 +12,6 @@ class IndicatorInline(admin.StackedInline):
 
 @admin.register(Component)
 class ComponentAdmin(admin.ModelAdmin):
-    list_display = ["name", "order", "medium_from", "high_from"]
+    list_display = ["name", "order", "medium_from", "high_from", "creative_from"]
     list_editable = ["order"]
     inlines = [IndicatorInline]
