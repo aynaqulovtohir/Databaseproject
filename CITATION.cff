@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software or its verification data, please cite it as below."
+title: "MB loyihalash: research platform for controlled studies of generative-AI support in database design education"
+type: software
+authors:
+  - family-names: Aynakulov
+    given-names: Tohir
+    affiliation: Jizzakh Branch of the National University of Uzbekistan
+    orcid: "https://orcid.org/0009-0002-0253-8157"
+license: MIT
+repository-code: "https://github.com/aynaqulovtohir/Databaseproject"
+keywords:
+  - computing education
+  - entity-relationship modeling
+  - generative AI
+  - research software verification
+  - simulation study

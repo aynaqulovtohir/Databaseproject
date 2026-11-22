@@ -50,7 +50,7 @@ chiqadi. Quyidagi bandlar buyruq nima qilishini tushuntiradi.
 3. **Topshiriqlar:**
    - O'quv ER laboratoriyasi (AI yoqilgan, imtihon rejimisiz), masalan «ER-model 2. Kutubxona».
    - Alohida modulda imtihon rejimidagi bitta qisqa ER topshirig'i, boshqa vaziyat bilan. Imtihon vaqtini
-     mashg'ulotning 45–65-daqiqalariga qo'ying.
+     mashg'ulotning 45–70-daqiqalariga qo'ying.
 4. **SUS so'rovnomasi:**
    ```
    python manage.py seed_sus --author <o'qituvchi logini> --group FS-2026
@@ -86,9 +86,9 @@ Rasmiy tasdiqlangan o'zbekcha SUS yo'q. Matn `backend/quizzes/sus_bank.py` fayli
 | 0–10 | Tanishtirish, qog'oz rozilik varaqasi (8-bo'lim) | Maqsadni tushuntiradi: «Platformani sinayapmiz, sizni emas» |
 | 10–15 | **T1.** Platformaga kirish va rozilik qarorini berish | Yordam bermaydi, vaqtni yozadi |
 | 15–45 | **T2–T5.** O'quv ER laboratoriyasi (AI bilan) | 3 daqiqadan ortiq tiqilib qolgan talabaga yordam beradi va buni yozib qo'yadi |
-| 45–65 | **T6.** Imtihon rejimidagi ER topshirig'i (AI'siz) | Yordam bermaydi |
-| 65–75 | **T7.** SUS so'rovnomasi va 3 ta ochiq savol | «Barcha 10 ta fikrga javob bering» deb eslatadi |
-| 75–80 | Yakun, minnatdorchilik | — |
+| 45–70 | **T6.** Imtihon rejimidagi ER topshirig'i (AI'siz) | Yordam bermaydi |
+| 70–78 | **T7.** SUS so'rovnomasi va 3 ta ochiq savol | «Barcha 10 ta fikrga javob bering» deb eslatadi |
+| 78–80 | Yakun, minnatdorchilik | — |
 
 ### Topshiriqlar va muvaffaqiyat mezoni
 

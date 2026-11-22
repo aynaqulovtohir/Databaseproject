@@ -1,0 +1,23 @@
+{
+  "title": "MB loyihalash: research platform for controlled studies of generative-AI support in database design education (verification scripts and data)",
+  "upload_type": "software",
+  "description": "<p>Source code of the «MB loyihalash» web platform for entity–relationship (ER), SQL and normalization laboratories, which controls large-language-model (LLM) support as an experimental condition, records the modeling process and computes the trial statistics.</p><p>The <code>research/texnik-tekshiruv/</code> folder contains the verification scripts, raw logs and simulation output reported in the accompanying manuscript: scripted synthetic learners with a known null effect (condition isolation, process-log fidelity, null calibration of the analytics, load tests with 12–65 concurrent accounts) and a replicated simulation of the platform's statistical functions (R = 2,000 per condition; <code>takroriy_simulyatsiya.py</code>). All data are synthetic; no human participants or personal data are included.</p>",
+  "creators": [
+    {
+      "name": "Aynakulov, Tohir",
+      "affiliation": "Jizzakh Branch of the National University of Uzbekistan",
+      "orcid": "0009-0002-0253-8157"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "computing education",
+    "entity-relationship modeling",
+    "generative AI",
+    "research software verification",
+    "simulation study",
+    "learning analytics"
+  ],
+  "language": "eng",
+  "access_right": "open"
+}
