@@ -2,6 +2,16 @@ cff-version: 1.2.0
 message: "If you use this software or its verification data, please cite it as below."
 title: "MB loyihalash: research platform for controlled studies of generative-AI support in database design education"
 type: software
+version: "1.0.1"
+date-released: "2026-11-22"
+doi: 10.5281/zenodo.24441469
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24441469
+    description: "Concept DOI: all versions, resolves to the latest"
+  - type: doi
+    value: 10.5281/zenodo.24441470
+    description: "Version 1.0.1, used in the synthetic-verification manuscript"
 authors:
   - family-names: Aynakulov
     given-names: Tohir
