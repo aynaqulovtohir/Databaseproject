@@ -7,7 +7,7 @@ from rest_framework import status
 from users.models import User
 
 from .models import ErSnapshot, Lab, LabAttempt, LabGrade
-from .process_stats import curve
+from .process_stats import conclusions, curve
 from .tests import ER_REFERENCE, PASSWORD, BaseTestCase
 from .tests_process import START, diagram, entity, relationship
 
@@ -38,6 +38,29 @@ TRIAL = [
     diagram([TALABA, GURUH]),
     diagram([TALABA, GURUH, FAN], [relationship("r1", "t", "g")]),
 ]
+
+
+class ConclusionsTests(SimpleTestCase):
+    def test_top_strategy_share_states_both_bases(self):
+        # 18 / 65 = 28% barcha ishlardan, 18 / 46 = 39% strategiyasi aniqlanganlardan (jadval bilan mos bo'lishi kerak)
+        items = [
+            {"strategy": "avval_obyektlar", "label": "Avval obyektlar", "count": 18},
+            {"strategy": "aralash", "label": "Aralash", "count": 15},
+            {"strategy": "sinab_korish", "label": "Sinab ko'rish", "count": 13},
+            {"strategy": "aniqlanmadi", "label": "Aniqlanmadi", "count": 19},
+        ]
+        strategies = {"items": items, "grade_test": None, "cohort_test": None}
+        first = conclusions(strategies, {"comparisons": []}, {"students": 0, "matrix": []})[0]
+        self.assertIn("18 ta ish: barcha 65 ta ishning 28%, strategiyasi aniqlangan 46 ta ishning 39%", first)
+
+    def test_top_strategy_share_without_undetermined(self):
+        items = [
+            {"strategy": "avval_obyektlar", "label": "Avval obyektlar", "count": 3},
+            {"strategy": "aralash", "label": "Aralash", "count": 1},
+        ]
+        strategies = {"items": items, "grade_test": None, "cohort_test": None}
+        first = conclusions(strategies, {"comparisons": []}, {"students": 0, "matrix": []})[0]
+        self.assertTrue(first.endswith("(3 ta ish: barcha 4 ta ishning 75%)."), first)
 
 
 class CurveTests(SimpleTestCase):
