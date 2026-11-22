@@ -177,7 +177,10 @@ export function AppShell() {
         </SheetContent>
       </Sheet>
 
-      <div className={cn('flex min-h-svh flex-col pt-15 transition-[margin]', !hidden && 'nice:ml-[300px]')}>
+      {/* Margin faqat keng ekranda animatsiyalanadi (menyuni yashirish/ochish): breakpoint'dan pastga o'tganda
+          (telefonni burish, oynani toraytirish) u darhol 0 bo'ladi, aks holda animatsiya davomida sahifa gorizontal
+          siljiydi */}
+      <div className={cn('flex min-h-svh flex-col pt-15 nice:transition-[margin]', !hidden && 'nice:ml-[300px]')}>
         <main className="w-full flex-1 px-4 py-5 sm:px-5 nice:px-[30px]">
           <Outlet />
         </main>
