@@ -5,7 +5,7 @@ Oldindan belgilangan mezonlar va tahlil rejasi: [`mezonlar_2026-11-21.md`](mezon
 
 ```
 foydalanish-sinovi/
-  OzMU-JF/  QDTU/  TATU-SF/      har bir muassasa uchun:
+  OzMU-JF/  QDTU/  GulDU/        har bir muassasa uchun:
     kuzatuv.csv                  T1–T7 baholari (2/1/0) va vaqt, taxallus bilan (FS-01 …)
     muammolar.csv                interfeys muammolari, og'irlik 0–4
     ochiq_javoblar.csv           3 ta ochiq savolga javoblar
