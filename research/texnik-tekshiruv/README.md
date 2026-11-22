@@ -22,6 +22,7 @@ chiqish, texnik tekshirish va pilot tadqiqot protokoli (Aynakulov T.T.).
 | `ai_bloklash_sinovi.py` | Nazorat guruhida AI funksiyalari bloklanishi (AI chaqirilmaydi) | 2-jadval |
 | `mashq_tayyorlash.py`, `mashq_ishga_tushirish.py` | Foydalanish sinovi protsedurasining 12 hisobli mashqi | 4.5 |
 | `mashq15_tayyorlash.py`, `mashq15_ishga_tushirish.py`, `mashq15_sus_qayta.py` | Xuddi shu mashq 15 hisob bilan (bir mashg'ulotdagi talabalar soni); SUS bosqichini alohida qayta bajarish | 3.7, 4.5 |
+| `takroriy_simulyatsiya.py` | Monte Karlo: `backend/competence/stats.py` funksiyalari (ANCOVA, Holm, ICC, t, Mann–Uitni) generator qoidasi bilan yaratilgan 2 000 × 12 ma'lumot to'plamida; soxta ijobiy natijalar ulushi, quvvat va kompetentlik «Umumiy» o'zgarishining eski/tuzatilgan usuli (PR #46). Platforma va bazasiz ishlaydi | sintetik tekshiruv maqolasi, 4.5 va 5.6 |
 | `natijalar/` | Loglar va platforma tahlil modullarining chiqishi | — |
 
 ## Ishga tushirish tartibi
@@ -49,6 +50,9 @@ python3 mashq15_ishga_tushirish.py mashq15.json | tee natijalar/mashq15.log
 python3 mashq15_sus_qayta.py mashq15.json | tee natijalar/mashq15_sus_qayta.log   # faqat SUS yopiq bo'lsa
 python manage.py usability_report --group FS-MASHQ15 --learn-lab <id> --exam-lab <id> --sus <id>
 python manage.py sus_report --quiz <id> --group FS-MASHQ15 --consented
+
+# Takroriy simulyatsiya (2026-11-22): platforma va baza kerak emas, ~1,5 daqiqa; seed qat'iy — natija bir xil chiqadi
+python3 -I takroriy_simulyatsiya.py ../../backend/competence/stats.py natijalar/takroriy_simulyatsiya.json
 ```
 
 `tekshiruv2.json`, `mashq.json` va `mashq15.json` fayllarida sintetik hisoblarning parollari bor, ular repozitoriyaga kiritilmaydi.
@@ -75,6 +79,23 @@ T2 da 2 hisobning mezonga yetmagani (kamida 3 obyekt va 2 bog'lanish) past daraj
 
 `login_sinovi.txt` va `ai_bloklash_sinovi.txt` shu skriptlar repozitoriyaga qo'shilgach qayta ishga tushirilib
 olindi; maqoladagi qiymatlar (40 login, 5,6 s) birinchi ishga tushirishdan, bu fayldagi vaqt farq qilishi mumkin.
+
+## Natijalar (2026-yil 22-noyabr, takroriy simulyatsiya)
+
+`natijalar/takroriy_simulyatsiya.json` (R = 2 000, seed 20261122; har bir shartda n = 10, 20, 64; tajriba guruhiga
+δ = 0; 0,05; 0,10; 0,15 qo'shilgan, chiqish testida d = 0; 0,28; 0,53; 0,81):
+
+| Ko'rsatkich | Natija |
+|---|---|
+| ANCOVA, effekt yo'q (soxta ijobiy) | 5,1% / 4,8% / 4,8% (n = 10 / 20 / 64) — nominal 5% |
+| Ikkilamchi 3 taqqoslash, kamida bittasi: tuzatishsiz → Holm | 12,4–13,0% → 4,4–4,7% |
+| ANCOVA quvvati, d ≈ 0,53 | 29,6% / 56,5% / 97,9% |
+| ICC > 0, klaster ta'siri yo'q | 22–26% takrorda (o'rtacha 0,032 / 0,017 / 0,005) |
+| Kompetentlik «Umumiy», haqiqiy o'sishda ahamiyatli «pasayish»: eski usul → tuzatilgan | 56% / 90% / 100% → 0% |
+
+Simulyatsiya statistik funksiyalarni bevosita chaqiradi (API, baza va mezon tanlash qismi chetlab o'tiladi): mezon
+har doim Styudent t (chiqish, kechiktirilgan) va Mann–Uitni U (o'sish); klaster ta'siri, tashlab ketish va shift
+dasturlanmagan.
 
 ## Cheklovlar
 
