@@ -151,7 +151,7 @@ function comparabilityWarnings(components: CompetenceComponent[]) {
     warnings.push(
       `Umumiy ball kesimlar o'rtasida taqqoslanmaydi: ${partial
         .map((component) => `«${component.name}» faqat ${component.stages.map((stage) => STAGE_LABELS[stage].toLowerCase()).join(' va ')}`)
-        .join(', ')} o'lchanadi. Komponentlar bo'yicha solishtiring yoki ikkala kesimga ham o'lchov qo'shing.`,
+        .join(', ')} o'lchanadi. Shuning uchun o'sish va bilim saqlanishi jadvallarida umumiy ball har bir talaba uchun faqat ikkala kesimda ham o'lchangan komponentlar bo'yicha hisoblanadi. Komponentlar bo'yicha solishtiring yoki ikkala kesimga ham o'lchov qo'shing.`,
     )
   }
   const missing = components.filter((component) => !component.stages.length)

@@ -435,17 +435,17 @@ def _describe(values):
     return {"n": info["n"], "mean": _r(info["mean"]), "sd": _r(info["sd"])}
 
 
-def change(measured, key, before_stage, after_stage):
+def change(pairs, before_stage, after_stage):
     """Har bir guruh ichida ikki kesim orasidagi o'zgarish (juftlangan t) va guruhlar o'zgarishlari farqi (Uelch t).
 
-    Faqat ikkala kesimda ham o'lchangan talabalar olinadi.
+    pairs(cohort, before_stage, after_stage) — {talaba_id: (oldingi ball, keyingi ball)}: faqat ikkala kesimda ham
+    o'lchangan talabalar.
     """
     result, deltas = {}, {}
     for cohort in COHORTS:
-        before, after = measured(before_stage, cohort, key), measured(after_stage, cohort, key)
-        both = sorted(set(before) & set(after))
-        before_scores = [before[sid]["score"] for sid in both]
-        after_scores = [after[sid]["score"] for sid in both]
+        both = pairs(cohort, before_stage, after_stage)
+        before_scores = [both[sid][0] for sid in sorted(both)]
+        after_scores = [both[sid][1] for sid in sorted(both)]
         deltas[cohort] = [y - x for x, y in zip(before_scores, after_scores)]
         result[cohort] = {
             "n": len(both),
@@ -476,6 +476,36 @@ def efficiency(components, groups):
     def measured(stage, cohort, key):
         return {sid: item[key] for sid, item in scores[stage][cohort].items() if item[key]["score"] is not None}
 
+    component_keys = [str(component.pk) for component in components]
+    names = {str(component.pk): component.name for component in components}
+    # Umumiy ball o'zgarishi qaysi komponentlar bo'yicha hisoblangani: {(kesim, kesim): {komponent nomi: talabalar soni}}
+    overall_basis = {}
+
+    def component_pairs(key):
+        def pairs(cohort, before_stage, after_stage):
+            before, after = measured(before_stage, cohort, key), measured(after_stage, cohort, key)
+            return {sid: (before[sid]["score"], after[sid]["score"]) for sid in set(before) & set(after)}
+
+        return pairs
+
+    def overall_pairs(cohort, before_stage, after_stage):
+        """Umumiy ball kesimlarda turli komponentlar to'plamidan tuzilishi mumkin (masalan, boshida faqat test,
+        oxirida laboratoriyalar ham). Bunday ballarni solishtirish yo'q o'zgarishni ko'rsatadi, shuning uchun har bir
+        talabaning umumiy bali faqat ikkala kesimda ham o'lchangan komponentlari bo'yicha qayta hisoblanadi."""
+        result = {}
+        basis = overall_basis.setdefault((before_stage, after_stage), {})
+        for sid, before in scores[before_stage][cohort].items():
+            after = scores[after_stage][cohort].get(sid)
+            if after is None:
+                continue
+            common = [key for key in component_keys if before[key]["score"] is not None and after[key]["score"] is not None]
+            if not common:
+                continue
+            result[sid] = (_mean([before[key]["score"] for key in common]), _mean([after[key]["score"] for key in common]))
+            for key in common:
+                basis[names[key]] = basis.get(names[key], 0) + 1
+        return result
+
     rows = []
     for key, name in [(str(component.pk), component.name) for component in components] + [("overall", "Umumiy")]:
         row = {"key": key, "name": name, "stages": {}}
@@ -495,8 +525,13 @@ def efficiency(components, groups):
                 "efficiency_ratio": _r(ratio, 3),
             }
         # O'sish (boshi → oxiri) va bilim saqlanishi (oxiri → kechiktirilgan test)
-        row["growth"] = change(measured, key, "initial", "final")
-        row["retention"] = change(measured, key, "final", "delayed")
+        pairs = overall_pairs if key == "overall" else component_pairs(key)
+        row["growth"] = change(pairs, "initial", "final")
+        row["retention"] = change(pairs, "final", "delayed")
+        if key == "overall":
+            # Jadvalda ko'rsatish uchun: umumiy ball o'zgarishi qaysi komponentlar bo'yicha hisoblandi
+            row["growth"]["basis"] = overall_basis.get(("initial", "final"), {})
+            row["retention"]["basis"] = overall_basis.get(("final", "delayed"), {})
         rows.append(row)
     return {
         "alpha": stats.ALPHA,
