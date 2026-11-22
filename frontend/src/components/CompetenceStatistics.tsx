@@ -233,9 +233,19 @@ function ChangeTable({
         <TableBody>
           {data.rows.map((row) => {
             const change = row[field]
+            const basis = change.basis ? Object.keys(change.basis) : null
             return (
               <TableRow key={row.key}>
-                <TableCell className="font-medium">{row.name}</TableCell>
+                <TableCell className="font-medium">
+                  {row.name}
+                  {basis ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {basis.length
+                        ? `ikkala kesimda o'lchangan komponentlar bo'yicha: ${basis.join(', ')}`
+                        : "ikkala kesimda o'lchangan komponent yo'q"}
+                    </span>
+                  ) : null}
+                </TableCell>
                 {(['experimental', 'control'] as const).map((cohort) => {
                   const item = change[cohort]
                   return (

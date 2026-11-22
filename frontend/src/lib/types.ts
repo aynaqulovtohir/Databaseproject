@@ -1099,7 +1099,12 @@ export interface CompetenceEfficiencyStage {
 export type CompetenceChange = Record<
   CompetenceCohort,
   { n: number; before_mean: number | null; after_mean: number | null; paired: StatPaired | null }
-> & { difference: StatTestT | null }
+> & {
+  difference: StatTestT | null
+  /** Faqat «Umumiy» qatorida: o'zgarish qaysi komponentlar bo'yicha hisoblangani ({nomi: talabalar soni}).
+   * Umumiy ball faqat ikkala kesimda ham o'lchangan komponentlardan qayta hisoblanadi. */
+  basis?: Record<string, number>
+}
 
 export interface CompetenceEfficiencyRow {
   key: string

@@ -387,6 +387,31 @@ class EfficiencyTests(CompetenceTests):
         stages = self.client.get("/api/competence/model/").data["components"][0]["stages"]
         self.assertEqual(stages, ["initial", "final", "delayed"])
 
+    @override_settings(RESEARCH_CONSENT_REQUIRED=False)
+    def test_overall_change_uses_only_components_measured_at_both_stages(self):
+        # «Amaliy» faqat tajriba oxirida o'lchanadi (laboratoriyalar): umumiy ball boshida faqat kognitivdan,
+        # oxirida esa ikkalasidan tuziladi. Bunday ballarni solishtirish yo'q o'zgarishni ko'rsatadi, shuning uchun
+        # umumiy ball o'sishi faqat ikkala kesimda o'lchangan komponent (kognitiv) bo'yicha hisoblanishi kerak.
+        practical = Component.objects.create(name="Amaliy", order=2, medium_from=40, high_from=70, creative_from=100)
+        Indicator.objects.create(component=practical, name="Lab", source=Indicator.Source.LABS)
+        for student, pre, post in ((self.student_a1, 3, 8), (self.student_a2, 4, 6)):
+            self.submit(self.pre, student, pre)
+            self.submit(self.post, student, post)
+        LabAttempt.objects.create(lab=self.lab, student=self.student_a1, sql_code="SELECT 1", is_correct=True)
+        self.auth_as(self.admin)
+        rows = {row["key"]: row for row in self.client.get("/api/competence/efficiency/").data["rows"]}
+        # Kesim ichida umumiy ball avvalgidek barcha o'lchangan komponentlardan: oxirida «Amaliy» ham qo'shilgan
+        self.assertNotEqual(
+            rows["overall"]["stages"]["final"]["describe"]["experimental"]["mean"],
+            rows[str(self.component.pk)]["stages"]["final"]["describe"]["experimental"]["mean"],
+        )
+        overall = {key: value for key, value in rows["overall"]["growth"]["experimental"].items()}
+        cognitive = rows[str(self.component.pk)]["growth"]["experimental"]
+        self.assertEqual((overall["before_mean"], overall["after_mean"]), (35.0, 70.0))
+        self.assertEqual(overall, cognitive)
+        self.assertEqual(rows["overall"]["growth"]["basis"], {"Kognitiv": 2})
+        self.assertNotIn("basis", rows[str(self.component.pk)]["growth"])
+
     def test_efficiency_is_staff_only(self):
         self.auth_as(self.student_a1)
         self.assertEqual(self.client.get("/api/competence/efficiency/").status_code, 403)
