@@ -197,6 +197,9 @@ class LabCoachTests(BaseTestCase):
         self.auth_as(self.student_a1)
         self.assertEqual(self.ask("savol").status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(self.client.get(self.chat_url).data, {"messages": [], "ai_left": 5})
+        from .models import AIFailure
+        failure = AIFailure.objects.get()
+        self.assertEqual((failure.student, failure.kind), (self.student_a1, AIFailure.Kind.LAB_CHAT))
 
 
 class RetrievalTests(BaseTestCase):

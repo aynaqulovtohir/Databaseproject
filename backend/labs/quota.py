@@ -17,7 +17,7 @@ import logging
 
 from ai.client import AIError, AINotConfigured, AITransientError, is_configured
 
-from .models import AIAction, LabAttempt
+from .models import AIAction, AIFailure, LabAttempt
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,12 @@ def record_ai_action(user, kind):
     """Muvaffaqiyatli AI yordamini limitdan yechadi (faqat talaba uchun)."""
     if user.is_student:
         AIAction.objects.create(student=user, kind=kind)
+
+
+def record_ai_failure(user, lab, kind, exc):
+    """Bajarilmay qolgan AI so'rovini qayd etadi (faqat talaba uchun, limitdan yechilmaydi)."""
+    if user.is_student:
+        AIFailure.objects.create(student=user, lab=lab, kind=kind, error=type(exc).__name__[:50])
 
 
 def ai_error_response(exc, what="so'rov"):

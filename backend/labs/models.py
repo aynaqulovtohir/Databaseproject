@@ -402,6 +402,33 @@ class AIAction(models.Model):
         ordering = ["-id"]
 
 
+class AIFailure(models.Model):
+    """Talabaning bajarilmay qolgan AI so'rovi (AI xizmati xato bergan): limitdan yechilmaydi.
+
+    Foydalanish sinovida T4 ni (AI'dan foydalanish) talaba aybi bilan bajarilmaganidan ajratish uchun.
+    Matn saqlanmaydi — faqat kim, qaysi laboratoriyada, qaysi turdagi so'rov, xato turi va qachon.
+    """
+
+    class Kind(models.TextChoices):
+        HINT = "hint", "Darajali maslahat"
+        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="ai_failures"
+    )
+    lab = models.ForeignKey(
+        "Lab", verbose_name="laboratoriya", on_delete=models.CASCADE, null=True, blank=True, related_name="ai_failures"
+    )
+    kind = models.CharField("turi", max_length=20, choices=Kind.choices)
+    error = models.CharField("xato turi", max_length=50, blank=True)
+    created_at = models.DateTimeField("vaqti", auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "bajarilmagan AI so'rovi (talaba)"
+        verbose_name_plural = "bajarilmagan AI so'rovlari (talabalar)"
+        ordering = ["-id"]
+
+
 class InterviewMessage(models.Model):
     """Talabaning AI-buyurtmachi bilan suhbati (talablarni aniqlash). Faqat talabaning o'zi ko'radi."""
 

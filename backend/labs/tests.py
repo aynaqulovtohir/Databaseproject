@@ -495,6 +495,11 @@ class AdviceTests(BaseTestCase):
     def test_ai_failure_does_not_spend_limit(self, generate):
         self.assertEqual(self.client.post(self.advice_url).status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertIsNone(LabAttempt.objects.get().ai_requested_at)
+        # Bajarilmagan so'rov talaba bo'yicha qayd etiladi (foydalanish sinovida T4 uchun), limitdan yechilmaydi
+        from .models import AIFailure
+        failure = AIFailure.objects.get()
+        self.assertEqual((failure.kind, failure.error), (AIFailure.Kind.HINT, "AITransientError"))
+        self.assertEqual(failure.lab, LabAttempt.objects.get().lab)
 
     @override_settings(LAB_AI_DAILY_LIMIT=2)
     @patch("labs.views.generate_advice", return_value="Maslahat")

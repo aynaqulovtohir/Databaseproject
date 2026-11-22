@@ -10,7 +10,7 @@ from django.utils import timezone
 from quizzes.models import Quiz, QuizAttempt
 from users.models import StudentGroup, User
 
-from .models import ErSnapshot, Lab, LabAttempt, LabChatMessage, LabGrade
+from .models import AIFailure, ErSnapshot, Lab, LabAttempt, LabChatMessage, LabGrade
 from .tests import ER_REFERENCE
 from .usability import report
 
@@ -102,10 +102,41 @@ class UsabilityReportTests(TestCase):
         data = report([s, no_ai], self.learn, self.exam, self.sus)
         self.assertEqual(data["rows"][0]["tasks"]["T4"], 2)
         self.assertEqual(data["rows"][1]["tasks"]["T4"], 0)
-        self.assertEqual(data["ai"], {"hints": 0, "coach_questions": 1, "users": 1})
+        self.assertEqual(data["ai"], {"hints": 0, "coach_questions": 1, "users": 1, "failed_requests": 0})
         self.assertEqual(data["tasks"]["T4"], {"done": 1, "n": 2})
-        self.assertEqual(data["logs"], {"works": 4, "enough_snapshots": 4, "reconstructed": 4, "min_snapshots": 5})
+        logs = {"works": 2, "enough_snapshots": 2, "reconstructed": 2, "min_snapshots": 5}
+        self.assertEqual(data["logs"], {"learn": logs, "exam": logs})
         self.assertEqual(data["grade_sources"], {"auto": 2})
+
+    def test_t4_with_only_ai_errors_is_excluded(self):
+        failed = self.full_student("u_failed")
+        LabAttempt.objects.filter(student=failed).update(ai_hints=[])
+        AIFailure.objects.create(student=failed, lab=self.learn, kind=AIFailure.Kind.LAB_CHAT, error="AITransientError")
+        # Xato bo'lgan, lekin keyin muvaffaqiyatli javob olgan talaba — T4 bajarilgan
+        recovered = self.full_student("u_recovered")
+        AIFailure.objects.create(student=recovered, lab=self.learn, kind=AIFailure.Kind.HINT, error="AITransientError")
+        # Boshqa laboratoriyadagi xato hisobga olinmaydi
+        other = self.full_student("u_otherlab")
+        LabAttempt.objects.filter(student=other).update(ai_hints=[])
+        AIFailure.objects.create(student=other, lab=self.exam, kind=AIFailure.Kind.HINT)
+        data = report([failed, recovered, other], self.learn, self.exam, self.sus)
+        self.assertEqual([row["tasks"]["T4"] for row in data["rows"]], [None, 2, 0])
+        self.assertEqual(data["tasks"]["T4"], {"done": 1, "n": 2})
+        self.assertEqual(data["t4_ai_errors"], 1)
+        self.assertEqual(data["ai"]["failed_requests"], 2)
+
+    def test_command_marks_ai_errors_and_splits_logs(self):
+        s = self.full_student("u_cmd_e")
+        LabAttempt.objects.filter(student=s).update(ai_hints=[])
+        AIFailure.objects.create(student=s, lab=self.learn, kind=AIFailure.Kind.LAB_CHAT)
+        out = StringIO()
+        call_command("usability_report", "--group", "FS-TEST", "--learn-lab", str(self.learn.pk),
+                     "--exam-lab", str(self.exam.pk), stdout=out)
+        text = out.getvalue()
+        self.assertIn(" 2  2  2  E  2  2  -", text)
+        self.assertIn("T4: 1 ta talabada faqat AI xatosi (E)", text)
+        self.assertIn("imtihon (T6, AI'siz) ishlari — mezon (1 ta ER ishi)", text)
+        self.assertIn("o'quv laboratoriyasi (1 ta ER ishi)", text)
 
     def test_without_sus_t7_is_not_counted(self):
         s = self.full_student("u_nosus")

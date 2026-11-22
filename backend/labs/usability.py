@@ -5,19 +5,22 @@ ma'lum, shuning uchun kuzatuvchi jadvalni qo'lda tuzatadi. Topshiriqlar:
 T1 — rozilik qarori berilgan (platformaga kirgan);
 T2 — o'quv laboratoriyasidagi oxirgi diagrammada kamida 3 obyekt va 2 bog'lanish;
 T3 — kamida bitta tekshiruv va undan keyin diagramma o'zgargan;
-T4 — o'quv laboratoriyasida AI maslahati yoki murabbiy savoli;
+T4 — o'quv laboratoriyasida AI maslahati yoki murabbiy savoli. Muvaffaqiyatli javob yo'q, lekin AI xizmati xato
+     bergan urinish (AIFailure) bor bo'lsa — talaba aybi emas: T4 baholanmaydi (None, "E" belgisi), mezon ulushidan
+     chiqariladi va soni alohida ko'rsatiladi;
 T5 — o'quv laboratoriyasi baholashga topshirilgan;
 T6 — imtihon (AI'siz) topshirig'i topshirilgan;
 T7 — SUS so'rovnomasining 10 ta fikriga ham javob berilgan (SUS berilmasa — hisoblanmaydi).
 
 Log to'liqligi ikki ta'rifda: (a) kamida MIN_SNAPSHOTS oraliq holat; (b) jarayon tiklanadi — kamida bitta oraliq
-holat bor va topshirishdan oldingi oxirgi holat topshirilgan diagrammaga teng.
+holat bor va topshirishdan oldingi oxirgi holat topshirilgan diagrammaga teng. O'quv (T2–T5) va imtihon (T6, AI'siz)
+ishlari alohida hisoblanadi: oldindan belgilangan mezon (≥ 90%) faqat imtihon ishlariga, (b) ta'rif bo'yicha.
 """
 from collections import Counter
 
 from quizzes.services import likert_value
 
-from .models import ErSnapshot, LabAttempt, LabChatMessage, LabGrade
+from .models import AIFailure, ErSnapshot, LabAttempt, LabChatMessage, LabGrade
 
 TASKS = ("T1", "T2", "T3", "T4", "T5", "T6", "T7")
 MIN_SNAPSHOTS = 5
@@ -54,12 +57,13 @@ def student_row(student, learn, exam, sus=None):
     last = snaps[-1].diagram if snaps else {"entities": [], "relationships": []}
     hints = sum(len(a.ai_hints or []) for a in attempts)
     questions = LabChatMessage.objects.filter(student=student, lab=learn, role=LabChatMessage.Role.USER).count()
+    ai_failed = AIFailure.objects.filter(student=student, lab=learn).count()
     grade = LabGrade.objects.filter(student=student, lab=learn).first()
     tasks = {
         "T1": student.research_consent is not None,
         "T2": len(last.get("entities", [])) >= MIN_ENTITIES and len(last.get("relationships", [])) >= MIN_RELATIONSHIPS,
         "T3": bool(checks) and any(s.created_at > checks[0].created_at and s.diagram != checks[0].diagram for s in snaps),
-        "T4": hints + questions > 0,
+        "T4": True if hints + questions > 0 else None if ai_failed else False,
         "T5": grade is not None,
         "T6": LabGrade.objects.filter(student=student, lab=exam).exists(),
         "T7": None if sus is None else _sus_answers(sus, student) == sus.questions.count(),
@@ -73,6 +77,8 @@ def student_row(student, learn, exam, sus=None):
         "snapshots": (len(snaps), len(exam_snaps)),
         "logs": [_log_complete(snaps, submission), _log_complete(exam_snaps, exam_submission)],
         "hints": hints,
+        "ai_failed": ai_failed,
+        "t4_ai_error": hints + questions == 0 and ai_failed > 0,
         "coach_questions": questions,
         "grade_source": grade.source if grade else None,
         "learn_minutes": minutes,
@@ -86,21 +92,23 @@ def report(students, learn, exam, sus=None):
     for task in TASKS:
         values = [row["tasks"][task] for row in rows if row["tasks"][task] is not None]
         summary[task] = {"done": sum(v == 2 for v in values), "n": len(values)}
-    works = [(log, count) for row in rows for log, count in zip(row["logs"], row["snapshots"]) if count]
+
+    def log_stats(index):
+        works = [row["logs"][index] for row in rows if row["snapshots"][index]]
+        return {"works": len(works), "enough_snapshots": sum(log[0] for log in works),
+                "reconstructed": sum(log[1] for log in works), "min_snapshots": MIN_SNAPSHOTS}
+
     return {
         "students": n,
         "rows": rows,
         "tasks": summary,
-        "logs": {
-            "works": len(works),
-            "enough_snapshots": sum(log[0] for log, _ in works),
-            "reconstructed": sum(log[1] for log, _ in works),
-            "min_snapshots": MIN_SNAPSHOTS,
-        },
+        "t4_ai_errors": sum(row["t4_ai_error"] for row in rows),
+        "logs": {"learn": log_stats(0), "exam": log_stats(1)},
         "ai": {
             "hints": sum(row["hints"] for row in rows),
             "coach_questions": sum(row["coach_questions"] for row in rows),
             "users": sum(row["hints"] + row["coach_questions"] > 0 for row in rows),
+            "failed_requests": sum(row["ai_failed"] for row in rows),
         },
         "grade_sources": dict(Counter(row["grade_source"] for row in rows if row["grade_source"])),
     }

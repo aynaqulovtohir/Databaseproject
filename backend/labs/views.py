@@ -39,12 +39,14 @@ from .quota import (
     ai_grades_left,
     ai_usable,
     record_ai_action,
+    record_ai_failure,
     refuse_ai,
     sandbox_down_response,
 )
 from .er import build_fixed, compare
 from .models import (
     AIAction,
+    AIFailure,
     AIOutputReview,
     BlindReview,
     ErSnapshot,
@@ -865,12 +867,14 @@ class LabAttemptAdviceView(APIView):
 
         try:
             advice = generate_advice(attempt, level, list(hints))
-        except AITransientError:
+        except AITransientError as exc:
+            record_ai_failure(request.user, attempt.lab, AIFailure.Kind.HINT, exc)
             return Response(
                 {"detail": "AI maslahatchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except AIError as exc:
+            record_ai_failure(request.user, attempt.lab, AIFailure.Kind.HINT, exc)
             logger.error("Laboratoriya maslahati xatosi: %s", exc)
             return Response(
                 {"detail": "AI bu kod bo'yicha maslahat bera olmadi."}, status=status.HTTP_502_BAD_GATEWAY
@@ -1003,6 +1007,7 @@ class LabChatView(APIView):
                 passages=find_passages(request.user, content, self.lab.title),
             )
         except AIError as exc:
+            record_ai_failure(request.user, self.lab, AIFailure.Kind.LAB_CHAT, exc)
             return ai_error_response(exc, "savol")
         with transaction.atomic():
             LabChatMessage.objects.create(

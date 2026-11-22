@@ -53,18 +53,25 @@ class Command(BaseCommand):
         for index, row in enumerate(data["rows"], start=1):
             student = row["student"]
             name = f"{student.first_name} {student.last_name}".strip() or student.username if options["names"] else f"FS-{index:02d}"
-            marks = " ".join(" -" if row["tasks"][t] is None else f"{row['tasks'][t]:>2}" for t in TASKS)
+            marks = " ".join(
+            " E" if t == "T4" and row["t4_ai_error"] else " -" if row["tasks"][t] is None else f"{row['tasks'][t]:>2}"
+            for t in TASKS
+        )
             out(f"{name[:24]:24} {marks}  {row['snapshots'][0]:>8}/{row['snapshots'][1]:<10} "
                 f"{row['hints']}+{row['coach_questions']:<12} {row['grade_source'] or '-':5} {row['learn_minutes'] if row['learn_minutes'] is not None else '-'}")
         out("\nMustaqil bajarganlar (loglar bo'yicha):")
         for task in TASKS:
             item = data["tasks"][task]
             out(f"  {task}: {_pct(item['done'], item['n'])}")
-        logs = data["logs"]
-        out(f"\nLog to'liqligi ({logs['works']} ta ER ishi):")
-        out(f"  (a) kamida {logs['min_snapshots']} oraliq holat: {_pct(logs['enough_snapshots'], logs['works'])}")
-        out(f"  (b) jarayon topshirilgan diagrammagacha tiklanadi: {_pct(logs['reconstructed'], logs['works'])}")
+        if data["t4_ai_errors"]:
+            out(f"  T4: {data['t4_ai_errors']} ta talabada faqat AI xatosi (E) — ulushdan chiqarildi")
+        for key, title in (("exam", "imtihon (T6, AI'siz) ishlari — mezon"), ("learn", "o'quv laboratoriyasi")):
+            logs = data["logs"][key]
+            out(f"\nLog to'liqligi, {title} ({logs['works']} ta ER ishi):")
+            out(f"  (a) kamida {logs['min_snapshots']} oraliq holat: {_pct(logs['enough_snapshots'], logs['works'])}")
+            out(f"  (b) jarayon topshirilgan diagrammagacha tiklanadi: {_pct(logs['reconstructed'], logs['works'])}")
         ai = data["ai"]
-        out(f"\nAI: {ai['users']}/{data['students']} talaba foydalandi; maslahatlar {ai['hints']}, murabbiyga savollar {ai['coach_questions']}")
+        out(f"\nAI: {ai['users']}/{data['students']} talaba foydalandi; maslahatlar {ai['hints']}, murabbiyga savollar {ai['coach_questions']}, "
+            f"xato bilan tugagan so'rovlar {ai['failed_requests']}")
         out(f"O'quv laboratoriyasi baho manbasi: {data['grade_sources'] or '—'}")
         out("\nEslatma: 'yordam bilan' (1) va vaqt kuzatuv varag'idan qo'shiladi.")
