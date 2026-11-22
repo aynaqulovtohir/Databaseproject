@@ -24,6 +24,7 @@ chiqish, texnik tekshirish va pilot tadqiqot protokoli (Aynakulov T.T.).
 | `yuklama65_tayyorlash.py`, `yuklama65_ishga_tushirish.py` | 65 sintetik hisob («Sintetik 01…65») bir vaqtda T1–T7: Gemini API limitini sinash | 4.5 |
 | `mashq15_tayyorlash.py`, `mashq15_ishga_tushirish.py`, `mashq15_sus_qayta.py` | Xuddi shu mashq 15 hisob bilan (bir mashg'ulotdagi talabalar soni); SUS bosqichini alohida qayta bajarish | 3.7, 4.5 |
 | `takroriy_simulyatsiya.py` | Monte Karlo: `backend/competence/stats.py` funksiyalari (ANCOVA, Holm, ICC, t, Mann–Uitni) generator qoidasi bilan yaratilgan 2 000 × 12 ma'lumot to'plamida; soxta ijobiy natijalar ulushi, quvvat va kompetentlik «Umumiy» o'zgarishining eski/tuzatilgan usuli (PR #46). Platforma va bazasiz ishlaydi | sintetik tekshiruv maqolasi, 4.5 va 5.6 |
+| `klaster_simulyatsiya.py` | Xuddi shu funksiyalar akademik guruh ta'siri bilan (ICC = 0; 0,05; 0,10): A — AI guruh bo'yicha (har shartda 2 guruh), B — har bir guruh ikkiga bo'linib, yarmi AI, yarmi nazorat; ANCOVA soxta ijobiy ulushi, quvvat va platformaning ICC ogohlantirishi (> 0,05) qanchalik tez-tez ishlashi | sintetik tekshiruv maqolasi, 4.5 va 5.6 |
 | `natijalar/` | Loglar va platforma tahlil modullarining chiqishi | — |
 
 ## Ishga tushirish tartibi
@@ -54,6 +55,7 @@ python manage.py sus_report --quiz <id> --group FS-MASHQ15 --consented
 
 # Takroriy simulyatsiya (2026-11-22): platforma va baza kerak emas, ~1,5 daqiqa; seed qat'iy — natija bir xil chiqadi
 python3 -I takroriy_simulyatsiya.py ../../backend/competence/stats.py natijalar/takroriy_simulyatsiya.json
+python3 -I klaster_simulyatsiya.py ../../backend/competence/stats.py natijalar/klaster_simulyatsiya.json   # ~4,5 daqiqa
 ```
 
 `tekshiruv2.json`, `mashq.json` va `mashq15.json` fayllarida sintetik hisoblarning parollari bor, ular repozitoriyaga kiritilmaydi.
@@ -103,6 +105,24 @@ olindi; maqoladagi qiymatlar (40 login, 5,6 s) birinchi ishga tushirishdan, bu f
 Simulyatsiya statistik funksiyalarni bevosita chaqiradi (API, baza va mezon tanlash qismi chetlab o'tiladi): mezon
 har doim Styudent t (chiqish, kechiktirilgan) va Mann–Uitni U (o'sish); klaster ta'siri, tashlab ketish va shift
 dasturlanmagan.
+
+## Natijalar (2026-yil 23-noyabr, klaster simulyatsiyasi)
+
+`natijalar/klaster_simulyatsiya.json` (R = 2 000, seed 20261123; 4 ta akademik guruh; guruh ta'siri chiqish testiga
+qo'shiladi, σ_u = 3,31 / 4,81 ball ICC = 0,05 / 0,10 ga mos; qoldiq SD = 14,43):
+
+| Dizayn, ICC | ANCOVA soxta ijobiy: n = 10 / 20 / 64 har shartda | Platforma ICC ogohlantirishi (n = 20) |
+|---|---|---|
+| A (AI guruh bo'yicha), 0 | 5,4% / 5,2% / 5,3% | 11% (soxta signal) |
+| A, 0,05 | 8,9% / 11,2% / 24,2% | 24% |
+| A, 0,10 | 9,5% / 15,3% / 33,6% | 36% |
+| B (guruh ichida bo'lish), 0,05 | 5,0% / 3,7% / 5,3% | — |
+| B, 0,10 | 4,4% / 3,9% / 4,2% | — |
+
+Xulosa: AI guruh bo'yicha yoqilsa va har shartda 2 ta guruh bo'lsa, guruh ta'siri soxta ijobiy ulushni guruh hajmi
+bilan birga oshiradi; platformaning ICC ogohlantirishi bunday holatlarning ko'pini sezmaydi. Har bir sinfni ikkita
+platforma guruhiga bo'lish (B) xatoni nominal darajada saqlaydi, quvvat kamaymaydi (δ = 0,10 da n = 20: 0,56).
+B dizaynda sinf ichida AI javoblari almashinishi (kontaminatsiya) xavfi bor.
 
 ## Cheklovlar
 
