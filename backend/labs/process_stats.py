@@ -216,9 +216,15 @@ def transition_section(rows):
 def conclusions(strategies, cohorts, transitions):
     lines = []
     known = sum(item["count"] for item in strategies["items"] if item["strategy"] in KNOWN_STRATEGIES)
+    total = sum(item["count"] for item in strategies["items"])
     if known:
         top = max((item for item in strategies["items"] if item["strategy"] in KNOWN_STRATEGIES), key=lambda item: item["count"])
-        lines.append(f"Eng ko'p uchragan strategiya — «{top['label']}» ({top['count']} ta ish, {round(100 * top['count'] / known)}%).")
+        # Ulush ikki asosda: jadvaldagi «Ishlar» ustuni barcha ishlarga nisbatan, «aniqlanmadi» esa chiqarilgan ulush
+        # ham kerak — bittasini izohsiz berish jadval bilan ziddiyatdek ko'rinadi.
+        share = f"barcha {total} ta ishning {round(100 * top['count'] / total)}%"
+        if known < total:
+            share += f", strategiyasi aniqlangan {known} ta ishning {round(100 * top['count'] / known)}%"
+        lines.append(f"Eng ko'p uchragan strategiya — «{top['label']}» ({top['count']} ta ish: {share}).")
     test = strategies["grade_test"]
     if test:
         verdict = "ahamiyatli farq qiladi" if test["significant"] else "statistik ahamiyatli farq qilmaydi"
