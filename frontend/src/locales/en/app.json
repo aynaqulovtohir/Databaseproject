@@ -1602,5 +1602,14 @@
  "Kirish@@tizimga": "Sign in",
  "Chiqish@@tizimdan": "Sign out",
  "Topshirish@@tugma": "Submit",
- "Statistika@@ustun": "Statistic"
+ "Statistika@@ustun": "Statistic",
+ "boshida → oxirida": "start → end",
+ "O'sishlar farqi": "Difference in gains",
+ "oxirida → keyin": "end → delayed",
+ "Saqlanish farqi": "Difference in retention",
+ "past@@daraja": "low",
+ "o'rta@@daraja": "medium",
+ "yuqori@@daraja": "high",
+ "kirish testida": "on the pre-test",
+ "chiqish testida": "on the post-test"
 }

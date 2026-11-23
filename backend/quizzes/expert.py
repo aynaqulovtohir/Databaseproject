@@ -34,7 +34,7 @@ S_CVI_UA_TARGET = 0.80
 SCALES = {"essential": (1, 3), "relevance": (1, 4), "clarity": (1, 4)}
 MAX_COMMENT = 1000
 EXPERT_FIELDS = {"full_name": 200, "degree": 200, "position": 200, "workplace": 300, "experience_years": 3}
-VERDICTS = {"keep": "Qoldirish", "revise": N_("Qayta ko'rib chiqish"), "remove": "Olib tashlash"}
+VERDICTS = {"keep": N_("Qoldirish"), "revise": N_("Qayta ko'rib chiqish"), "remove": N_("Olib tashlash")}
 
 
 def new_token():

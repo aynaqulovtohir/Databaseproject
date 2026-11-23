@@ -1,7 +1,7 @@
 """Virtual laboratoriya: talaba SQL kodni yozadi, tizim uni ishga tushirib tekshiradi."""
 from django.conf import settings
 from django.db import models
-from config.i18n import N_
+from config.i18n import N_, tr
 
 MAX_SQL_LENGTH = 50_000
 MAX_LEVEL = 5
@@ -149,7 +149,7 @@ class Lab(models.Model):
         except RequirementsError as exc:
             raise ValidationError({"requirements": str(exc)})
         if self.requirements and self.kind != self.Kind.ER:
-            raise ValidationError({"requirements": "Talablarni aniqlash faqat ER-diagramma laboratoriyasida bo'ladi."})
+            raise ValidationError({"requirements": tr("Talablarni aniqlash faqat ER-diagramma laboratoriyasida bo'ladi.")})
 
     @property
     def is_interview(self):

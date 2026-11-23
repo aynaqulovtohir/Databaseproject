@@ -24,7 +24,7 @@ FORMS = ("A", "B")
 EQUIVALENCE_MARGIN = 10  # foiz punkti: 20 savolli testda 2 ta savol
 ITEM_GAP = 0.15
 MIN_FORM = 3
-KIND_LABELS = {"pre": "Kirish testi", "post": "Chiqish testi", "delayed": N_("Kechiktirilgan test")}
+KIND_LABELS = {"pre": N_("Kirish testi"), "post": N_("Chiqish testi"), "delayed": N_("Kechiktirilgan test")}
 
 
 def _r(value, digits=3):

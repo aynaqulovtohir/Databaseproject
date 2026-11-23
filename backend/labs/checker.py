@@ -17,8 +17,7 @@ ERROR_TIPS = {
     "42P07": N_("Bunday nomli jadval allaqachon mavjud. Boshqa nom tanlang yoki jadvalni ikki marta yaratmang."),
     "42701": N_("Bitta jadvalda bir xil nomli ustun ikki marta yozilgan."),
     "42702": N_("Bu ustun nomi bir nechta jadvalda bor. Qaysi jadvalniki ekanini ko'rsating: jadval.ustun."),
-    "42803": "SELECT dagi agregat funksiya (COUNT, SUM, ...) ichida bo'lmagan har bir ustun "
-    "GROUP BY da ham yozilishi kerak.",
+    "42803": N_("SELECT dagi agregat funksiya (COUNT, SUM, ...) ichida bo'lmagan har bir ustun GROUP BY da ham yozilishi kerak."),
     "42883": N_("Bunday funksiya yoki operator yo'q. Funksiya nomini va argumentlar turini tekshiring (masalan, matn bilan sonni to'g'ridan-to'g'ri solishtirib bo'lmaydi)."),
     "42804": N_("Ma'lumot turlari mos emas. Ustun turi va unga berilayotgan qiymat turini tekshiring."),
     "42704": N_("Bunday ma'lumot turi yoki obyekt yo'q. Tur nomi to'g'ri yozilganini tekshiring."),

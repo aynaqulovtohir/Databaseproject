@@ -33,7 +33,7 @@ from config.i18n import tr, N_
 
 STAGES = {"initial": N_("Tajriba boshida"), "final": N_("Tajriba oxirida"), "delayed": N_("Tajribadan keyin")}
 STAGE_QUIZZES = {"initial": "initial_quizzes", "final": "final_quizzes", "delayed": "delayed_quizzes"}
-LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori", "creative": "Ijodiy-amaliy"}
+LEVELS = {"low": N_("Past"), "medium": N_("O'rta"), "high": N_("Yuqori"), "creative": N_("Ijodiy-amaliy")}
 # Umumiy daraja (komponentlar o'rtachasi) chegaralari; komponentlarniki admin panelda sozlanadi
 OVERALL_MEDIUM_FROM = 40
 OVERALL_HIGH_FROM = 70

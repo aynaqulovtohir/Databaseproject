@@ -369,14 +369,14 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
         </section>
         <section className="grid gap-2">
           <h3 className="text-sm font-medium">{t("O'sish: tajriba boshidan oxirigacha (har bir guruh ichida, juftlangan t-test)")}</h3>
-          <ChangeTable data={data} field="growth" span="boshida → oxirida" differenceLabel="O'sishlar farqi" />
+          <ChangeTable data={data} field="growth" span={t('boshida → oxirida')} differenceLabel={t("O'sishlar farqi")} />
         </section>
         {stages.includes('delayed') ? (
           <section className="grid gap-2">
             <h3 className="text-sm font-medium">
               {t("Bilim saqlanishi: tajriba oxiridan kechiktirilgan testgacha (manfiy o'zgarish — unutilgan qism)")}
             </h3>
-            <ChangeTable data={data} field="retention" span="oxirida → keyin" differenceLabel="Saqlanish farqi" />
+            <ChangeTable data={data} field="retention" span={t('oxirida → keyin')} differenceLabel={t('Saqlanish farqi')} />
           </section>
         ) : null}
         {lines.length ? (
