@@ -28,6 +28,7 @@ import { type Assignment, type AssignmentStage, type ErDiagram, type MissingStud
 import { cleanDiagram, EMPTY_DIAGRAM } from '@/lib/er'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { t } from '@/lib/i18n'
 
 const MAX_SQL_LENGTH = 50_000
 
@@ -38,7 +39,7 @@ function BackLink() {
       className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
-      Topshiriqlar
+      {t('Topshiriqlar')}
     </Link>
   )
 }
@@ -60,9 +61,9 @@ function ConditionCard({ assignment, children }: { assignment: Assignment; child
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Topshiriq sharti</CardTitle>
+        <CardTitle>{t('Topshiriq sharti')}</CardTitle>
         <CardDescription className="flex flex-wrap items-center gap-2">
-          <span>Muddat: {formatDateTime(assignment.deadline)}</span>
+          <span>{t('Muddat: {deadline}', { deadline: formatDateTime(assignment.deadline) })}</span>
           <DeadlineBadge deadline={assignment.deadline} />
         </CardDescription>
       </CardHeader>
@@ -73,10 +74,10 @@ function ConditionCard({ assignment, children }: { assignment: Assignment; child
             {assignment.stages.map((stage) => (
               <li key={stage.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span>
-                  <span className="font-medium">{stage.order + 1}-bosqich.</span> {stage.title}
+                  <span className="font-medium">{t('{value}-bosqich.', { value: stage.order + 1 })}</span> {stage.title}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {formatDateTime(stage.deadline)} · {stagePoints(assignment, stage)} ball
+                  {formatDateTime(stage.deadline)} · {stagePoints(assignment, stage)}{' '}{t('ball')}
                 </span>
               </li>
             ))}
@@ -112,7 +113,7 @@ function StaffView({ assignment }: { assignment: Assignment }) {
   const remove = useMutation({
     mutationFn: () => api(`/assignments/${assignment.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Topshiriq o'chirildi")
+      toast.success(t("Topshiriq o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['assignments'] })
       void navigate('/assignments', { replace: true })
     },
@@ -128,7 +129,7 @@ function StaffView({ assignment }: { assignment: Assignment }) {
   } else if (submissions.isError) {
     submissionsContent = <ErrorState error={submissions.error} onRetry={() => void submissions.refetch()} />
   } else if (!submissions.data.length) {
-    submissionsContent = <EmptyState icon={Inbox} title="Hali yechim kelmagan" />
+    submissionsContent = <EmptyState icon={Inbox} title={t('Hali yechim kelmagan')} />
   } else {
     const order = (submission: Submission) => assignment.stages.find((stage) => stage.id === submission.stage)?.order ?? 0
     const rows = [...submissions.data].sort(
@@ -138,12 +139,12 @@ function StaffView({ assignment }: { assignment: Assignment }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Talaba</TableHead>
-            {assignment.stages.length ? <TableHead>Bosqich</TableHead> : null}
-            <TableHead>Holat</TableHead>
-            <TableHead className="text-right">Urinish</TableHead>
-            <TableHead className="text-right">Ball</TableHead>
-            <TableHead>Topshirilgan</TableHead>
+            <TableHead>{t('Talaba')}</TableHead>
+            {assignment.stages.length ? <TableHead>{t('Bosqich')}</TableHead> : null}
+            <TableHead>{t('Holat')}</TableHead>
+            <TableHead className="text-right">{t('Urinish')}</TableHead>
+            <TableHead className="text-right">{t('Ball')}</TableHead>
+            <TableHead>{t('Topshirilgan')}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -165,7 +166,7 @@ function StaffView({ assignment }: { assignment: Assignment }) {
               <TableCell className="text-right">
                 <Button asChild variant="outline" size="lg">
                   <Link to={`/submissions/${submission.id}`}>
-                    {submission.status === 'submitted' ? 'Tekshirish' : "Ko'rish"}
+                    {submission.status === 'submitted' ? t('Tekshirish') : t("Ko'rish")}
                   </Link>
                 </Button>
               </TableCell>
@@ -182,7 +183,7 @@ function StaffView({ assignment }: { assignment: Assignment }) {
   } else if (missing.isError) {
     missingContent = <ErrorState error={missing.error} onRetry={() => void missing.refetch()} />
   } else if (!missing.data.length) {
-    missingContent = <p className="text-sm text-muted-foreground">Barcha talabalar yechim topshirgan.</p>
+    missingContent = <p className="text-sm text-muted-foreground">{t('Barcha talabalar yechim topshirgan.')}</p>
   } else {
     missingContent = (
       <ul className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
@@ -201,16 +202,16 @@ function StaffView({ assignment }: { assignment: Assignment }) {
       <BackLink />
       <PageHeader
         title={assignment.title}
-        description={`${fullName(assignment.author)} · Guruhlar: ${groupNames(assignment.groups, groups)}`}
+        description={`${fullName(assignment.author)} · ${t('Guruhlar: {groups}', { groups: groupNames(assignment.groups, groups) })}`}
         actions={
           <>
             <Button variant="outline" size="lg" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
-              Tahrirlash
+              {t('Tahrirlash')}
             </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />
-              O'chirish
+              {t("O'chirish")}
             </Button>
           </>
         }
@@ -221,31 +222,32 @@ function StaffView({ assignment }: { assignment: Assignment }) {
             <RubricList
               key={stage.id}
               criteria={stageCriteria(assignment, stage)}
-              title={`${stage.order + 1}-bosqich rubrikasi: ${stage.title}`}
+              title={t('{value}-bosqich rubrikasi: {title}', { value: stage.order + 1, title: stage.title })}
             />
           ))}
           <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-            <div className="font-medium">Yashirin baholash izohlari</div>
+            <div className="font-medium">{t('Yashirin baholash izohlari')}</div>
             <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
-              {assignment.grading_criteria?.trim() || 'Kiritilmagan.'}
+              {assignment.grading_criteria?.trim() || t('Kiritilmagan.')}
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">Talabaga ko'rinmaydi.</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("Talabaga ko'rinmaydi.")}</p>
           </div>
         </ConditionCard>
         <Card>
           <CardHeader>
-            <CardTitle>Yechimlar</CardTitle>
+            <CardTitle>{t('Yechimlar')}</CardTitle>
             <CardDescription>
-              Har bir talabaning {assignment.stages.length ? 'har bir bosqich bo\'yicha ' : ''}oxirgi urinishi
-              ko'rsatiladi.
+              {assignment.stages.length
+                ? t("Har bir talabaning har bir bosqich bo'yicha oxirgi urinishi ko'rsatiladi.")
+                : t("Har bir talabaning oxirgi urinishi ko'rsatiladi.")}
             </CardDescription>
           </CardHeader>
           <CardContent>{submissionsContent}</CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Topshirmaganlar{missing.data?.length ? ` (${missing.data.length})` : ''}</CardTitle>
-            <CardDescription>Topshiriq berilgan guruhlardagi hali birorta yechim yubormagan talabalar.</CardDescription>
+            <CardTitle>{t('Topshirmaganlar')}{missing.data?.length ? ` (${missing.data.length})` : ''}</CardTitle>
+            <CardDescription>{t('Topshiriq berilgan guruhlardagi hali birorta yechim yubormagan talabalar.')}</CardDescription>
           </CardHeader>
           <CardContent>{missingContent}</CardContent>
         </Card>
@@ -254,9 +256,9 @@ function StaffView({ assignment }: { assignment: Assignment }) {
       {editing ? <AssignmentDialog assignment={assignment} onClose={() => setEditing(false)} /> : null}
       <ConfirmDialog
         open={confirmingDelete}
-        title="Topshiriqni o'chirish"
-        description={`«${assignment.title}» o'chiriladi. Yechim kelgan topshiriqni o'chirib bo'lmaydi.`}
-        confirmLabel="O'chirish"
+        title={t("Topshiriqni o'chirish")}
+        description={t("«{title}» o'chiriladi. Yechim kelgan topshiriqni o'chirib bo'lmaydi.", { title: assignment.title })}
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmingDelete(false)}
@@ -272,12 +274,12 @@ function ResultBanner({ submission }: { submission: Submission }) {
     return (
       <Alert>
         <AlertTitle>
-          Baho: {submission.grade.score} / {submission.grade.max_score}
+          {t('Baho: {score} / {max_score}', { score: submission.grade.score, max_score: submission.grade.max_score })}
         </AlertTitle>
         <AlertDescription className="whitespace-pre-wrap">
           <GradeBreakdown grade={submission.grade} />
           <p className={submission.grade.rubric_scores?.length ? 'mt-2' : ''}>
-            {submission.grade.comment || "O'qituvchi izoh qoldirmagan."}
+            {submission.grade.comment || t("O'qituvchi izoh qoldirmagan.")}
           </p>
         </AlertDescription>
       </Alert>
@@ -286,16 +288,16 @@ function ResultBanner({ submission }: { submission: Submission }) {
   if (submission.status === 'returned') {
     return (
       <Alert>
-        <AlertTitle>Yechim qayta ishlashga qaytarildi</AlertTitle>
+        <AlertTitle>{t('Yechim qayta ishlashga qaytarildi')}</AlertTitle>
         <AlertDescription className="whitespace-pre-wrap">{submission.return_comment}</AlertDescription>
       </Alert>
     )
   }
   return (
     <Alert>
-      <AlertTitle>Yechim topshirildi</AlertTitle>
+      <AlertTitle>{t('Yechim topshirildi')}</AlertTitle>
       <AlertDescription>
-        O'qituvchi tekshirib, baho qo'yadi. Baholangunga qadar yangi urinish topshirishingiz mumkin.
+        {t("O'qituvchi tekshirib, baho qo'yadi. Baholangunga qadar yangi urinish topshirishingiz mumkin.")}
       </AlertDescription>
     </Alert>
   )
@@ -312,7 +314,7 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="font-medium">{submission.attempt_number}-urinish</span>
+        <span className="font-medium">{t('{attempt_number}-urinish', { attempt_number: submission.attempt_number })}</span>
         <SubmissionStatusBadge submission={submission} />
         <span className="ml-auto text-xs text-muted-foreground">{formatDateTime(submission.submitted_at)}</span>
         <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} aria-hidden="true" />
@@ -324,13 +326,13 @@ function AttemptItem({ submission, defaultOpen }: { submission: Submission; defa
           {/* Tajribaning nazorat guruhida AI ko'rsatilmaydi */}
           {user.ai_enabled ? (
             <div>
-              <h3 className="mb-2 text-sm font-medium">AI tahlili</h3>
+              <h3 className="mb-2 text-sm font-medium">{t('AI tahlili')}</h3>
               <AnalysisPanel submissionId={submission.id} />
             </div>
           ) : null}
           {user.ai_enabled ? (
             <div>
-              <h3 className="mb-2 text-sm font-medium">Loyiha himoyasi</h3>
+              <h3 className="mb-2 text-sm font-medium">{t('Loyiha himoyasi')}</h3>
               <VivaPanel submissionId={submission.id} />
             </div>
           ) : null}
@@ -366,7 +368,7 @@ function SubmitForm({
           : { sql_code: code, stage: stage ? stage.id : null },
       }),
     onSuccess: (submission) => {
-      toast.success('Yechim topshirildi')
+      toast.success(t('Yechim topshirildi'))
       setCode('')
       setDiagram(EMPTY_DIAGRAM)
       queryClient.setQueryData<Submission[]>(['submissions', assignment.id], (current) => [
@@ -394,12 +396,12 @@ function SubmitForm({
     <form onSubmit={handleSubmit} className="grid gap-3" noValidate>
       {late ? (
         <Alert variant="destructive">
-          <AlertDescription>Muddat o'tgan: yechim «kechikkan» deb belgilanadi.</AlertDescription>
+          <AlertDescription>{t("Muddat o'tgan: yechim «kechikkan» deb belgilanadi.")}</AlertDescription>
         </Alert>
       ) : null}
       {isDiagram ? (
         <div className="grid gap-1.5">
-          <span className="text-sm font-medium">ER-diagramma</span>
+          <span className="text-sm font-medium">{t('ER-diagramma')}</span>
           <ErEditor value={diagram} onChange={setDiagram} />
           {error ? (
             <p className="text-xs text-destructive" role="alert">
@@ -410,12 +412,12 @@ function SubmitForm({
       ) : (
       <div className="grid gap-1.5">
         <label htmlFor={fieldId} className="text-sm font-medium">
-          SQL kod
+          {t('SQL kod')}
         </label>
         <Textarea
           id={fieldId}
           className="max-h-[32rem] min-h-48 font-mono text-sm md:text-xs"
-          placeholder={'CREATE TABLE ...'}
+          placeholder={t('CREATE TABLE ...')}
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
@@ -433,7 +435,7 @@ function SubmitForm({
       )}
       <Button type="submit" size="lg" className="justify-self-start" disabled={mutation.isPending || (isDiagram ? !diagram.entities.length : !code.trim())}>
         {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-        {isRetry ? 'Yangi urinishni topshirish' : 'Yechimni topshirish'}
+        {isRetry ? t('Yangi urinishni topshirish') : t('Yechimni topshirish')}
       </Button>
     </form>
   )
@@ -458,7 +460,7 @@ function StageWork({
       {canSubmit ? <SubmitForm assignment={assignment} stage={stage} isRetry={Boolean(latest)} /> : null}
       {attempts.length ? (
         <div>
-          <h3 className="mb-2 text-sm font-medium">Urinishlarim</h3>
+          <h3 className="mb-2 text-sm font-medium">{t('Urinishlarim')}</h3>
           <ul className="grid gap-2">
             {attempts.map((submission, index) => (
               <AttemptItem key={submission.id} submission={submission} defaultOpen={index === 0} />
@@ -489,7 +491,7 @@ function StudentView({ assignment }: { assignment: Assignment }) {
   return (
     <>
       <BackLink />
-      <PageHeader title={assignment.title} description={`O'qituvchi: ${fullName(assignment.author)}`} />
+      <PageHeader title={assignment.title} description={t("O'qituvchi: {author}", { author: fullName(assignment.author) })} />
       {/* ER-diagramma chizish uchun keng joy kerak: bunday loyihada AI yordamchi yon ustunda emas, pastda */}
       <div
         className={cn(
@@ -501,8 +503,8 @@ function StudentView({ assignment }: { assignment: Assignment }) {
           <ConditionCard assignment={assignment}>
             {assignment.my_stages?.total_score != null ? (
               <p className="text-sm font-medium">
-                Loyiha bo'yicha jami: {assignment.my_stages.total_score} / 100
-                <span className="font-normal text-muted-foreground"> (baholangan bosqichlar)</span>
+                {t("Loyiha bo'yicha jami: {total_score} / 100", { total_score: assignment.my_stages.total_score })}
+                <span className="font-normal text-muted-foreground">{' '}{t('(baholangan bosqichlar)')}</span>
               </p>
             ) : null}
           </ConditionCard>
@@ -515,18 +517,18 @@ function StudentView({ assignment }: { assignment: Assignment }) {
                 <Card key={stage.id}>
                   <CardHeader>
                     <CardTitle>
-                      {stage.order + 1}-bosqich. {stage.title}
+                      {t('{value}-bosqich. {title}', { value: stage.order + 1, title: stage.title })}
                     </CardTitle>
                     <CardDescription className="flex flex-wrap items-center gap-2">
-                      <span>Muddat: {formatDateTime(stage.deadline)}</span>
+                      <span>{t('Muddat: {deadline}', { deadline: formatDateTime(stage.deadline) })}</span>
                       <DeadlineBadge deadline={stage.deadline} />
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-4">
                     {stage.description ? <p className="text-sm whitespace-pre-wrap">{stage.description}</p> : null}
-                    <RubricList criteria={stageCriteria(assignment, stage)} title="Bu bosqich qanday baholanadi" />
+                    <RubricList criteria={stageCriteria(assignment, stage)} title={t('Bu bosqich qanday baholanadi')} />
                     {locked ? (
-                      <p className="text-sm text-muted-foreground">Avval {previous!.order + 1}-bosqichni topshiring.</p>
+                      <p className="text-sm text-muted-foreground">{t('Avval {value}-bosqichni topshiring.', { value: previous!.order + 1 })}</p>
                     ) : (
                       <StageWork assignment={assignment} stage={stage} attempts={attempts} />
                     )}
@@ -537,9 +539,9 @@ function StudentView({ assignment }: { assignment: Assignment }) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Mening yechimim</CardTitle>
+                <CardTitle>{t('Mening yechimim')}</CardTitle>
                 <CardDescription>
-                  Har bir topshirish alohida urinish sifatida saqlanadi va AI tomonidan tahlil qilinadi.
+                  {t('Har bir topshirish alohida urinish sifatida saqlanadi va AI tomonidan tahlil qilinadi.')}
                 </CardDescription>
               </CardHeader>
               <CardContent>{work ?? <ListSkeleton rows={2} />}</CardContent>
@@ -549,8 +551,8 @@ function StudentView({ assignment }: { assignment: Assignment }) {
         {user.ai_enabled ? (
           <Card>
             <CardHeader>
-              <CardTitle>AI yordamchi</CardTitle>
-              <CardDescription>Yozishmani faqat siz ko'rasiz.</CardDescription>
+              <CardTitle>{t('AI yordamchi')}</CardTitle>
+              <CardDescription>{t("Yozishmani faqat siz ko'rasiz.")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ChatPanel assignmentId={assignment.id} />

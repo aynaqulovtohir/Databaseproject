@@ -26,6 +26,7 @@ import {
   type LabTryTable,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { localized, t } from '@/lib/i18n'
 
 const MAX_SQL_LENGTH = 50_000
 
@@ -34,7 +35,7 @@ function ResultTable({ table }: { table: LabRunTable }) {
   return (
     <div>
       <h3 className="mb-2 text-sm font-medium">
-        So'rov natijasi <span className="font-normal text-muted-foreground">({table.row_count} qator)</span>
+        {t("So'rov natijasi")}{' '}<span className="font-normal text-muted-foreground">{t('({row_count} qator)', { row_count: table.row_count })}</span>
       </h3>
       <div className="max-h-80 overflow-auto rounded-lg border">
         <Table>
@@ -52,7 +53,7 @@ function ResultTable({ table }: { table: LabRunTable }) {
               <TableRow key={rowIndex}>
                 {row.map((value, columnIndex) => (
                   <TableCell key={columnIndex} className="font-mono text-xs whitespace-pre-wrap">
-                    {value === null ? <span className="text-muted-foreground italic">NULL</span> : value}
+                    {value === null ? <span className="text-muted-foreground italic">{t('NULL')}</span> : value}
                   </TableCell>
                 ))}
               </TableRow>
@@ -60,9 +61,9 @@ function ResultTable({ table }: { table: LabRunTable }) {
           </TableBody>
         </Table>
       </div>
-      {!table.rows.length ? <p className="mt-2 text-xs text-muted-foreground">So'rov hech qanday qator qaytarmadi.</p> : null}
+      {!table.rows.length ? <p className="mt-2 text-xs text-muted-foreground">{t("So'rov hech qanday qator qaytarmadi.")}</p> : null}
       {table.truncated ? (
-        <p className="mt-2 text-xs text-muted-foreground">Faqat dastlabki {table.rows.length} qator ko'rsatildi.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t("Faqat dastlabki {length} qator ko'rsatildi.", { length: table.rows.length })}</p>
       ) : null}
     </div>
   )
@@ -75,7 +76,7 @@ interface AdviceResponse {
   max_level: number
 }
 
-const HINT_TITLES = ['Yo\'naltiruvchi savol', 'Tushuncha', 'Aniq ko\'rsatma']
+const HINT_TITLES = localized(['Yo\'naltiruvchi savol', 'Tushuncha', 'Aniq ko\'rsatma'])
 
 /** Bosqichma-bosqich AI maslahati: 1-daraja o'zi so'raladi, keyingisini talaba tugma bilan oladi. */
 export function AiAdvice({ attemptId }: { attemptId: number }) {
@@ -98,12 +99,12 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
     <div className="grid gap-2 rounded-lg border bg-background p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
         <Sparkles className="size-4" aria-hidden="true" />
-        AI maslahati
+        {t('AI maslahati')}
       </div>
       {advice.isPending ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          Maslahat tayyorlanmoqda…
+          {t('Maslahat tayyorlanmoqda…')}
         </p>
       ) : advice.isError ? (
         <p className="text-sm text-muted-foreground">{errorMessage(advice.error)}</p>
@@ -112,7 +113,7 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
           {advice.data.hints.map((hint, index) => (
             <div key={index} className="text-sm text-foreground">
               <span className="text-xs font-medium text-muted-foreground">
-                {index + 1}-daraja: {HINT_TITLES[index] ?? ''}
+                {t('{value}-daraja:', { value: index + 1 })}{' '}{HINT_TITLES[index] ?? ''}
               </span>
               <p className="whitespace-pre-wrap">{hint}</p>
             </div>
@@ -126,7 +127,7 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
               onClick={() => more.mutate(advice.data.level + 1)}
             >
               {more.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Lightbulb aria-hidden="true" />}
-              Ko'proq yordam ({advice.data.level + 1}/{advice.data.max_level})
+              {t("Ko'proq yordam ({value}/{max_level})", { value: advice.data.level + 1, max_level: advice.data.max_level })}
             </Button>
           ) : null}
         </>
@@ -135,21 +136,21 @@ export function AiAdvice({ attemptId }: { attemptId: number }) {
   )
 }
 
-const STEP_STATUS: Record<LabConcurrentStep['status'], { label: string; className: string }> = {
+const STEP_STATUS: Record<LabConcurrentStep['status'], { label: string; className: string }> = localized({
   ok: { label: 'bajarildi', className: 'text-muted-foreground' },
   waiting: { label: 'qulf kutmoqda…', className: 'text-amber-700' },
   resumed: { label: 'kutgandan keyin bajarildi', className: 'text-amber-700' },
   error: { label: 'xato', className: 'text-destructive' },
-}
+})
 
 /** Ikki sessiya (A va B) buyruqlari qanday ketma-ketlikda bajarilgani va har biri nimani o'qigani. */
 function ConcurrencyTimeline({ steps }: { steps?: LabConcurrentStep[] }) {
   if (!steps?.length) return null
   return (
     <div>
-      <h3 className="mb-1 text-sm font-medium">Vaqt chizig'i: ikki sessiya bir vaqtda</h3>
+      <h3 className="mb-1 text-sm font-medium">{t("Vaqt chizig'i: ikki sessiya bir vaqtda")}</h3>
       <p className="mb-2 text-xs text-muted-foreground">
-        Yuqoridan pastga — vaqt tartibida. A va B — kodingizni bir vaqtda bajargan ikki sessiya.
+        {t('Yuqoridan pastga — vaqt tartibida. A va B — kodingizni bir vaqtda bajargan ikki sessiya.')}
       </p>
       <ol className="grid gap-1.5">
         {steps.map((step, index) => {
@@ -172,7 +173,7 @@ function ConcurrencyTimeline({ steps }: { steps?: LabConcurrentStep[] }) {
               </div>
               {step.rows.length ? (
                 <div className="font-mono text-muted-foreground">
-                  o'qidi: {step.columns.join(', ')} = {step.rows.map((row) => row.join(', ')).join('; ')}
+                  {t("o'qidi: {columns} = {rows}", { columns: step.columns.join(', '), rows: step.rows.map((row) => row.join(', ')).join('; ') })}
                 </div>
               ) : null}
             </li>
@@ -187,9 +188,9 @@ function PlanView({ plan }: { plan?: string[] | null }) {
   if (!plan?.length) return null
   return (
     <div>
-      <h3 className="mb-1 text-sm font-medium">So'rov rejasi (EXPLAIN)</h3>
+      <h3 className="mb-1 text-sm font-medium">{t("So'rov rejasi (EXPLAIN)")}</h3>
       <p className="mb-2 text-xs text-muted-foreground">
-        Shartdagi so'rov qanday bajarilishi: Seq Scan — jadval to'liq o'qiladi, Index Scan — indeks ishlatiladi.
+        {t("Shartdagi so'rov qanday bajarilishi: Seq Scan — jadval to'liq o'qiladi, Index Scan — indeks ishlatiladi.")}
       </p>
       <SqlCode code={plan.join('\n')} />
     </div>
@@ -200,11 +201,11 @@ function ErrorDetails({ error }: { error: LabRunError }) {
   return (
     <div className="grid gap-1 text-sm">
       <p className="font-mono text-xs break-words">
-        {error.line ? `${error.line}-qator: ` : ''}
+        {error.line ? t('{line}-qator: ', { line: error.line }) : ''}
         {error.message}
       </p>
       {error.detail ? <p className="font-mono text-xs break-words">{error.detail}</p> : null}
-      {error.hint ? <p className="font-mono text-xs break-words">Hint: {error.hint}</p> : null}
+      {error.hint ? <p className="font-mono text-xs break-words">{t('Hint: {hint}', { hint: error.hint })}</p> : null}
     </div>
   )
 }
@@ -214,7 +215,7 @@ function ErrorTip({ tip }: { tip: string }) {
     <div className="flex gap-2 rounded-lg border bg-background p-3 text-sm text-foreground">
       <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <p>
-        <span className="font-medium">Maslahat: </span>
+        <span className="font-medium">{t('Maslahat:')}{' '}</span>
         {tip}
       </p>
     </div>
@@ -227,16 +228,16 @@ function Verdict({ result }: { result: LabRunResult }) {
       <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-emerald-900" role="status">
         <div className="flex items-center gap-2 font-medium">
           <CircleCheck className="size-5 shrink-0" aria-hidden="true" />
-          To'g'ri!
+          {t("To'g'ri!")}
         </div>
         <p className="mt-1 text-sm">
           {result.probes
-            ? "Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi."
+            ? t("Cheklovlar barcha hujumlarni to'xtatdi va to'g'ri ma'lumotni qabul qildi.")
             : result.queries?.length
-              ? "Jadvallar kutilganidek va barcha tekshiruv so'rovlari to'g'ri natija berdi."
+              ? t("Jadvallar kutilganidek va barcha tekshiruv so'rovlari to'g'ri natija berdi.")
               : result.checked_against_solution
-                ? 'Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.'
-                : 'Kod xatosiz ishladi.'}
+                ? t('Kod xatosiz ishladi va natija kutilgan natija bilan mos keldi.')
+                : t('Kod xatosiz ishladi.')}
         </p>
         {result.ai_explain && result.attempt_id ? (
           <div className="mt-3">
@@ -252,17 +253,17 @@ function Verdict({ result }: { result: LabRunResult }) {
     <div className="grid gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900" role="alert">
       <div className="flex items-center gap-2 font-medium">
         <CircleX className="size-5 shrink-0" aria-hidden="true" />
-        {error ? 'Kod xato berdi' : "Natija noto'g'ri"}
+        {error ? t('Kod xato berdi') : t("Natija noto'g'ri")}
       </div>
       {error ? (
         <ErrorDetails error={error} />
       ) : (
         <p className="text-sm">
           {result.probes
-            ? "Kod xatosiz ishladi, lekin ba'zi sinovlar o'tmadi:"
+            ? t("Kod xatosiz ishladi, lekin ba'zi sinovlar o'tmadi:")
             : result.queries?.length
-              ? "Kod xatosiz bajarildi, lekin natija kutilganidan farq qiladi:"
-              : 'Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:'}
+              ? t('Kod xatosiz bajarildi, lekin natija kutilganidan farq qiladi:')
+              : t('Kod xatosiz ishladi, lekin natija kutilganidan farq qiladi:')}
         </p>
       )}
       {result.differences.length ? (
@@ -282,7 +283,7 @@ function TablesSummary({ tables }: { tables: LabTryTable[] }) {
   if (!tables.length) return null
   return (
     <div>
-      <h3 className="mb-2 text-sm font-medium">Bazadagi jadvallar</h3>
+      <h3 className="mb-2 text-sm font-medium">{t('Bazadagi jadvallar')}</h3>
       <div className="grid gap-2 sm:grid-cols-2">
         {tables.map((table) => (
           <div key={table.name} className="min-w-0 rounded-lg border p-3">
@@ -290,14 +291,14 @@ function TablesSummary({ tables }: { tables: LabTryTable[] }) {
               <span className="font-mono text-sm font-medium break-all">{table.name}</span>
               <span className="text-xs text-muted-foreground">
                 {table.row_count}
-                {table.rows_truncated ? '+' : ''} qator
+                {table.rows_truncated ? '+' : ''}{' '}{t('qator')}
               </span>
             </div>
             <ul className="mt-2 grid gap-0.5 font-mono text-xs">
               {table.columns.map((column) => (
                 <li key={column.name} className="break-all">
                   {column.name} <span className="text-muted-foreground">{column.type}</span>
-                  {column.not_null ? <span className="text-muted-foreground"> NOT NULL</span> : null}
+                  {column.not_null ? <span className="text-muted-foreground">{' '}{t('NOT NULL')}</span> : null}
                 </li>
               ))}
             </ul>
@@ -326,7 +327,7 @@ function TryResult({ result }: { result: LabTryResult }) {
         <div className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950" role="alert">
           <div className="flex items-center gap-2 font-medium">
             <CircleX className="size-5 shrink-0" aria-hidden="true" />
-            Kod xato berdi
+            {t('Kod xato berdi')}
           </div>
           <ErrorDetails error={error} />
           {error.tip ? <ErrorTip tip={error.tip} /> : null}
@@ -335,7 +336,7 @@ function TryResult({ result }: { result: LabTryResult }) {
         <div className="rounded-lg border bg-muted/40 p-3 text-sm" role="status">
           <div className="flex items-center gap-2 font-medium">
             <FlaskConical className="size-4 shrink-0" aria-hidden="true" />
-            Kod xatosiz bajarildi
+            {t('Kod xatosiz bajarildi')}
             {result.status_message ? (
               <span className="font-mono text-xs font-normal text-muted-foreground">({result.status_message})</span>
             ) : null}
@@ -343,7 +344,7 @@ function TryResult({ result }: { result: LabTryResult }) {
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        Bu sinov: natija namunaviy yechim bilan solishtirilmadi va urinish hisoblanmadi.
+        {t('Bu sinov: natija namunaviy yechim bilan solishtirilmadi va urinish hisoblanmadi.')}
       </p>
       <PlanView plan={result.plan} />
       <ConcurrencyTimeline steps={result.steps} />
@@ -366,7 +367,7 @@ export function GradeCard({ grade, best }: { grade: LabGrade; best?: LabGrade })
       {grade.comment ? <p className="mt-2 text-sm whitespace-pre-wrap">{grade.comment}</p> : null}
       {best && best.score > grade.score ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          Bahoyingiz o'zgarmadi: oldingi eng yuqori ballingiz {best.score} saqlanib qoldi.
+          {t("Bahoyingiz o'zgarmadi: oldingi eng yuqori ballingiz {score} saqlanib qoldi.", { score: best.score })}
         </p>
       ) : null}
     </div>
@@ -472,12 +473,12 @@ export function LabRunner({
       <form onSubmit={handleSubmit} className="grid gap-3" noValidate>
         <div className="grid gap-1.5">
           <label htmlFor="lab_code" className="text-sm font-medium">
-            SQL kod
+            {t('SQL kod')}
           </label>
           <Textarea
             id="lab_code"
             className="max-h-[32rem] min-h-56 font-mono text-sm md:text-xs"
-            placeholder="SELECT ..."
+            placeholder={t('SELECT ...')}
             spellCheck={false}
             autoCapitalize="none"
             autoCorrect="off"
@@ -500,24 +501,23 @@ export function LabRunner({
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" size="lg" variant="outline" disabled={!canRun} onClick={tryCode}>
             {trying ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}
-            {trying ? 'Bajarilmoqda…' : "Sinab ko'rish"}
+            {trying ? t('Bajarilmoqda…') : t("Sinab ko'rish")}
           </Button>
           <Button type="submit" size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun}>
             {running ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
-            {running ? 'Tekshirilmoqda…' : 'Tekshirish'}
+            {running ? t('Tekshirilmoqda…') : t('Tekshirish')}
           </Button>
           {gradable ? (
             <Button type="button" size="lg" disabled={!canRun} onClick={() => run('submit')}>
               {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-              {submitting ? 'Baholanmoqda…' : 'Baholashga topshirish'}
+              {submitting ? t('Baholanmoqda…') : t('Baholashga topshirish')}
             </Button>
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          «Sinab ko'rish» kodni bajarib natijasini ko'rsatadi, lekin tekshirmaydi va urinish hisoblanmaydi
-          (Ctrl + Shift + Enter). «Tekshirish» natijani kutilgan natija bilan solishtiradi (Ctrl + Enter).
+          {t("«Sinab ko'rish» kodni bajarib natijasini ko'rsatadi, lekin tekshirmaydi va urinish hisoblanmaydi (Ctrl + Shift + Enter). «Tekshirish» natijani kutilgan natija bilan solishtiradi (Ctrl + Enter).")}
           {gradable
-            ? " Tayyor bo'lgach «Baholashga topshirish»ni bosing: kodingizga ball qo'yiladi. Qayta topshirish mumkin, eng yuqori ball saqlanadi."
+            ? t(" Tayyor bo'lgach «Baholashga topshirish»ni bosing: kodingizga ball qo'yiladi. Qayta topshirish mumkin, eng yuqori ball saqlanadi.")
             : ''}
         </p>
       </form>
@@ -541,7 +541,7 @@ export function LabRunner({
           {result.result ? <ResultTable table={result.result} /> : null}
           {!result.error && !result.result && result.status_message ? (
             <p className="text-xs text-muted-foreground">
-              Oxirgi buyruq: <span className="font-mono">{result.status_message}</span>
+              {t('Oxirgi buyruq:')}{' '}<span className="font-mono">{result.status_message}</span>
             </p>
           ) : null}
         </div>

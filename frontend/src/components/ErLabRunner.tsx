@@ -13,6 +13,7 @@ import { api, apiFetch, errorMessage, fieldErrors } from '@/lib/api'
 import { useConfidence } from '@/lib/confidence'
 import { cleanDiagram, EMPTY_DIAGRAM, snapshotDiagram } from '@/lib/er'
 import type { ErDiagram, ErFix, LabRunResult } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function ErVerdict({ result }: { result: LabRunResult }) {
   if (result.is_correct) {
@@ -20,9 +21,9 @@ function ErVerdict({ result }: { result: LabRunResult }) {
       <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-emerald-900" role="status">
         <div className="flex items-center gap-2 font-medium">
           <CircleCheck className="size-5 shrink-0" aria-hidden="true" />
-          To'g'ri!
+          {t("To'g'ri!")}
         </div>
-        <p className="mt-1 text-sm">Diagramma namunaviy loyiha bilan to'liq mos keldi.</p>
+        <p className="mt-1 text-sm">{t("Diagramma namunaviy loyiha bilan to'liq mos keldi.")}</p>
         {result.ai_explain && result.attempt_id ? (
           <div className="mt-3">
             <SelfExplain attemptId={result.attempt_id} kind="er" />
@@ -35,7 +36,7 @@ function ErVerdict({ result }: { result: LabRunResult }) {
     <div className="grid gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900" role="alert">
       <div className="flex items-center gap-2 font-medium">
         <CircleX className="size-5 shrink-0" aria-hidden="true" />
-        Diagrammada xatolar bor
+        {t('Diagrammada xatolar bor')}
       </div>
       <ul className="list-disc space-y-1 pl-5 text-sm">
         {result.differences.map((difference, index) => (
@@ -54,17 +55,16 @@ export function ErFixView({ fix }: { fix: ErFix }) {
     <div className="grid gap-3 rounded-lg border bg-card p-3">
       <div className="flex items-center gap-2 font-medium">
         <Wrench className="size-5 shrink-0 text-primary" aria-hidden="true" />
-        Tuzatilgan loyiha
+        {t('Tuzatilgan loyiha')}
       </div>
       <p className="text-sm text-muted-foreground">
-        Diagrammangiz asosida tuzatilgan variant. Ranglar nima o'zgarganini ko'rsatadi; obyektlarni sudrab joylashtirish
-        mumkin. Uni o'rganib, o'z diagrammangizni tuzating va qayta topshiring.
+        {t("Diagrammangiz asosida tuzatilgan variant. Ranglar nima o'zgarganini ko'rsatadi; obyektlarni sudrab joylashtirish mumkin. Uni o'rganib, o'z diagrammangizni tuzating va qayta topshiring.")}
       </p>
       <ErFixLegend />
       <ErEditor value={fix.diagram} className="h-[26rem]" />
       {fix.diagram.changes.length ? (
         <div>
-          <h3 className="mb-1 text-sm font-medium">O'zgarishlar</h3>
+          <h3 className="mb-1 text-sm font-medium">{t("O'zgarishlar")}</h3>
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {fix.diagram.changes.map((change, index) => (
               <li key={index}>{change}</li>
@@ -76,7 +76,7 @@ export function ErFixView({ fix }: { fix: ErFix }) {
         <div className="rounded-lg border bg-background p-3">
           <div className="mb-1 flex items-center gap-1.5 text-sm font-medium">
             <Sparkles className="size-4" aria-hidden="true" />
-            AI tushuntirishi: nima uchun shunday
+            {t('AI tushuntirishi: nima uchun shunday')}
           </div>
           <p className="text-sm whitespace-pre-wrap">{fix.explanation}</p>
         </div>
@@ -213,11 +213,10 @@ export function ErLabRunner({
       {withJustification ? (
         <div className="grid gap-1.5">
           <label htmlFor={`justification-${labId}`} className="text-sm font-medium">
-            Qarorlaringizni asoslang
+            {t('Qarorlaringizni asoslang')}
           </label>
           <p className="text-xs text-muted-foreground">
-            2–3 gap: qaysi tushunchani alohida obyekt qildingiz va nega? Ko'p-ko'p bog'lanishni qanday ifodaladingiz?
-            Topshirishda yuboriladi va baholanadi.
+            {t("2–3 gap: qaysi tushunchani alohida obyekt qildingiz va nega? Ko'p-ko'p bog'lanishni qanday ifodaladingiz? Topshirishda yuboriladi va baholanadi.")}
           </p>
           <Textarea
             id={`justification-${labId}`}
@@ -231,20 +230,18 @@ export function ErLabRunner({
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => run('run')}>
           {running ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}
-          {running ? 'Tekshirilmoqda…' : 'Tekshirish'}
+          {running ? t('Tekshirilmoqda…') : t('Tekshirish')}
         </Button>
         {gradable ? (
           <Button size="lg" disabled={!canRun} onClick={() => run('submit')}>
             {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-            {submitting ? 'Baholanmoqda…' : 'Baholashga topshirish'}
+            {submitting ? t('Baholanmoqda…') : t('Baholashga topshirish')}
           </Button>
         ) : null}
       </div>
       {gradable ? (
         <p className="text-xs text-muted-foreground">
-          «Tekshirish» xatolarni ko'rsatadi va AI maslahat beradi, lekin to'g'ri javobni aytmaydi. «Baholashga
-          topshirish»dan keyin ball qo'yiladi va diagrammangizning tuzatilgan varianti ko'rsatiladi. Qayta topshirish
-          mumkin, eng yuqori ball saqlanadi.
+          {t("«Tekshirish» xatolarni ko'rsatadi va AI maslahat beradi, lekin to'g'ri javobni aytmaydi. «Baholashga topshirish»dan keyin ball qo'yiladi va diagrammangizning tuzatilgan varianti ko'rsatiladi. Qayta topshirish mumkin, eng yuqori ball saqlanadi.")}
         </p>
       ) : null}
 

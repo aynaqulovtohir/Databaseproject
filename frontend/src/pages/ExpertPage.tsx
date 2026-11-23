@@ -16,24 +16,25 @@ import { api, errorMessage } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import type { ExpertInfo, ExpertItem, ExpertPage as ExpertPageData, ExpertRating } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { localized, t } from '@/lib/i18n'
 
-const ESSENTIAL = [
+const ESSENTIAL = localized([
   { value: 3, label: 'Zarur' },
   { value: 2, label: "Foydali, lekin zarur emas" },
   { value: 1, label: 'Keraksiz' },
-]
-const RELEVANCE = [
+])
+const RELEVANCE = localized([
   { value: 1, label: 'Mos emas' },
   { value: 2, label: 'Qisman mos' },
   { value: 3, label: 'Mos' },
   { value: 4, label: 'Juda mos' },
-]
-const CLARITY = [
+])
+const CLARITY = localized([
   { value: 1, label: 'Tushunarsiz' },
   { value: 2, label: 'Qayta yozish kerak' },
   { value: 3, label: 'Tushunarli' },
   { value: 4, label: 'Juda aniq' },
-]
+])
 const SCALES = ['essential', 'relevance', 'clarity'] as const
 
 function Scale({
@@ -103,18 +104,18 @@ function ItemCard({
           </span>
         </CardTitle>
         {item.kind === 'likert' ? (
-          <CardDescription>So'rovnoma fikri: talaba 1 dan 5 gacha shkalada qo'shiladi yoki qo'shilmaydi.</CardDescription>
+          <CardDescription>{t("So'rovnoma fikri: talaba 1 dan 5 gacha shkalada qo'shiladi yoki qo'shilmaydi.")}</CardDescription>
         ) : null}
       </CardHeader>
       <CardContent className="grid gap-4">
         {item.choices.length ? (
-          <ul className="grid gap-1" aria-label="Javob variantlari">
+          <ul className="grid gap-1" aria-label={t('Javob variantlari')}>
             {item.choices.map((choice, index) => (
               <li
                 key={index}
                 className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900')}
               >
-                {choice.is_correct ? <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" /> : <span className="size-4 shrink-0" />}
+                {choice.is_correct ? <CircleCheck className="size-4 shrink-0" aria-label={t("to'g'ri javob")} /> : <span className="size-4 shrink-0" />}
                 {choice.text}
               </li>
             ))}
@@ -122,7 +123,7 @@ function ItemCard({
         ) : null}
         <Scale
           name={`essential-${item.key}`}
-          legend="Savol o'lchanadigan tushuncha uchun zarurmi?"
+          legend={t("Savol o'lchanadigan tushuncha uchun zarurmi?")}
           options={ESSENTIAL}
           value={rating.essential}
           disabled={disabled}
@@ -130,7 +131,7 @@ function ItemCard({
         />
         <Scale
           name={`relevance-${item.key}`}
-          legend="Mavzuga mosligi"
+          legend={t('Mavzuga mosligi')}
           options={RELEVANCE}
           value={rating.relevance}
           disabled={disabled}
@@ -138,13 +139,13 @@ function ItemCard({
         />
         <Scale
           name={`clarity-${item.key}`}
-          legend="Ifodasi va variantlarining aniqligi"
+          legend={t('Ifodasi va variantlarining aniqligi')}
           options={CLARITY}
           value={rating.clarity}
           disabled={disabled}
           onChange={(value) => onChange({ ...rating, clarity: value })}
         />
-        <FormField id={`comment-${item.key}`} label="Izoh yoki taklif (ixtiyoriy)">
+        <FormField id={`comment-${item.key}`} label={t('Izoh yoki taklif (ixtiyoriy)')}>
           <Textarea
             id={`comment-${item.key}`}
             rows={2}
@@ -173,7 +174,7 @@ function ExpertForm({ token, page }: { token: string; page: ExpertPageData }) {
     onSuccess: (data, submit) => {
       setSubmittedAt(data.submitted_at)
       setConfirming(false)
-      toast.success(submit ? 'Rahmat! Baholaringiz yuborildi' : 'Saqlandi. Keyinroq shu havola orqali davom ettirishingiz mumkin')
+      toast.success(submit ? t('Rahmat! Baholaringiz yuborildi') : t('Saqlandi. Keyinroq shu havola orqali davom ettirishingiz mumkin'))
     },
     onError: (error) => {
       setConfirming(false)
@@ -186,26 +187,26 @@ function ExpertForm({ token, page }: { token: string; page: ExpertPageData }) {
       {submittedAt ? (
         <Alert>
           <CheckCircle2 aria-hidden="true" />
-          <AlertDescription>Baholaringiz {formatDateTime(submittedAt)} da yuborilgan. Rahmat!</AlertDescription>
+          <AlertDescription>{t('Baholaringiz {submittedAt} da yuborilgan. Rahmat!', { submittedAt: formatDateTime(submittedAt) })}</AlertDescription>
         </Alert>
       ) : !page.open ? (
         <Alert variant="destructive">
-          <AlertDescription>Baholash muddati tugagan.</AlertDescription>
+          <AlertDescription>{t('Baholash muddati tugagan.')}</AlertDescription>
         </Alert>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Ekspert haqida</CardTitle>
-          <CardDescription>Ekspertlar ro'yxati dissertatsiya ilovasida keltiriladi. Ism-familiya majburiy.</CardDescription>
+          <CardTitle>{t('Ekspert haqida')}</CardTitle>
+          <CardDescription>{t("Ekspertlar ro'yxati dissertatsiya ilovasida keltiriladi. Ism-familiya majburiy.")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {(
             [
-              ['full_name', 'Familiya, ism, otasining ismi', 200],
-              ['degree', "Ilmiy daraja va unvon (masalan, t.f.n., dotsent)", 200],
-              ['position', 'Lavozim', 200],
-              ['workplace', 'Ish joyi', 300],
+              ['full_name', t('Familiya, ism, otasining ismi'), 200],
+              ['degree', t('Ilmiy daraja va unvon (masalan, t.f.n., dotsent)'), 200],
+              ['position', t('Lavozim'), 200],
+              ['workplace', t('Ish joyi'), 300],
             ] as const
           ).map(([field, label, max]) => (
             <FormField key={field} id={`expert-${field}`} label={label}>
@@ -219,7 +220,7 @@ function ExpertForm({ token, page }: { token: string; page: ExpertPageData }) {
               />
             </FormField>
           ))}
-          <FormField id="expert-experience" label="Fan bo'yicha pedagogik staj (yil)">
+          <FormField id="expert-experience" label={t("Fan bo'yicha pedagogik staj (yil)")}>
             <Input
               id="expert-experience"
               type="number"
@@ -249,16 +250,16 @@ function ExpertForm({ token, page }: { token: string; page: ExpertPageData }) {
       {locked ? null : (
         <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur">
           <span className="text-sm text-muted-foreground tabular-nums">
-            Baholangan: {rated} / {page.items.length}
+            {t('Baholangan: {rated} / {length}', { rated, length: page.items.length })}
           </span>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="lg" disabled={save.isPending} onClick={() => save.mutate(false)}>
               <Save aria-hidden="true" />
-              Saqlash
+              {t('Saqlash')}
             </Button>
             <Button size="lg" disabled={save.isPending || rated < page.items.length || !expert.full_name?.trim()} onClick={() => setConfirming(true)}>
               {save.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-              Yuborish
+              {t('Yuborish')}
             </Button>
           </div>
         </div>
@@ -266,9 +267,9 @@ function ExpertForm({ token, page }: { token: string; page: ExpertPageData }) {
 
       <ConfirmDialog
         open={confirming}
-        title="Baholarni yuborish"
-        description="Yuborilgandan keyin baholarni o'zgartirib bo'lmaydi."
-        confirmLabel="Yuborish"
+        title={t('Baholarni yuborish')}
+        description={t("Yuborilgandan keyin baholarni o'zgartirib bo'lmaydi.")}
+        confirmLabel={t('Yuborish')}
         pending={save.isPending}
         onConfirm={() => save.mutate(true)}
         onClose={() => setConfirming(false)}
@@ -296,24 +297,22 @@ export function ExpertPage() {
         <header className="grid gap-2">
           <h1 className="font-heading text-2xl font-semibold text-heading">{page.data.title}</h1>
           <p className="text-sm text-muted-foreground">
-            «{page.data.quiz_title}» savollarini ekspert sifatida baholash
-            {page.data.closes_at ? ` · ${formatDateTime(page.data.closes_at)} gacha` : ''}
+            {t('«{quiz_title}» savollarini ekspert sifatida baholash', { quiz_title: page.data.quiz_title })}
+            {page.data.closes_at ? t(' · {closes_at} gacha', { closes_at: formatDateTime(page.data.closes_at) }) : ''}
           </p>
         </header>
         <Card>
           <CardHeader>
-            <CardTitle>Ko'rsatma</CardTitle>
+            <CardTitle>{t("Ko'rsatma")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm leading-relaxed">
             <p>
-              <span className="font-medium">O'lchanadigan tushuncha: </span>
+              <span className="font-medium">{t("O'lchanadigan tushuncha:")}{' '}</span>
               {page.data.construct}
             </p>
             {page.data.instructions ? <p className="whitespace-pre-wrap">{page.data.instructions}</p> : null}
             <p className="text-muted-foreground">
-              Har bir savolni uch mezon bo'yicha baholang: zarurligi, mavzuga mosligi va aniqligi. To'g'ri javoblar yashil bilan
-              belgilangan. Javoblaringizni «Saqlash» bilan saqlab, keyinroq shu havola orqali davom ettirishingiz mumkin. Havolani
-              boshqalarga bermang: unda test javoblari bor.
+              {t("Har bir savolni uch mezon bo'yicha baholang: zarurligi, mavzuga mosligi va aniqligi. To'g'ri javoblar yashil bilan belgilangan. Javoblaringizni «Saqlash» bilan saqlab, keyinroq shu havola orqali davom ettirishingiz mumkin. Havolani boshqalarga bermang: unda test javoblari bor.")}
             </p>
           </CardContent>
         </Card>
@@ -328,7 +327,7 @@ export function ExpertPage() {
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Database className="size-5" aria-hidden="true" />
           </div>
-          <div className="text-sm font-semibold">MB loyihalash · ekspert baholashi</div>
+          <div className="text-sm font-semibold">{t('MB loyihalash · ekspert baholashi')}</div>
         </div>
         {content}
       </div>

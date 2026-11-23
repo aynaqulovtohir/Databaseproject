@@ -10,12 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { CompetenceEfficiency, CompetenceEfficiencyRow, CompetenceStage, StatDescribe } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const STAGE_LABELS: Record<CompetenceStage, string> = {
+const STAGE_LABELS: Record<CompetenceStage, string> = localized({
   initial: 'Tajriba boshida',
   final: 'Tajriba oxirida',
   delayed: 'Tajribadan keyin',
-}
+})
 
 function formatP(p: number | null | undefined) {
   if (p === null || p === undefined) return '—'
@@ -42,13 +43,13 @@ function PValue({ p, alpha }: { p: number | null | undefined; alpha: number }) {
   return (
     <span className={significant ? 'font-semibold tabular-nums' : 'tabular-nums'}>
       {pText(p)}
-      {significant ? <span className="sr-only"> (ahamiyatli)</span> : null}
+      {significant ? <span className="sr-only">{' '}{t('(ahamiyatli)')}</span> : null}
       {significant ? <span aria-hidden="true">*</span> : null}
     </span>
   )
 }
 
-/** Dissertatsiya matni uchun tayyor xulosa jumlalari (O'zbek tilida, raqamlar vergul bilan). */
+/** Dissertatsiya matni uchun tayyor xulosa jumlalari (tanlangan tilda, raqamlar vergul bilan). */
 function conclusions(rows: CompetenceEfficiencyRow[], stage: CompetenceStage, alpha: number) {
   const items: string[] = []
   for (const row of rows) {
@@ -59,31 +60,51 @@ function conclusions(rows: CompetenceEfficiencyRow[], stage: CompetenceStage, al
     const test = data.t_test
     const chi = data.chi_square
     const parts = [
-      `«${row.name}»: tajriba guruhida o'rtacha ball ${num(tg.mean, 1)} (SD = ${num(tg.sd, 1)}, n = ${tg.n}), nazorat guruhida ${num(ng.mean, 1)} (SD = ${num(ng.sd, 1)}, n = ${ng.n})`,
+      t(
+        "«{name}»: tajriba guruhida o'rtacha ball {tgMean} (SD = {tgSd}, n = {tgN}), nazorat guruhida {ngMean} (SD = {ngSd}, n = {ngN})",
+        {
+          name: row.name,
+          tgMean: num(tg.mean, 1),
+          tgSd: num(tg.sd, 1),
+          tgN: tg.n,
+          ngMean: num(ng.mean, 1),
+          ngSd: num(ng.sd, 1),
+          ngN: ng.n,
+        },
+      ),
     ]
     if (test) {
       const significant = test.p < alpha
+      const stats = { df: num(test.df, 1), t: num(test.t), p: pText(test.p), d: num(test.cohens_d) }
       if (stage === 'initial') {
         parts.push(
           significant
-            ? `guruhlar boshlang'ich holatda statistik farq qiladi (Uelch t(${num(test.df, 1)}) = ${num(test.t)}, ${pText(test.p)}) — tanlov ekvivalent emas`
-            : `boshlang'ich holatda guruhlar o'rtasida statistik ahamiyatli farq yo'q (Uelch t(${num(test.df, 1)}) = ${num(test.t)}, ${pText(test.p)}), ya'ni guruhlar teng`,
+            ? t("guruhlar boshlang'ich holatda statistik farq qiladi (Uelch t({df}) = {t}, {p}) — tanlov ekvivalent emas", stats)
+            : t(
+                "boshlang'ich holatda guruhlar o'rtasida statistik ahamiyatli farq yo'q (Uelch t({df}) = {t}, {p}), ya'ni guruhlar teng",
+                stats,
+              ),
         )
       } else {
         parts.push(
           significant
-            ? `farq statistik ahamiyatli (Uelch t(${num(test.df, 1)}) = ${num(test.t)}, ${pText(test.p)}; Koen d = ${num(test.cohens_d)})`
-            : `farq statistik ahamiyatli emas (Uelch t(${num(test.df, 1)}) = ${num(test.t)}, ${pText(test.p)})`,
+            ? t('farq statistik ahamiyatli (Uelch t({df}) = {t}, {p}; Koen d = {d})', stats)
+            : t('farq statistik ahamiyatli emas (Uelch t({df}) = {t}, {p})', stats),
         )
       }
     }
     if (chi) {
       parts.push(
-        `darajalar taqsimoti bo'yicha χ²(${chi.df}) = ${num(chi.chi2)}, ${pText(chi.p)}, Kramer V = ${num(chi.cramers_v)}${chi.reliable ? '' : ' (kutilgan sonlar 5 dan kam — natija taxminiy)'}`,
+        t("darajalar taqsimoti bo'yicha χ²({df}) = {chi2}, {p}, Kramer V = {v}", {
+          df: chi.df,
+          chi2: num(chi.chi2),
+          p: pText(chi.p),
+          v: num(chi.cramers_v),
+        }) + (chi.reliable ? '' : ' ' + t('(kutilgan sonlar 5 dan kam — natija taxminiy)')),
       )
     }
     if (stage !== 'initial' && data.efficiency_ratio !== null) {
-      parts.push(`samaradorlik koeffitsienti K = ${num(data.efficiency_ratio)}`)
+      parts.push(t('samaradorlik koeffitsienti K = {k}', { k: num(data.efficiency_ratio) }))
     }
     if (stage === 'delayed') {
       const { experimental, control, difference } = row.retention
@@ -91,14 +112,19 @@ function conclusions(rows: CompetenceEfficiencyRow[], stage: CompetenceStage, al
         item.before_mean !== null && item.after_mean !== null ? num(item.after_mean - item.before_mean, 1) : '—'
       if (experimental.n && control.n) {
         const retained = difference && difference.p < alpha
+        const stats = difference ? { df: num(difference.df, 1), t: num(difference.t), p: pText(difference.p) } : {}
         parts.push(
-          `tajriba oxiridan kechiktirilgan testgacha o'zgarish: tajriba guruhida ${delta(experimental)}, nazorat guruhida ${delta(control)} ball` +
+          t("tajriba oxiridan kechiktirilgan testgacha o'zgarish: tajriba guruhida {experimental}, nazorat guruhida {control} ball", {
+            experimental: delta(experimental),
+            control: delta(control),
+          }) +
             (difference
-              ? retained
-                ? difference.t > 0
-                  ? ` — tajriba guruhi bilimni statistik ahamiyatli darajada yaxshiroq saqlagan (Uelch t(${num(difference.df, 1)}) = ${num(difference.t)}, ${pText(difference.p)})`
-                  : ` — nazorat guruhi bilimni statistik ahamiyatli darajada yaxshiroq saqlagan (Uelch t(${num(difference.df, 1)}) = ${num(difference.t)}, ${pText(difference.p)})`
-                : ` — saqlanishdagi farq statistik ahamiyatli emas (${pText(difference.p)})`
+              ? ' — ' +
+                (retained
+                  ? difference.t > 0
+                    ? t('tajriba guruhi bilimni statistik ahamiyatli darajada yaxshiroq saqlagan (Uelch t({df}) = {t}, {p})', stats)
+                    : t('nazorat guruhi bilimni statistik ahamiyatli darajada yaxshiroq saqlagan (Uelch t({df}) = {t}, {p})', stats)
+                  : t('saqlanishdagi farq statistik ahamiyatli emas ({p})', stats))
               : ''),
         )
       }
@@ -110,8 +136,8 @@ function conclusions(rows: CompetenceEfficiencyRow[], stage: CompetenceStage, al
 
 function toTsv(rows: CompetenceEfficiencyRow[], stage: CompetenceStage) {
   const header = [
-    'Komponent', 'TG n', 'TG M', 'TG SD', 'NG n', 'NG M', 'NG SD', 'χ²', 'df', 'p (χ²)', 'Kramer V',
-    'Uelch t', 'df', 'p (t)', 'Koen d', 'Mann–Uitni U', 'p (U)', 'K',
+    t('Komponent'), 'TG n', 'TG M', 'TG SD', 'NG n', 'NG M', 'NG SD', 'χ²', 'df', 'p (χ²)', t('Kramer V'),
+    t('Uelch t'), 'df', 'p (t)', t('Koen d'), t('Mann–Uitni U'), 'p (U)', 'K',
   ]
   const lines = rows.map((row) => {
     const data = row.stages[stage]
@@ -132,13 +158,13 @@ function ComparisonTable({ data, stage }: { data: CompetenceEfficiency; stage: C
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Komponent</TableHead>
-            <TableHead>Tajriba guruhi (M ± SD, n)</TableHead>
-            <TableHead>Nazorat guruhi (M ± SD, n)</TableHead>
-            <TableHead>Pirson χ²</TableHead>
-            <TableHead>Uelch t-testi</TableHead>
-            <TableHead>Mann–Uitni U</TableHead>
-            {stage !== 'initial' ? <TableHead title="Tajriba guruhi o'rtachasi / nazorat guruhi o'rtachasi">K</TableHead> : null}
+            <TableHead>{t('Komponent')}</TableHead>
+            <TableHead>{t('Tajriba guruhi (M ± SD, n)')}</TableHead>
+            <TableHead>{t('Nazorat guruhi (M ± SD, n)')}</TableHead>
+            <TableHead>{t('Pirson χ²')}</TableHead>
+            <TableHead>{t('Uelch t-testi')}</TableHead>
+            <TableHead>{t('Mann–Uitni U')}</TableHead>
+            {stage !== 'initial' ? <TableHead title={t("Tajriba guruhi o'rtachasi / nazorat guruhi o'rtachasi")}>{t('K')}</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -159,13 +185,13 @@ function ComparisonTable({ data, stage }: { data: CompetenceEfficiency; stage: C
                       <span>
                         χ²({item.chi_square.df}) = {num(item.chi_square.chi2)}
                         {item.chi_square.reliable ? null : (
-                          <span className="text-muted-foreground" title={`Eng kichik kutilgan son ${num(item.chi_square.min_expected, 1)} — ${data.min_expected} dan kam`}>
+                          <span className="text-muted-foreground" title={t('Eng kichik kutilgan son {value} — {min} dan kam', { value: num(item.chi_square.min_expected, 1), min: data.min_expected })}>
                             {' '}†
                           </span>
                         )}
                       </span>
                       <PValue p={item.chi_square.p} alpha={data.alpha} />
-                      <span className="text-xs text-muted-foreground">V = {num(item.chi_square.cramers_v)}</span>
+                      <span className="text-xs text-muted-foreground">{t('V =')}{' '}{num(item.chi_square.cramers_v)}</span>
                     </div>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -175,10 +201,10 @@ function ComparisonTable({ data, stage }: { data: CompetenceEfficiency; stage: C
                   {item.t_test ? (
                     <div className="grid">
                       <span>
-                        t({num(item.t_test.df, 1)}) = {num(item.t_test.t)}
+                        {t('t(')}{num(item.t_test.df, 1)}) = {num(item.t_test.t)}
                       </span>
                       <PValue p={item.t_test.p} alpha={data.alpha} />
-                      <span className="text-xs text-muted-foreground">d = {num(item.t_test.cohens_d)}</span>
+                      <span className="text-xs text-muted-foreground">{t('d =')}{' '}{num(item.t_test.cohens_d)}</span>
                     </div>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -188,8 +214,8 @@ function ComparisonTable({ data, stage }: { data: CompetenceEfficiency; stage: C
                   {item.mann_whitney ? (
                     <div className="grid">
                       <span>
-                        U = {num(item.mann_whitney.u, 1)}
-                        {item.mann_whitney.approximate ? <span className="text-muted-foreground" title="Tanlanma kichik: normal yaqinlashish taxminiy"> ‡</span> : null}
+                        {t('U =')}{' '}{num(item.mann_whitney.u, 1)}
+                        {item.mann_whitney.approximate ? <span className="text-muted-foreground" title={t('Tanlanma kichik: normal yaqinlashish taxminiy')}> ‡</span> : null}
                       </span>
                       <PValue p={item.mann_whitney.p} alpha={data.alpha} />
                     </div>
@@ -224,10 +250,10 @@ function ChangeTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Komponent</TableHead>
-            <TableHead>Tajriba guruhi: {span}</TableHead>
-            <TableHead>Nazorat guruhi: {span}</TableHead>
-            <TableHead>{differenceLabel} (Uelch t)</TableHead>
+            <TableHead>{t('Komponent')}</TableHead>
+            <TableHead>{t('Tajriba guruhi: {span}', { span })}</TableHead>
+            <TableHead>{t('Nazorat guruhi: {span}', { span })}</TableHead>
+            <TableHead>{t('{differenceLabel} (Uelch t)', { differenceLabel })}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -241,8 +267,8 @@ function ChangeTable({
                   {basis ? (
                     <span className="block text-xs font-normal text-muted-foreground">
                       {basis.length
-                        ? `ikkala kesimda o'lchangan komponentlar bo'yicha: ${basis.join(', ')}`
-                        : "ikkala kesimda o'lchangan komponent yo'q"}
+                        ? t("ikkala kesimda o'lchangan komponentlar bo'yicha: {basis}", { basis: basis.join(', ') })
+                        : t("ikkala kesimda o'lchangan komponent yo'q")}
                     </span>
                   ) : null}
                 </TableCell>
@@ -253,19 +279,19 @@ function ChangeTable({
                       {item.n ? (
                         <div className="grid">
                           <span>
-                            {num(item.before_mean, 1)} → {num(item.after_mean, 1)} <span className="text-muted-foreground">(n = {item.n})</span>
+                            {num(item.before_mean, 1)} → {num(item.after_mean, 1)} <span className="text-muted-foreground">{t('(n = {n})', { n: item.n })}</span>
                           </span>
                           {item.paired ? (
                             <>
                               <PValue p={item.paired.p} alpha={data.alpha} />
                               <span className="text-xs text-muted-foreground">
-                                t({item.paired.df}) = {num(item.paired.t)}, d<sub>z</sub> = {num(item.paired.d_z)}
+                                {t('t({df}) =', { df: item.paired.df })}{' '}{num(item.paired.t)}{t(', d')}<sub>{t('z')}</sub> = {num(item.paired.d_z)}
                               </span>
                             </>
                           ) : null}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">Ikkala kesimda o'lchanganlar yo'q</span>
+                        <span className="text-muted-foreground">{t("Ikkala kesimda o'lchanganlar yo'q")}</span>
                       )}
                     </TableCell>
                   )
@@ -273,9 +299,9 @@ function ChangeTable({
                 <TableCell className="tabular-nums">
                   {change.difference ? (
                     <div className="grid">
-                      <span>t({num(change.difference.df, 1)}) = {num(change.difference.t)}</span>
+                      <span>{t('t(')}{num(change.difference.df, 1)}) = {num(change.difference.t)}</span>
                       <PValue p={change.difference.p} alpha={data.alpha} />
-                      <span className="text-xs text-muted-foreground">g = {num(change.difference.hedges_g)}</span>
+                      <span className="text-xs text-muted-foreground">{t('g =')}{' '}{num(change.difference.hedges_g)}</span>
                     </div>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -309,15 +335,15 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
     const copy = async () => {
       try {
         await navigator.clipboard.writeText(toTsv(data.rows, stage))
-        toast.success("Jadval nusxalandi: Excel yoki Word jadvaliga joylashtiring.")
+        toast.success(t('Jadval nusxalandi: Excel yoki Word jadvaliga joylashtiring.'))
       } catch {
-        toast.error("Nusxalab bo'lmadi: brauzer ruxsat bermadi.")
+        toast.error(t("Nusxalab bo'lmadi: brauzer ruxsat bermadi."))
       }
     }
     content = (
       <div className="grid gap-5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-lg border p-0.5" role="group" aria-label="Kesim">
+          <div className="inline-flex rounded-lg border p-0.5" role="group" aria-label={t('Kesim')}>
             {stages.map((item) => (
               <Button key={item} type="button" size="sm" variant={stage === item ? 'secondary' : 'ghost'} aria-pressed={stage === item} onClick={() => setStage(item)}>
                 {STAGE_LABELS[item]}
@@ -326,29 +352,29 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
             <Copy aria-hidden="true" />
-            Jadvalni nusxalash
+            {t('Jadvalni nusxalash')}
           </Button>
           <span className="text-sm text-muted-foreground">
-            Tajriba guruhi: {data.students.experimental} talaba · Nazorat guruhi: {data.students.control} talaba
+            {t('Tajriba guruhi: {experimental} talaba · Nazorat guruhi: {control} talaba', { experimental: data.students.experimental, control: data.students.control })}
           </span>
         </div>
         {!data.students.experimental || !data.students.control ? (
           <p className="text-sm text-muted-foreground">
-            Solishtirish uchun ikkala guruh ham kerak: tajriba (AI yoqilgan) va nazorat (AI o'chirilgan). Hozir testlar hisoblanmaydi.
+            {t("Solishtirish uchun ikkala guruh ham kerak: tajriba (AI yoqilgan) va nazorat (AI o'chirilgan). Hozir testlar hisoblanmaydi.")}
           </p>
         ) : null}
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">Tajriba va nazorat guruhlari: {STAGE_LABELS[stage].toLowerCase()}</h3>
+          <h3 className="text-sm font-medium">{t('Tajriba va nazorat guruhlari:')}{' '}{STAGE_LABELS[stage].toLowerCase()}</h3>
           <ComparisonTable data={data} stage={stage} />
         </section>
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">O'sish: tajriba boshidan oxirigacha (har bir guruh ichida, juftlangan t-test)</h3>
+          <h3 className="text-sm font-medium">{t("O'sish: tajriba boshidan oxirigacha (har bir guruh ichida, juftlangan t-test)")}</h3>
           <ChangeTable data={data} field="growth" span="boshida → oxirida" differenceLabel="O'sishlar farqi" />
         </section>
         {stages.includes('delayed') ? (
           <section className="grid gap-2">
             <h3 className="text-sm font-medium">
-              Bilim saqlanishi: tajriba oxiridan kechiktirilgan testgacha (manfiy o'zgarish — unutilgan qism)
+              {t("Bilim saqlanishi: tajriba oxiridan kechiktirilgan testgacha (manfiy o'zgarish — unutilgan qism)")}
             </h3>
             <ChangeTable data={data} field="retention" span="oxirida → keyin" differenceLabel="Saqlanish farqi" />
           </section>
@@ -356,7 +382,7 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
         {lines.length ? (
           <section className="grid gap-2">
             <h3 className="flex items-center gap-2 text-sm font-medium">
-              Xulosa matni <Badge variant="outline">{STAGE_LABELS[stage]}</Badge>
+              {t('Xulosa matni')}{' '}<Badge variant="outline">{STAGE_LABELS[stage]}</Badge>
             </h3>
             <ul className="grid list-disc gap-1.5 pl-5 text-sm">
               {lines.map((line) => (
@@ -366,11 +392,7 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
           </section>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          * — statistik ahamiyatli (p &lt; {String(data.alpha).replace('.', ',')}). † — χ² taxminiy: eng kichik kutilgan son {data.min_expected} dan kam
-          (Kochran qoidasi), kichik guruhlarda Fisher aniq testini qo'llash tavsiya etiladi. ‡ — Mann–Uitni: tanlanma kichik (n &lt; 8),
-          normal yaqinlashish taxminiy. Uelch t-testi dispersiyalar tengligini talab qilmaydi; taqsimot normal bo'lmasa, Mann–Uitni
-          natijasiga tayaning. d — Koen d (0,2 kichik, 0,5 o'rta, 0,8 katta effekt), V — Kramer V, g — Xedjes g,
-          K — samaradorlik koeffitsienti (tajriba / nazorat o'rtachasi; 1 dan katta bo'lsa, tajriba guruhi yaxshiroq).
+          {t('* — statistik ahamiyatli (p <')}{' '}{String(data.alpha).replace('.', ',')}{t("). † — χ² taxminiy: eng kichik kutilgan son {min_expected} dan kam (Kochran qoidasi), kichik guruhlarda Fisher aniq testini qo'llash tavsiya etiladi. ‡ — Mann–Uitni: tanlanma kichik (n < 8), normal yaqinlashish taxminiy. Uelch t-testi dispersiyalar tengligini talab qilmaydi; taqsimot normal bo'lmasa, Mann–Uitni natijasiga tayaning. d — Koen d (0,2 kichik, 0,5 o'rta, 0,8 katta effekt), V — Kramer V, g — Xedjes g, K — samaradorlik koeffitsienti (tajriba / nazorat o'rtachasi; 1 dan katta bo'lsa, tajriba guruhi yaxshiroq).", { min_expected: data.min_expected })}
         </p>
       </div>
     )
@@ -379,10 +401,9 @@ export function CompetenceStatisticsCard({ stages }: { stages: CompetenceStage[]
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Statistik tahlil</CardTitle>
+        <CardTitle>{t('Statistik tahlil')}</CardTitle>
         <CardDescription>
-          Tajriba samaradorligi: tajriba boshida guruhlar teng bo'lishi (farq ahamiyatsiz), oxirida esa tajriba guruhi ustun bo'lishi kerak.
-          Faqat shu kesimda o'lchangan talabalar hisobga olinadi.
+          {t("Tajriba samaradorligi: tajriba boshida guruhlar teng bo'lishi (farq ahamiyatsiz), oxirida esa tajriba guruhi ustun bo'lishi kerak. Faqat shu kesimda o'lchangan talabalar hisobga olinadi.")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>

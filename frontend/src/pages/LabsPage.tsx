@@ -18,18 +18,19 @@ import { fullName, useUser } from '@/lib/auth'
 import { downloadFile } from '@/lib/download'
 import { groupNames, useGroupOptions } from '@/lib/groups'
 import { MAX_SCORE, type Lab, type LabModuleShort, type LabProgress } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 export function LabProgressBadge({ progress }: { progress: Pick<LabProgress, 'attempts' | 'solved' | 'grade'> }) {
   if (progress.grade) {
     return (
       <Badge className="bg-emerald-100 text-emerald-800 tabular-nums">
-        Baho: {progress.grade.score} / {MAX_SCORE}
+        {t('Baho: {score} / {MAX_SCORE}', { score: progress.grade.score, MAX_SCORE })}
       </Badge>
     )
   }
-  if (progress.solved) return <Badge className="bg-emerald-100 text-emerald-800">Bajarilgan</Badge>
-  if (progress.attempts) return <Badge className="bg-amber-100 text-amber-800">{progress.attempts} ta urinish</Badge>
-  return <Badge variant="outline">Boshlanmagan</Badge>
+  if (progress.solved) return <Badge className="bg-emerald-100 text-emerald-800">{t('Bajarilgan')}</Badge>
+  if (progress.attempts) return <Badge className="bg-amber-100 text-amber-800">{t('{attempts} ta urinish', { attempts: progress.attempts })}</Badge>
+  return <Badge variant="outline">{t('Boshlanmagan')}</Badge>
 }
 
 /** Ilmiy tadqiqot uchun anonim ma'lumotlar: urinishlar, xato turlari va baholar (ZIP ichida CSV) */
@@ -54,10 +55,10 @@ function ResearchExportButton() {
       variant="outline"
       disabled={downloading}
       onClick={() => void download()}
-      title="Anonim ma'lumotlar: talaba ismi va kodi kirmaydi"
+      title={t("Anonim ma'lumotlar: talaba ismi va kodi kirmaydi")}
     >
       <Download aria-hidden="true" />
-      {downloading ? 'Tayyorlanmoqda…' : "Tadqiqot ma'lumotlari"}
+      {downloading ? t('Tayyorlanmoqda…') : t("Tadqiqot ma'lumotlari")}
     </Button>
   )
 }
@@ -96,7 +97,7 @@ function LabCard({ lab, isStaff, groupsText }: { lab: Lab; isStaff: boolean; gro
         {lab.title}
         {lab.kind !== 'sql' ? (
           <Badge variant="outline" className="ml-2 align-middle">
-            {lab.kind === 'er' ? 'ER-diagramma' : 'Normallashtirish'}
+            {lab.kind === 'er' ? t('ER-diagramma') : t('Normallashtirish')}
           </Badge>
         ) : null}
       </h2>
@@ -105,7 +106,7 @@ function LabCard({ lab, isStaff, groupsText }: { lab: Lab; isStaff: boolean; gro
         {lab.locked ? (
           <Badge variant="outline">
             <Lock aria-hidden="true" />
-            Yopiq
+            {t('Yopiq')}
           </Badge>
         ) : lab.my_progress ? (
           <LabProgressBadge progress={lab.my_progress} />
@@ -119,15 +120,15 @@ function LabCard({ lab, isStaff, groupsText }: { lab: Lab; isStaff: boolean; gro
       <div className="rounded-xl border border-dashed bg-muted/30 p-4" aria-disabled="true">
         {header}
         <p className="mt-1 text-sm text-muted-foreground">
-          Avval{' '}
+          {t('Avval')}{' '}
           {lab.blocked_by ? (
             <Link to={`/labs/${lab.blocked_by.id}`} className="font-medium text-foreground underline underline-offset-4">
               «{lab.blocked_by.title}»
             </Link>
           ) : (
-            'oldingi laboratoriyani'
+            t('oldingi laboratoriyani')
           )}{' '}
-          laboratoriyasini yeching, shundan keyin bu laboratoriya ochiladi.
+          {t('laboratoriyasini yeching, shundan keyin bu laboratoriya ochiladi.')}
         </p>
       </div>
     )
@@ -142,7 +143,7 @@ function LabCard({ lab, isStaff, groupsText }: { lab: Lab; isStaff: boolean; gro
       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{lab.description}</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>{fullName(lab.author)}</span>
-        {isStaff ? <span>Guruhlar: {groupsText}</span> : null}
+        {isStaff ? <span>{t('Guruhlar: {groupsText}', { groupsText })}</span> : null}
       </div>
     </Link>
   )
@@ -160,7 +161,7 @@ export function LabsPage() {
   const addButton = isStaff ? (
     <Button size="lg" onClick={() => setCreating(true)}>
       <Plus aria-hidden="true" />
-      Laboratoriya qo'shish
+      {t("Laboratoriya qo'shish")}
     </Button>
   ) : null
 
@@ -173,13 +174,13 @@ export function LabsPage() {
     content = (
       <EmptyState
         icon={FlaskConical}
-        title="Hali laboratoriya yo'q"
+        title={t("Hali laboratoriya yo'q")}
         description={
           isStaff
-            ? 'Guruhlaringiz uchun birinchi SQL laboratoriyasini yarating.'
+            ? t('Guruhlaringiz uchun birinchi SQL laboratoriyasini yarating.')
             : user.group
-              ? "O'qituvchi laboratoriya qo'shganda shu yerda ko'rinadi."
-              : 'Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.'
+              ? t("O'qituvchi laboratoriya qo'shganda shu yerda ko'rinadi.")
+              : t('Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.')
         }
         action={addButton}
       />
@@ -196,12 +197,12 @@ export function LabsPage() {
               {hasModules ? (
                 <div>
                   <h2 id={`module-${section.module?.id ?? 'free'}`} className="flex flex-wrap items-center gap-2 text-base font-semibold">
-                    {section.module ? section.module.title : 'Boshqa laboratoriyalar'}
-                    {section.module?.sequential ? <Badge variant="secondary">Ketma-ket</Badge> : null}
+                    {section.module ? section.module.title : t('Boshqa laboratoriyalar')}
+                    {section.module?.sequential ? <Badge variant="secondary">{t('Ketma-ket')}</Badge> : null}
                     {section.module?.exam ? <ExamBadge exam={section.module.exam} /> : null}
                     {!isStaff && section.module ? (
                       <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                        {solved} / {section.labs.length} bajarilgan
+                        {t('{solved} / {length} bajarilgan', { solved, length: section.labs.length })}
                       </span>
                     ) : null}
                   </h2>
@@ -227,11 +228,11 @@ export function LabsPage() {
   return (
     <>
       <PageHeader
-        title="Virtual laboratoriya"
+        title={t('Virtual laboratoriya')}
         description={
           isStaff
-            ? 'SQL laboratoriyalari va talabalar natijalari.'
-            : "SQL kod yozing va ishga tushiring: to'g'ri bo'lsa yashil, xato bo'lsa maslahat chiqadi."
+            ? t('SQL laboratoriyalari va talabalar natijalari.')
+            : t("SQL kod yozing va ishga tushiring: to'g'ri bo'lsa yashil, xato bo'lsa maslahat chiqadi.")
         }
         actions={
           isStaff && labs.data?.length ? (
@@ -239,7 +240,7 @@ export function LabsPage() {
               <ResearchExportButton />
               <Button size="lg" variant="outline" onClick={() => setManagingModules(true)}>
                 <Layers aria-hidden="true" />
-                Modullar
+                {t('Modullar')}
               </Button>
               {addButton}
             </>

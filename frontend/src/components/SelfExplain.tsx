@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
 import { EXPLANATION_VERDICTS, type ExplanationVerdict } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 const MIN_LENGTH = 40
 
@@ -37,16 +38,16 @@ export function SelfExplain({ attemptId, kind }: { attemptId: number; kind: 'sql
     <div className="grid gap-2 rounded-lg border bg-background p-3 text-foreground">
       <div className="flex items-center gap-1.5 text-sm font-medium">
         <MessageSquareText className="size-4" aria-hidden="true" />
-        Yechimingizni o'z so'zlaringiz bilan tushuntiring
+        {t("Yechimingizni o'z so'zlaringiz bilan tushuntiring")}
       </div>
       <p className="text-xs text-muted-foreground">
         {kind === 'er'
-          ? "Nega bog'lanishlar va kardinallik aynan shunday? Qaysi atribut nima uchun kalit?"
-          : 'Kodingiz nima qiladi va nega shunday yozdingiz (qaysi jadval, qaysi shart, nega shu tartibda)?'}{' '}
-        Bahoga ta'sir qilmaydi, lekin o'qituvchi ko'radi: tushunib yechganingizni shu ko'rsatadi.
+          ? t("Nega bog'lanishlar va kardinallik aynan shunday? Qaysi atribut nima uchun kalit?")
+          : t('Kodingiz nima qiladi va nega shunday yozdingiz (qaysi jadval, qaysi shart, nega shu tartibda)?')}{' '}
+        {t("Bahoga ta'sir qilmaydi, lekin o'qituvchi ko'radi: tushunib yechganingizni shu ko'rsatadi.")}
       </p>
       <Textarea
-        aria-label="Tushuntirish"
+        aria-label={t('Tushuntirish')}
         className="min-h-24"
         maxLength={3000}
         value={text}
@@ -69,7 +70,7 @@ export function SelfExplain({ attemptId, kind }: { attemptId: number; kind: 'sql
         onClick={() => mutation.mutate()}
       >
         {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-        Tushuntirishni tekshirish
+        {t('Tushuntirishni tekshirish')}
       </Button>
       {mutation.data ? (
         <div className="grid gap-1 text-sm" aria-live="polite">

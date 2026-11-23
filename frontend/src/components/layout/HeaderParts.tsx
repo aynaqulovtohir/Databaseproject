@@ -16,6 +16,7 @@ import { timeAgo, useDashboard } from '@/lib/dashboard'
 import { navItemsFor } from '@/lib/nav'
 import { ROLE_LABELS, type DashboardTone } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { intlLocale, t } from '@/lib/i18n'
 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
@@ -30,7 +31,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
           compact ? 'sm:text-xl' : 'hidden min-[480px]:inline',
         )}
       >
-        MB loyihalash
+        {t('MB loyihalash')}
       </span>
     </Link>
   )
@@ -46,9 +47,9 @@ export function HeaderSearch({ className }: { className?: string }) {
   const [active, setActive] = useState(0)
 
   const results = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase('uz')
+    const needle = query.trim().toLocaleLowerCase(intlLocale())
     if (!needle) return []
-    return navItemsFor(user.role).filter((item) => item.label.toLocaleLowerCase('uz').includes(needle))
+    return navItemsFor(user.role).filter((item) => item.label.toLocaleLowerCase(intlLocale()).includes(needle))
   }, [query, user.role])
 
   function go(index: number) {
@@ -80,7 +81,7 @@ export function HeaderSearch({ className }: { className?: string }) {
   return (
     <form role="search" onSubmit={onSubmit} className={cn('relative', className)}>
       <label htmlFor={`${listId}-input`} className="sr-only">
-        Sahifa qidirish
+        {t('Sahifa qidirish')}
       </label>
       <input
         id={`${listId}-input`}
@@ -90,7 +91,7 @@ export function HeaderSearch({ className }: { className?: string }) {
         aria-controls={listId}
         aria-autocomplete="list"
         autoComplete="off"
-        placeholder="Sahifa qidirish..."
+        placeholder={t('Sahifa qidirish...')}
         value={query}
         onChange={(event) => {
           setQuery(event.target.value)
@@ -105,7 +106,7 @@ export function HeaderSearch({ className }: { className?: string }) {
       <button
         type="submit"
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-heading"
-        aria-label="Qidirish"
+        aria-label={t('Qidirish')}
       >
         <Search className="size-4" aria-hidden="true" />
       </button>
@@ -116,7 +117,7 @@ export function HeaderSearch({ className }: { className?: string }) {
           className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-md bg-popover py-1 shadow-(--card-shadow) ring-1 ring-border"
         >
           {results.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-muted-foreground">Mos sahifa topilmadi</li>
+            <li className="px-3 py-2 text-sm text-muted-foreground">{t('Mos sahifa topilmadi')}</li>
           ) : (
             results.map((item, index) => (
               <li
@@ -161,7 +162,7 @@ export function NotificationsMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="relative flex size-10 items-center justify-center rounded-md text-heading outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        aria-label={count ? `Bildirishnomalar: ${count} ta` : 'Bildirishnomalar'}
+        aria-label={count ? t('Bildirishnomalar: {count} ta', { count }) : t('Bildirishnomalar')}
       >
         <Bell className="size-5" aria-hidden="true" />
         {count ? (
@@ -173,12 +174,12 @@ export function NotificationsMenu() {
       <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0">
         <DropdownMenuLabel className="border-b px-4 py-3 text-center text-sm font-normal text-heading">
           {isPending
-            ? 'Yuklanmoqda...'
+            ? t('Yuklanmoqda...')
             : isError
-              ? "Bildirishnomalarni olib bo'lmadi"
+              ? t("Bildirishnomalarni olib bo'lmadi")
               : count
-                ? `Sizda ${count} ta bildirishnoma bor`
-                : "Yangi bildirishnoma yo'q"}
+                ? t('Sizda {count} ta bildirishnoma bor', { count })
+                : t("Yangi bildirishnoma yo'q")}
         </DropdownMenuLabel>
         <div className="max-h-96 overflow-y-auto">
           {alerts.map((alert, index) => (
@@ -186,8 +187,8 @@ export function NotificationsMenu() {
               <Link to={alert.link} className="flex items-start gap-3">
                 <Bell className={cn('mt-0.5 size-4 shrink-0', TONE_ICON[alert.tone])} aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="block truncate font-medium text-heading">{alert.title}</span>
-                  <span className="block text-xs text-muted-foreground">{alert.text}</span>
+                  <span className="block truncate font-medium text-heading">{t(alert.title)}</span>
+                  <span className="block text-xs text-muted-foreground">{t(alert.text)}</span>
                   <span className="block text-xs text-muted-foreground">{timeAgo(alert.at)}</span>
                 </span>
               </Link>
@@ -201,7 +202,7 @@ export function NotificationsMenu() {
 
 function initials(person: { first_name: string; last_name: string; username: string }) {
   const text = `${person.first_name.charAt(0)}${person.last_name.charAt(0)}`.trim()
-  return (text || person.username.slice(0, 2)).toLocaleUpperCase('uz')
+  return (text || person.username.slice(0, 2)).toLocaleUpperCase(intlLocale())
 }
 
 /** Profil menyusi: ism, rol, profil sahifasi va chiqish. */
@@ -213,7 +214,7 @@ export function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="flex items-center gap-2 rounded-md py-1 pr-1 pl-1 text-heading outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 sm:pr-2"
-        aria-label={`Profil menyusi: ${name}`}
+        aria-label={t('Profil menyusi: {name}', { name })}
       >
         <span className="brand-gradient flex size-9 items-center justify-center rounded-full text-xs font-semibold text-white">
           {initials(user)}
@@ -232,13 +233,13 @@ export function ProfileMenu() {
         <DropdownMenuItem asChild className="py-2">
           <Link to="/profile">
             <UserRound aria-hidden="true" />
-            Mening profilim
+            {t('Mening profilim')}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="py-2" onSelect={() => void logout()}>
           <LogOut aria-hidden="true" />
-          Chiqish
+          {t('Chiqish@@tizimdan')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

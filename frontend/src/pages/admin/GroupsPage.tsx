@@ -18,6 +18,7 @@ import { api, errorMessage } from '@/lib/api'
 import { fullName } from '@/lib/auth'
 import { applyFormError } from '@/lib/forms'
 import type { AdminUser, Group } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const GROUP_FIELDS = ['name', 'teachers', 'ai_enabled', 'in_study'] as const
 
@@ -43,7 +44,7 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
         : api<Group>('/groups/', { method: 'POST', body })
     },
     onSuccess: () => {
-      toast.success(group ? 'Guruh saqlandi' : 'Guruh yaratildi')
+      toast.success(group ? t('Guruh saqlandi') : t('Guruh yaratildi'))
       void queryClient.invalidateQueries({ queryKey: ['groups'] })
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       onClose()
@@ -61,29 +62,29 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
     <Dialog open onOpenChange={(open) => (!open && !mutation.isPending ? onClose() : undefined)}>
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{group ? 'Guruhni tahrirlash' : 'Yangi guruh'}</DialogTitle>
+          <DialogTitle>{group ? t('Guruhni tahrirlash') : t('Yangi guruh')}</DialogTitle>
           <DialogDescription>
-            Biriktirilgan o'qituvchilar shu guruhga material va topshiriq bera oladi.
+            {t("Biriktirilgan o'qituvchilar shu guruhga material va topshiriq bera oladi.")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <FormField id="group_name" label="Guruh nomi" error={errors.name}>
+          <FormField id="group_name" label={t('Guruh nomi')} error={errors.name}>
             <Input
               id="group_name"
               className="h-10"
-              placeholder="Masalan: 210-21"
+              placeholder={t('Masalan: 210-21')}
               aria-invalid={Boolean(errors.name)}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
           </FormField>
-          <FormField id="group_teachers" label="O'qituvchilar" error={errors.teachers}>
+          <FormField id="group_teachers" label={t("O'qituvchilar")} error={errors.teachers}>
             <CheckList
               idPrefix="teacher"
               options={teachers.map((teacher) => ({ id: teacher.id, label: fullName(teacher) }))}
               selected={teacherIds}
               onChange={setTeacherIds}
-              emptyText="Hali o'qituvchi yo'q. Avval «Foydalanuvchilar» sahifasida o'qituvchi yarating."
+              emptyText={t("Hali o'qituvchi yo'q. Avval «Foydalanuvchilar» sahifasida o'qituvchi yarating.")}
               invalid={Boolean(errors.teachers)}
             />
           </FormField>
@@ -95,10 +96,9 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
               onChange={(event) => setAiEnabled(event.target.checked)}
             />
             <span>
-              AI yordamchisi yoqilgan
+              {t('AI yordamchisi yoqilgan')}
               <span className="block text-xs text-muted-foreground">
-                Tajriba uchun nazorat guruhida o'chiring: talabalar AI maslahati, AI bahosi, AI chat va AI tahlilini
-                ko'rmaydi (baho avtomatik tekshiruv bilan qo'yiladi). O'qituvchiga AI tahlili ko'rinaveradi.
+                {t("Tajriba uchun nazorat guruhida o'chiring: talabalar AI maslahati, AI bahosi, AI chat va AI tahlilini ko'rmaydi (baho avtomatik tekshiruv bilan qo'yiladi). O'qituvchiga AI tahlili ko'rinaveradi.")}
               </span>
             </span>
           </label>
@@ -110,21 +110,19 @@ function GroupDialog({ group, teachers, onClose }: GroupDialogProps) {
               onChange={(event) => setInStudy(event.target.checked)}
             />
             <span>
-              Tadqiqotga kiradi
+              {t('Tadqiqotga kiradi')}
               <span className="block text-xs text-muted-foreground">
-                Tajriba tahlili, ER jarayoni statistikasi, kompetentlik solishtiruvi va tadqiqot eksportiga faqat
-                belgilangan guruhlar kiradi. Sinov va o'quv guruhlarini belgilamang. Birorta guruh belgilanmagan
-                bo'lsa, barcha guruhlar olinadi.
+                {t("Tajriba tahlili, ER jarayoni statistikasi, kompetentlik solishtiruvi va tadqiqot eksportiga faqat belgilangan guruhlar kiradi. Sinov va o'quv guruhlarini belgilamang. Birorta guruh belgilanmagan bo'lsa, barcha guruhlar olinadi.")}
               </span>
             </span>
           </label>
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
-              Bekor qilish
+              {t('Bekor qilish')}
             </Button>
             <Button type="submit" size="lg" disabled={mutation.isPending || !name.trim()}>
               {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Saqlash
+              {t('Saqlash')}
             </Button>
           </DialogFooter>
         </form>
@@ -148,7 +146,7 @@ export function GroupsPage() {
   const remove = useMutation({
     mutationFn: (group: Group) => api(`/groups/${group.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Guruh o'chirildi")
+      toast.success(t("Guruh o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['groups'] })
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       setDeleting(null)
@@ -172,7 +170,7 @@ export function GroupsPage() {
   const addButton = (
     <Button size="lg" onClick={() => setEditing('new')}>
       <Plus aria-hidden="true" />
-      Guruh qo'shish
+      {t("Guruh qo'shish")}
     </Button>
   )
 
@@ -185,8 +183,8 @@ export function GroupsPage() {
     content = (
       <EmptyState
         icon={UsersRound}
-        title="Hali guruh yo'q"
-        description="Talabalarni biriktirish uchun avval guruh yarating."
+        title={t("Hali guruh yo'q")}
+        description={t('Talabalarni biriktirish uchun avval guruh yarating.')}
         action={addButton}
       />
     )
@@ -196,12 +194,12 @@ export function GroupsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Guruh</TableHead>
-              <TableHead>O'qituvchilar</TableHead>
-              <TableHead>AI</TableHead>
-              <TableHead>Tadqiqot</TableHead>
-              <TableHead className="text-right">Talabalar</TableHead>
-              <TableHead className="text-right">Amallar</TableHead>
+              <TableHead>{t('Guruh')}</TableHead>
+              <TableHead>{t("O'qituvchilar")}</TableHead>
+              <TableHead>{t('AI')}</TableHead>
+              <TableHead>{t('Tadqiqot')}</TableHead>
+              <TableHead className="text-right">{t('Talabalar')}</TableHead>
+              <TableHead className="text-right">{t('Amallar')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -211,14 +209,14 @@ export function GroupsPage() {
                 <TableCell className="max-w-80 truncate">{teacherNames(group.teachers)}</TableCell>
                 <TableCell>
                   {group.ai_enabled ? (
-                    <Badge variant="outline">Yoqilgan</Badge>
+                    <Badge variant="outline">{t('Yoqilgan')}</Badge>
                   ) : (
-                    <Badge className="bg-amber-100 text-amber-800">O'chirilgan</Badge>
+                    <Badge className="bg-amber-100 text-amber-800">{t("O'chirilgan")}</Badge>
                   )}
                 </TableCell>
                 <TableCell>
                   {group.in_study ? (
-                    <Badge variant="outline">Kiradi</Badge>
+                    <Badge variant="outline">{t('Kiradi')}</Badge>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -229,7 +227,7 @@ export function GroupsPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${group.name}: tahrirlash`}
+                      aria-label={t('{name}: tahrirlash', { name: group.name })}
                       onClick={() => setEditing(group)}
                     >
                       <Pencil />
@@ -237,7 +235,7 @@ export function GroupsPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${group.name}: o'chirish`}
+                      aria-label={t("{name}: o'chirish", { name: group.name })}
                       onClick={() => setDeleting(group)}
                     >
                       <Trash2 />
@@ -255,8 +253,8 @@ export function GroupsPage() {
   return (
     <>
       <PageHeader
-        title="Guruhlar"
-        description="Guruhlar va ularga biriktirilgan o'qituvchilar."
+        title={t('Guruhlar')}
+        description={t("Guruhlar va ularga biriktirilgan o'qituvchilar.")}
         actions={groups.data?.length ? addButton : null}
       />
       {content}
@@ -271,13 +269,13 @@ export function GroupsPage() {
       ) : null}
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="Guruhni o'chirish"
+        title={t("Guruhni o'chirish")}
         description={
           deleting
-            ? `«${deleting.name}» guruhi o'chiriladi. Undagi ${deleting.student_count} ta talaba guruhsiz qoladi va shu guruhga berilgan material hamda topshiriqlarni ko'rmay qoladi.`
+            ? t("«{name}» guruhi o'chiriladi. Undagi {student_count} ta talaba guruhsiz qoladi va shu guruhga berilgan material hamda topshiriqlarni ko'rmay qoladi.", { name: deleting.name, student_count: deleting.student_count })
             : ''
         }
-        confirmLabel="O'chirish"
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(null)}

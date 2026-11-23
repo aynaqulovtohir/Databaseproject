@@ -8,12 +8,13 @@ import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import type { ErProcess, ErProcessMetrics, ErProcessStep } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const SOURCE_LABELS: Record<ErProcessStep['source'], string> = {
+const SOURCE_LABELS: Record<ErProcessStep['source'], string> = localized({
   edit: 'Chizish',
   run: 'Tekshirish',
   submit: 'Topshirish',
-}
+})
 
 const CHART = { width: 640, height: 180, left: 40, right: 12, top: 12, bottom: 28 }
 
@@ -22,7 +23,7 @@ function percent(value: number | null) {
 }
 
 function minutes(value: number | null) {
-  return value === null ? '—' : `${value} daq.`
+  return value === null ? '—' : t('{value} daq.', { value })
 }
 
 /** Namunaga yaqinlashish: har bir qadamdagi moslik, tekshirish/topshirish nuqtalari bilan */
@@ -43,7 +44,7 @@ function ConvergenceChart({ steps, current, onSelect }: { steps: ErProcessStep[]
         viewBox={`0 0 ${CHART.width} ${CHART.height}`}
         className="w-full min-w-[30rem]"
         role="img"
-        aria-label="Namunaga moslik vaqt bo'yicha"
+        aria-label={t("Namunaga moslik vaqt bo'yicha")}
       >
         {[0, 0.5, 1].map((tick) => (
           <g key={tick} className="text-muted-foreground">
@@ -54,10 +55,10 @@ function ConvergenceChart({ steps, current, onSelect }: { steps: ErProcessStep[]
           </g>
         ))}
         <text x={CHART.left} y={CHART.height - 8} fontSize={11} className="fill-muted-foreground">
-          0 daq.
+          {t('0 daq.')}
         </text>
         <text x={CHART.left + plotWidth} y={CHART.height - 8} textAnchor="end" fontSize={11} className="fill-muted-foreground">
-          {steps[steps.length - 1].minutes} daq.
+          {t('{minutes} daq.', { minutes: steps[steps.length - 1].minutes })}
         </text>
         <line
           x1={x(active.minutes)}
@@ -94,19 +95,19 @@ function ConvergenceChart({ steps, current, onSelect }: { steps: ErProcessStep[]
 
 function MetricList({ metrics, strategy }: { metrics: ErProcessMetrics; strategy: string | null }) {
   const items = [
-    ['Faol vaqt', minutes(metrics.active_minutes)],
-    ['Sessiyalar', String(metrics.sessions)],
-    ['Tekshiruvlar', String(metrics.checks)],
-    ["Birinchi bog'lanishgacha", minutes(metrics.first_relationship_minutes)],
-    ["Qo'shilgan / o'chirilgan", `${metrics.added} / ${metrics.removed}`],
-    ['Kardinallikni o\'zgartirish', String(metrics.cardinality_changes)],
-    ['Birinchi tekshiruvda moslik', percent(metrics.first_check_ratio)],
-    ['Yakuniy moslik', percent(metrics.final_ratio)],
+    [t('Faol vaqt'), minutes(metrics.active_minutes)],
+    [t('Sessiyalar'), String(metrics.sessions)],
+    [t('Tekshiruvlar'), String(metrics.checks)],
+    [t("Birinchi bog'lanishgacha"), minutes(metrics.first_relationship_minutes)],
+    [t("Qo'shilgan / o'chirilgan"), `${metrics.added} / ${metrics.removed}`],
+    [t("Kardinallikni o'zgartirish"), String(metrics.cardinality_changes)],
+    [t('Birinchi tekshiruvda moslik'), percent(metrics.first_check_ratio)],
+    [t('Yakuniy moslik'), percent(metrics.final_ratio)],
   ]
   return (
     <div className="grid gap-2">
       <div className="text-sm">
-        <span className="text-muted-foreground">Strategiya: </span>
+        <span className="text-muted-foreground">{t('Strategiya:')}{' '}</span>
         <span className="font-medium">{strategy}</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
@@ -136,8 +137,8 @@ export function ErProcessView({ labId, studentId }: { labId: number; studentId: 
     return (
       <EmptyState
         icon={History}
-        title="Chizish jarayoni yozilmagan"
-        description="Talaba bu laboratoriyada hali diagramma chizmagan yoki jarayonni yozish joriy etilishidan oldin ishlagan."
+        title={t('Chizish jarayoni yozilmagan')}
+        description={t('Talaba bu laboratoriyada hali diagramma chizmagan yoki jarayonni yozish joriy etilishidan oldin ishlagan.')}
       />
     )
   }
@@ -151,11 +152,11 @@ export function ErProcessView({ labId, studentId }: { labId: number; studentId: 
       <div className="grid gap-2">
         <label htmlFor="process-step" className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-medium">
-            Qadam {current + 1} / {steps.length}
+            {t('Qadam {value} / {steps}', { value: current + 1, steps: steps.length })}
           </span>
           <Badge variant={step.source === 'edit' ? 'secondary' : 'default'}>{SOURCE_LABELS[step.source]}</Badge>
           <span className="text-muted-foreground">
-            {formatDateTime(step.at)} · {step.minutes} daq. · sessiya {step.session} · moslik {percent(step.ratio)}
+            {t('{at} · {minutes} daq. · sessiya {session} · moslik {ratio}', { at: formatDateTime(step.at), minutes: step.minutes, session: step.session, ratio: percent(step.ratio) })}
           </span>
         </label>
         <input
@@ -177,7 +178,7 @@ export function ErProcessView({ labId, studentId }: { labId: number; studentId: 
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">Oldingi qadamdan farq yo'q.</p>
+          <p className="text-sm text-muted-foreground">{t("Oldingi qadamdan farq yo'q.")}</p>
         )}
       </div>
       {/* Muharrir holatni faqat ochilganda o'qiydi: har bir qadam uchun qayta yaratiladi */}

@@ -12,6 +12,7 @@ import { api, errorMessage } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { PeerCriterionKey, PeerReviewReceived, PeerReviewState } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const MIN_COMMENT = 20
 const MAX_COMMENT = 2000
@@ -76,7 +77,7 @@ function ReviewForm({ labId, state }: { labId: number; state: PeerReviewState })
       queryClient.setQueryData(['peer-review', labId], next)
       setScores({})
       setComment('')
-      toast.success('Baholash yuborildi. Rahmat!')
+      toast.success(t('Baholash yuborildi. Rahmat!'))
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -109,23 +110,23 @@ function ReviewForm({ labId, state }: { labId: number; state: PeerReviewState })
       </div>
       <div className="grid gap-1.5">
         <label htmlFor={`peer-comment-${labId}`} className="text-sm font-medium">
-          Izoh
+          {t('Izoh')}
         </label>
         <Textarea
           id={`peer-comment-${labId}`}
           className="min-h-24"
           maxLength={MAX_COMMENT}
-          placeholder="Nima yaxshi chiqqan? Nimani tuzatish yoki yaxshilash mumkin? Hurmat bilan va aniq yozing."
+          placeholder={t('Nima yaxshi chiqqan? Nimani tuzatish yoki yaxshilash mumkin? Hurmat bilan va aniq yozing.')}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
         />
         <p className="text-xs text-muted-foreground tabular-nums">
-          {commentOk ? `${comment.trim().length} belgi` : `Kamida ${MIN_COMMENT} belgi (${comment.trim().length} / ${MIN_COMMENT})`}
+          {commentOk ? t('{length} belgi', { length: comment.trim().length }) : t('Kamida {MIN_COMMENT} belgi ({length} / {MIN_COMMENT2})', { MIN_COMMENT, length: comment.trim().length, MIN_COMMENT2: MIN_COMMENT })}
         </p>
       </div>
       <Button type="submit" size="lg" className="w-fit" disabled={!canSend}>
         {send.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-        Baholashni yuborish
+        {t('Baholashni yuborish')}
       </Button>
     </form>
   )
@@ -156,7 +157,7 @@ function ReceivedReview({ labId, review, state }: { labId: number; review: PeerR
       </div>
       <p className="text-sm whitespace-pre-wrap">{review.comment}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Bu izoh sizga foydali bo'ldimi?</span>
+        <span className="text-xs text-muted-foreground">{t("Bu izoh sizga foydali bo'ldimi?")}</span>
         <Button
           type="button"
           size="sm"
@@ -166,7 +167,7 @@ function ReceivedReview({ labId, review, state }: { labId: number; review: PeerR
           onClick={() => mark.mutate(true)}
         >
           <ThumbsUp aria-hidden="true" />
-          Foydali
+          {t('Foydali')}
         </Button>
         <Button
           type="button"
@@ -177,7 +178,7 @@ function ReceivedReview({ labId, review, state }: { labId: number; review: PeerR
           onClick={() => mark.mutate(false)}
         >
           <ThumbsDown aria-hidden="true" />
-          Foydali emas
+          {t('Foydali emas')}
         </Button>
       </div>
     </li>
@@ -197,7 +198,7 @@ export function PeerReviewPanel({ labId }: { labId: number }) {
     <div className="grid gap-6">
       <section className="grid gap-3">
         <h3 className="flex items-baseline justify-between gap-2 text-sm font-medium">
-          Guruhdoshingiz ishini baholang
+          {t('Guruhdoshingiz ishini baholang')}
           <span className="font-normal text-muted-foreground tabular-nums">
             {data.written} / {data.per_lab}
           </span>
@@ -209,7 +210,7 @@ export function PeerReviewPanel({ labId }: { labId: number }) {
         )}
       </section>
       <section className="grid gap-3 border-t pt-4">
-        <h3 className="text-sm font-medium">Sizning ishingizga berilgan baholar</h3>
+        <h3 className="text-sm font-medium">{t('Sizning ishingizga berilgan baholar')}</h3>
         {data.received.length ? (
           <ul className="grid gap-3">
             {data.received.map((review) => (
@@ -218,7 +219,7 @@ export function PeerReviewPanel({ labId }: { labId: number }) {
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Baholashga topshirgan diagrammangizni guruhdoshlaringiz baholagach, ularning izohlari shu yerda chiqadi.
+            {t('Baholashga topshirgan diagrammangizni guruhdoshlaringiz baholagach, ularning izohlari shu yerda chiqadi.')}
           </p>
         )}
       </section>

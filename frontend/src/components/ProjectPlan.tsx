@@ -1,14 +1,15 @@
 import type { Grade, RubricCriterion } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** Rubrika mezonlari ro'yxati: nomi, bali va nima tekshirilishi. */
-export function RubricList({ criteria, title = 'Baholash rubrikasi' }: { criteria: RubricCriterion[]; title?: string }) {
+export function RubricList({ criteria, title = t('Baholash rubrikasi') }: { criteria: RubricCriterion[]; title?: string }) {
   if (!criteria.length) return null
   const total = criteria.reduce((sum, item) => sum + item.points, 0)
   return (
     <div className="rounded-lg border bg-muted/30 p-3">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-medium">{title}</h3>
-        <span className="text-xs text-muted-foreground tabular-nums">jami {total} ball</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{t('jami {total} ball', { total })}</span>
       </div>
       <ul className="grid gap-1.5 text-sm">
         {criteria.map((item, index) => (

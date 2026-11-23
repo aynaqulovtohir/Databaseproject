@@ -19,10 +19,11 @@ import { applyFormError } from '@/lib/forms'
 import { useGroupOptions } from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import type { ErDiagram, Lab, LabCheckQuery, LabKind, LabProbe } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
 const LAB_FIELDS = ['kind', 'title', 'description', 'theory', 'setup_sql', 'solution_sql', 'hidden_setup_sql', 'starter_sql', 'norm_task', 'reference_diagram', 'given_diagram', 'plan_query', 'plan_forbidden', 'concurrent', 'ask_justification', 'find_error', 'probes', 'check_queries', 'topic', 'level', 'groups'] as const
 
-const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
+const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = localized([
   { value: 'sql', label: 'SQL kod', hint: 'Talaba SQL yozadi, natija namunaviy yechim bilan solishtiriladi.' },
   { value: 'er', label: 'ER-diagramma', hint: 'Talaba ER-diagramma chizadi, u namunaviy diagramma bilan solishtiriladi.' },
   {
@@ -30,12 +31,12 @@ const KIND_OPTIONS: { value: LabKind; label: string; hint: string }[] = [
     label: 'Normallashtirish',
     hint: "Talaba nomzod kalitlarni, normal formani va dekompozitsiyani topadi; javob algoritm bilan tekshiriladi.",
   },
-]
+])
 
 function fdsText(lab?: Lab) {
   return (lab?.norm_task?.fds ?? []).map((fd) => `${fd.lhs.join(', ')} -> ${fd.rhs.join(', ')}`).join('\n')
 }
-const TOPIC_OPTIONS = [
+const TOPIC_OPTIONS = localized([
   ['', "Avtomatik (laboratoriya turidan)"],
   ['er', 'ER-model'],
   ['design', 'Jadvallarni loyihalash'],
@@ -51,7 +52,7 @@ const TOPIC_OPTIONS = [
   ['warehouse', "Ma'lumotlar ombori (OLAP)"],
   ['json', "Yarim tuzilmali ma'lumot (JSONB)"],
   ['vector', 'Vektorli qidiruv (AI)'],
-] as const
+] as const)
 const SQL_PROPS = { spellCheck: false, autoCapitalize: 'none', autoCorrect: 'off' } as const
 
 interface LabDialogProps {
@@ -123,7 +124,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
         : api<Lab>('/labs/', { method: 'POST', body })
     },
     onSuccess: (saved) => {
-      toast.success(lab ? 'Laboratoriya saqlandi' : 'Laboratoriya yaratildi')
+      toast.success(lab ? t('Laboratoriya saqlandi') : t('Laboratoriya yaratildi'))
       queryClient.setQueryData(['lab', saved.id], saved)
       void queryClient.invalidateQueries({ queryKey: ['labs'] })
       onClose()
@@ -134,9 +135,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     const problems: Record<string, string> = {}
-    if (!groupIds.length) problems.groups = 'Kamida bitta guruh tanlang.'
+    if (!groupIds.length) problems.groups = t('Kamida bitta guruh tanlang.')
     if (kind === 'er' && !setupSql.trim() && !referenceDiagram.entities.length) {
-      problems.reference_diagram = 'Namunaviy diagrammada kamida bitta obyekt chizing.'
+      problems.reference_diagram = t('Namunaviy diagrammada kamida bitta obyekt chizing.')
     }
     setErrors(problems)
     if (!Object.keys(problems).length) mutation.mutate()
@@ -146,13 +147,13 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
     <Dialog open onOpenChange={(open) => (!open && !mutation.isPending ? onClose() : undefined)}>
       <DialogContent className={cn('max-h-[92svh] overflow-y-auto', kind === 'er' ? 'sm:max-w-6xl' : 'sm:max-w-2xl')}>
         <DialogHeader>
-          <DialogTitle>{lab ? 'Laboratoriyani tahrirlash' : 'Yangi laboratoriya'}</DialogTitle>
+          <DialogTitle>{lab ? t('Laboratoriyani tahrirlash') : t('Yangi laboratoriya')}</DialogTitle>
           <DialogDescription>{KIND_OPTIONS.find((option) => option.value === kind)?.hint}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
           {lab ? null : (
             <fieldset className="grid gap-1.5">
-              <legend className="mb-1.5 text-sm font-medium">Laboratoriya turi</legend>
+              <legend className="mb-1.5 text-sm font-medium">{t('Laboratoriya turi')}</legend>
               <div className="flex flex-wrap gap-2">
                 {KIND_OPTIONS.map((option) => (
                   <label
@@ -175,7 +176,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </div>
             </fieldset>
           )}
-          <FormField id="lab_title" label="Sarlavha" error={errors.title}>
+          <FormField id="lab_title" label={t('Sarlavha')} error={errors.title}>
             <Input
               id="lab_title"
               className="h-10"
@@ -186,12 +187,12 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
           </FormField>
           <FormField
             id="lab_description"
-            label="Laboratoriya sharti"
+            label={t('Laboratoriya sharti')}
             error={errors.description}
             hint={
               kind === 'er'
-                ? "Obyekt va atribut nomlarini aniq yozing: talaba diagrammasi nomlar bo'yicha solishtiriladi."
-                : 'Jadval va ustun nomlarini aniq yozing: talaba natijasi namuna bilan solishtiriladi.'
+                ? t("Obyekt va atribut nomlarini aniq yozing: talaba diagrammasi nomlar bo'yicha solishtiriladi.")
+                : t('Jadval va ustun nomlarini aniq yozing: talaba natijasi namuna bilan solishtiriladi.')
             }
           >
             <Textarea
@@ -204,9 +205,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
           </FormField>
           <FormField
             id="lab_theory"
-            label="Nazariya va namuna (ixtiyoriy)"
+            label={t('Nazariya va namuna (ixtiyoriy)')}
             error={errors.theory}
-            hint="Talabaga shart ostida ko'rinadi. Kodni ``` qatorlari orasiga yozing. Namunani boshqa mavzuda bering, yechimni yozmang."
+            hint={t("Talabaga shart ostida ko'rinadi. Kodni ``` qatorlari orasiga yozing. Namunani boshqa mavzuda bering, yechimni yozmang.")}
           >
             <Textarea
               id="lab_theory"
@@ -221,14 +222,14 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             <>
               <FormField
                 id="lab_er_setup_sql"
-                label="Berilgan baza (teskari loyihalash, ixtiyoriy)"
+                label={t('Berilgan baza (teskari loyihalash, ixtiyoriy)')}
                 error={errors.setup_sql}
-                hint="Jadvallar va kalitlar (CREATE TABLE). To'ldirilsa, talaba shu bazaning ER-diagrammasini tiklaydi; namuna saqlashda bazadan avtomatik hosil qilinadi: jadval — obyekt, FOREIGN KEY — N:1 (UNIQUE bo'lsa 1:1), faqat ikki kalitdan iborat oraliq jadval — M:N. Talabaga ko'rinadi."
+                hint={t("Jadvallar va kalitlar (CREATE TABLE). To'ldirilsa, talaba shu bazaning ER-diagrammasini tiklaydi; namuna saqlashda bazadan avtomatik hosil qilinadi: jadval — obyekt, FOREIGN KEY — N:1 (UNIQUE bo'lsa 1:1), faqat ikki kalitdan iborat oraliq jadval — M:N. Talabaga ko'rinadi.")}
               >
                 <Textarea
                   id="lab_er_setup_sql"
                   className="max-h-72 min-h-24 font-mono text-sm md:text-xs"
-                  placeholder="CREATE TABLE guruh (id INTEGER PRIMARY KEY, nomi VARCHAR(50));"
+                  placeholder={t('CREATE TABLE guruh (id INTEGER PRIMARY KEY, nomi VARCHAR(50));')}
                   maxLength={50_000}
                   aria-invalid={Boolean(errors.setup_sql)}
                   value={setupSql}
@@ -244,19 +245,17 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                   onChange={(event) => setAskJustification(event.target.checked)}
                 />
                 <span>
-                  Topshirishda yozma asoslash so'ralsin (o'lchov topshirig'i)
+                  {t("Topshirishda yozma asoslash so'ralsin (o'lchov topshirig'i)")}
                   <span className="block text-xs text-muted-foreground">
-                    Talaba diagramma bilan birga qarorlarini 2–3 gapda asoslaydi; matn ko'r baholashda ko'rinadi va
-                    rubrikaning «qarorlarni asoslash» mezoni bo'yicha baholanadi.
+                    {t("Talaba diagramma bilan birga qarorlarini 2–3 gapda asoslaydi; matn ko'r baholashda ko'rinadi va rubrikaning «qarorlarni asoslash» mezoni bo'yicha baholanadi.")}
                   </span>
                 </span>
               </label>
               {setupSql.trim() ? null : (
                 <div className="grid gap-1.5">
-                  <span className="text-sm font-medium">Namunaviy ER-diagramma</span>
+                  <span className="text-sm font-medium">{t('Namunaviy ER-diagramma')}</span>
                   <p className="text-xs text-muted-foreground">
-                    Talabaga ko'rinmaydi. Talaba diagrammasi shu bilan solishtiriladi: obyektlar, atributlar, PK va
-                    bog'lanishlar kardinalligi. FK atributlari solishtirilmaydi.
+                    {t("Talabaga ko'rinmaydi. Talaba diagrammasi shu bilan solishtiriladi: obyektlar, atributlar, PK va bog'lanishlar kardinalligi. FK atributlari solishtirilmaydi.")}
                   </p>
                   <ErEditor value={referenceDiagram} onChange={setReferenceDiagram} />
                   {errors.reference_diagram ? (
@@ -271,13 +270,13 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
             <>
               <FormField
                 id="lab_norm_attributes"
-                label="Munosabat atributlari"
+                label={t('Munosabat atributlari')}
                 error={errors.norm_task}
-                hint="Vergul bilan, lotin harflarida (2–10 ta). Talabaga ko'rinadi."
+                hint={t("Vergul bilan, lotin harflarida (2–10 ta). Talabaga ko'rinadi.")}
               >
                 <Input
                   id="lab_norm_attributes"
-                  placeholder="talaba_id, ism, fan_id, fan_nomi, baho"
+                  placeholder={t('talaba_id, ism, fan_id, fan_nomi, baho')}
                   aria-invalid={Boolean(errors.norm_task)}
                   value={normAttributes}
                   onChange={(event) => setNormAttributes(event.target.value)}
@@ -286,37 +285,36 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </FormField>
               <FormField
                 id="lab_norm_fds"
-                label="Funksional bog'liqliklar"
-                hint="Har bir qatorda bittasi: chap tomon -> o'ng tomon. Talabaga ko'rinadi."
+                label={t("Funksional bog'liqliklar")}
+                hint={t("Har bir qatorda bittasi: chap tomon -> o'ng tomon. Talabaga ko'rinadi.")}
               >
                 <Textarea
                   id="lab_norm_fds"
                   className="max-h-64 min-h-28 font-mono text-sm md:text-xs"
-                  placeholder={'talaba_id -> ism\nfan_id -> fan_nomi\ntalaba_id, fan_id -> baho'}
+                  placeholder={t('talaba_id -> ism\nfan_id -> fan_nomi\ntalaba_id, fan_id -> baho')}
                   value={normFds}
                   onChange={(event) => setNormFds(event.target.value)}
                   {...SQL_PROPS}
                 />
               </FormField>
-              <FormField id="lab_norm_target" label="Maqsad normal forma">
+              <FormField id="lab_norm_target" label={t('Maqsad normal forma')}>
                 <select
                   id="lab_norm_target"
                   className="h-10 justify-self-start rounded-md border bg-background px-2 text-sm"
                   value={normTarget}
                   onChange={(event) => setNormTarget(event.target.value as '3NF' | 'BCNF')}
                 >
-                  <option value="3NF">3NF (bog'liqliklar saqlanishi ham tekshiriladi)</option>
-                  <option value="BCNF">BCNF</option>
+                  <option value="3NF">{t("3NF (bog'liqliklar saqlanishi ham tekshiriladi)")}</option>
+                  <option value="BCNF">{t('BCNF')}</option>
                 </select>
               </FormField>
             </>
           ) : (
             <>
               <div className="grid gap-1.5">
-                <span className="text-sm font-medium">Talabaga beriladigan ER-model (ixtiyoriy)</span>
+                <span className="text-sm font-medium">{t('Talabaga beriladigan ER-model (ixtiyoriy)')}</span>
                 <p className="text-xs text-muted-foreground">
-                  ER → SQL laboratoriyasi uchun: talaba shu model bo'yicha jadvallarni yaratadi. Talabaga ko'rinadi;
-                  tekshiruv namunaviy yechim bo'yicha. Bo'sh qoldirilsa, ko'rsatilmaydi.
+                  {t("ER → SQL laboratoriyasi uchun: talaba shu model bo'yicha jadvallarni yaratadi. Talabaga ko'rinadi; tekshiruv namunaviy yechim bo'yicha. Bo'sh qoldirilsa, ko'rsatilmaydi.")}
                 </p>
                 <ErEditor value={givenDiagram} onChange={setGivenDiagram} />
                 {errors.given_diagram ? (
@@ -327,14 +325,14 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </div>
               <FormField
                 id="lab_setup"
-                label="Tayyor jadvallar (SQL)"
+                label={t('Tayyor jadvallar (SQL)')}
                 error={errors.setup_sql}
-                hint="Ixtiyoriy. Talaba kodidan oldin bajariladi va talabaga ko'rinadi: CREATE TABLE va INSERT buyruqlari."
+                hint={t("Ixtiyoriy. Talaba kodidan oldin bajariladi va talabaga ko'rinadi: CREATE TABLE va INSERT buyruqlari.")}
               >
                 <Textarea
                   id="lab_setup"
                   className="max-h-64 min-h-28 font-mono text-sm md:text-xs"
-                  placeholder={"CREATE TABLE kitob (id INT PRIMARY KEY, nomi VARCHAR(100));\nINSERT INTO kitob VALUES (1, 'Alifbo');"}
+                  placeholder={t("CREATE TABLE kitob (id INT PRIMARY KEY, nomi VARCHAR(100));\nINSERT INTO kitob VALUES (1, 'Alifbo');")}
                   aria-invalid={Boolean(errors.setup_sql)}
                   value={setupSql}
                   onChange={(event) => setSetupSql(event.target.value)}
@@ -343,14 +341,14 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </FormField>
               <FormField
                 id="lab_solution"
-                label="Namunaviy yechim (SQL)"
+                label={t('Namunaviy yechim (SQL)')}
                 error={errors.solution_sql}
-                hint="Talabaga ko'rinmaydi. Bo'sh qoldirilsa, xatosiz ishlagan har qanday kod to'g'ri hisoblanadi."
+                hint={t("Talabaga ko'rinmaydi. Bo'sh qoldirilsa, xatosiz ishlagan har qanday kod to'g'ri hisoblanadi.")}
               >
                 <Textarea
                   id="lab_solution"
                   className="max-h-64 min-h-28 font-mono text-sm md:text-xs"
-                  placeholder="SELECT nomi FROM kitob ORDER BY nomi;"
+                  placeholder={t('SELECT nomi FROM kitob ORDER BY nomi;')}
                   aria-invalid={Boolean(errors.solution_sql)}
                   value={solutionSql}
                   onChange={(event) => setSolutionSql(event.target.value)}
@@ -359,9 +357,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </FormField>
               <FormField
                 id="lab_hidden"
-                label="Yashirin test ma'lumotlari (SQL, ixtiyoriy)"
+                label={t("Yashirin test ma'lumotlari (SQL, ixtiyoriy)")}
                 error={errors.hidden_setup_sql}
-                hint="Talabaga ko'rinmaydi. Boshlang'ich jadvallar bilan bir xil jadvallar, lekin boshqa ma'lumotlar. To'g'ri chiqqan kod shu ma'lumotlarda ham tekshiriladi: natijani qo'lda yozib aldab bo'lmaydi."
+                hint={t("Talabaga ko'rinmaydi. Boshlang'ich jadvallar bilan bir xil jadvallar, lekin boshqa ma'lumotlar. To'g'ri chiqqan kod shu ma'lumotlarda ham tekshiriladi: natijani qo'lda yozib aldab bo'lmaydi.")}
               >
                 <Textarea
                   id="lab_hidden"
@@ -374,9 +372,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </FormField>
               <FormField
                 id="lab_starter"
-                label="Boshlang'ich kod (ixtiyoriy)"
+                label={t("Boshlang'ich kod (ixtiyoriy)")}
                 error={errors.starter_sql}
-                hint="Talaba muharririda dastlab turadi. Masalan, «AI yozgan xatoli yechim — xatolarini toping» mashqi uchun."
+                hint={t('Talaba muharririda dastlab turadi. Masalan, «AI yozgan xatoli yechim — xatolarini toping» mashqi uchun.')}
               >
                 <Textarea
                   id="lab_starter"
@@ -389,14 +387,14 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               </FormField>
               <FormField
                 id="lab_plan_query"
-                label="Rejasi tekshiriladigan so'rov (indeks laboratoriyasi, ixtiyoriy)"
+                label={t("Rejasi tekshiriladigan so'rov (indeks laboratoriyasi, ixtiyoriy)")}
                 error={errors.plan_query}
-                hint="Talaba kodidan keyin shu so'rovning EXPLAIN rejasi olinadi (so'rov bajarilmaydi). Talabaga ko'rinadi. Namunaviy yechim indeks yaratishi kerak."
+                hint={t("Talaba kodidan keyin shu so'rovning EXPLAIN rejasi olinadi (so'rov bajarilmaydi). Talabaga ko'rinadi. Namunaviy yechim indeks yaratishi kerak.")}
               >
                 <Textarea
                   id="lab_plan_query"
                   className="max-h-40 min-h-16 font-mono text-sm md:text-xs"
-                  placeholder="SELECT id FROM foydalanuvchi WHERE email = '...'"
+                  placeholder={t("SELECT id FROM foydalanuvchi WHERE email = '...'")}
                   maxLength={5000}
                   aria-invalid={Boolean(errors.plan_query)}
                   value={planQuery}
@@ -412,11 +410,10 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                     checked={concurrent}
                     onChange={(event) => setConcurrent(event.target.checked)}
                   />
-                  Ikki sessiyada bir vaqtda tekshirish (tranzaksiya laboratoriyasi)
+                  {t('Ikki sessiyada bir vaqtda tekshirish (tranzaksiya laboratoriyasi)')}
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Talaba kodi (BEGIN … COMMIT) A va B sessiyalarida bir vaqtda bajariladi; natija ketma-ket ikki marta
-                  bajarilgandagiga teng bo'lishi kerak. Namunaviy yechim ham shu tekshiruvdan o'tishi kerak.
+                  {t("Talaba kodi (BEGIN … COMMIT) A va B sessiyalarida bir vaqtda bajariladi; natija ketma-ket ikki marta bajarilgandagiga teng bo'lishi kerak. Namunaviy yechim ham shu tekshiruvdan o'tishi kerak.")}
                 </p>
                 {errors.concurrent ? (
                   <p className="text-xs text-destructive" role="alert">
@@ -425,12 +422,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 ) : null}
               </div>
               <div className="grid gap-1.5">
-                <span className="text-sm font-medium">Tekshiruv so'rovlari (migratsiya, view, funksiya va trigger laboratoriyalari, ixtiyoriy)</span>
+                <span className="text-sm font-medium">{t("Tekshiruv so'rovlari (migratsiya, view, funksiya va trigger laboratoriyalari, ixtiyoriy)")}</span>
                 <p className="text-xs text-muted-foreground">
-                  Boshlang'ich jadvallar — eski sxema va ma'lumotlar, namunaviy yechim — migratsiya. Talaba migratsiyasidan keyin
-                  jadvallar va shu so'rovlar natijasi namunaviy migratsiyadagi bilan solishtiriladi; yashirin ma'lumotlar berilsa,
-                  ularda ham. Bir nechta buyruq bo'lishi mumkin, oxirgisi SELECT (masalan, UPDATE dan keyin trigger yozgan jadvalni o'qish); ular orqaga qaytariladi. Saqlashda tekshiriladi: so'rov namunaviy yechimdan keyin ishlaydi va usiz boshqacha natija beradi.
-                  Talabaga ko'rinadi.
+                  {t("Boshlang'ich jadvallar — eski sxema va ma'lumotlar, namunaviy yechim — migratsiya. Talaba migratsiyasidan keyin jadvallar va shu so'rovlar natijasi namunaviy migratsiyadagi bilan solishtiriladi; yashirin ma'lumotlar berilsa, ularda ham. Bir nechta buyruq bo'lishi mumkin, oxirgisi SELECT (masalan, UPDATE dan keyin trigger yozgan jadvalni o'qish); ular orqaga qaytariladi. Saqlashda tekshiriladi: so'rov namunaviy yechimdan keyin ishlaydi va usiz boshqacha natija beradi. Talabaga ko'rinadi.")}
                 </p>
                 <CheckQueriesEditor value={checkQueries} onChange={setCheckQueries} />
                 {errors.check_queries ? (
@@ -440,11 +434,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
                 ) : null}
               </div>
               <div className="grid gap-1.5">
-                <span className="text-sm font-medium">Cheklov sinovlari (yaxlitlik cheklovlari laboratoriyasi, ixtiyoriy)</span>
+                <span className="text-sm font-medium">{t('Cheklov sinovlari (yaxlitlik cheklovlari laboratoriyasi, ixtiyoriy)')}</span>
                 <p className="text-xs text-muted-foreground">
-                  Talaba kodidan keyin har biri alohida bajariladi va orqaga qaytariladi. Hujumni cheklov rad etishi, to'g'ri
-                  ma'lumotni qabul qilishi kerak. Saqlashda tekshiriladi: hujum cheklovsiz o'tadi, namunaviy yechim esa
-                  barcha sinovdan o'tadi. Yashirin sinovlarning faqat soni talabaga ko'rinadi.
+                  {t("Talaba kodidan keyin har biri alohida bajariladi va orqaga qaytariladi. Hujumni cheklov rad etishi, to'g'ri ma'lumotni qabul qilishi kerak. Saqlashda tekshiriladi: hujum cheklovsiz o'tadi, namunaviy yechim esa barcha sinovdan o'tadi. Yashirin sinovlarning faqat soni talabaga ko'rinadi.")}
                 </p>
                 <ProbesEditor value={probes} onChange={setProbes} />
                 {errors.probes ? (
@@ -456,9 +448,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               {planQuery.trim() ? (
                 <FormField
                   id="lab_plan_forbidden"
-                  label="Rejada bo'lmasligi kerak"
+                  label={t("Rejada bo'lmasligi kerak")}
                   error={errors.plan_forbidden}
-                  hint="Vergul bilan: Seq Scan, Sort, Bitmap Heap Scan."
+                  hint={t('Vergul bilan: Seq Scan, Sort, Bitmap Heap Scan.')}
                 >
                   <Input
                     id="lab_plan_forbidden"
@@ -473,9 +465,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
           )}
           <FormField
             id="lab_topic"
-            label="Mavzu"
+            label={t('Mavzu')}
             error={errors.topic}
-            hint="Talabaning o'quv yo'li (mavzular bo'yicha o'zlashtirish va tavsiya) shu bo'yicha hisoblanadi."
+            hint={t("Talabaning o'quv yo'li (mavzular bo'yicha o'zlashtirish va tavsiya) shu bo'yicha hisoblanadi.")}
           >
             <select
               id="lab_topic"
@@ -492,9 +484,9 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
           </FormField>
           <FormField
             id="lab_level"
-            label="Murakkablik darajasi"
+            label={t('Murakkablik darajasi')}
             error={errors.level}
-            hint="Modulda laboratoriyalar soddadan murakkabga joylanadi. Tartib va modul — «Modullar» oynasida."
+            hint={t('Modulda laboratoriyalar soddadan murakkabga joylanadi. Tartib va modul — «Modullar» oynasida.')}
           >
             <select
               id="lab_level"
@@ -502,7 +494,7 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               value={level}
               onChange={(event) => setLevel(event.target.value)}
             >
-              <option value="">Belgilanmagan</option>
+              <option value="">{t('Belgilanmagan')}</option>
               {LEVEL_LABELS.map((label, index) => (
                 <option key={label} value={index + 1}>
                   {index + 1} — {label}
@@ -518,31 +510,29 @@ export function LabDialog({ lab, onClose }: LabDialogProps) {
               onChange={(event) => setFindError(event.target.checked)}
             />
             <span>
-              «Xatoni top» mashqi
+              {t('«Xatoni top» mashqi')}
               <span className="block text-xs text-muted-foreground">
-                Shartda talabaga tayyor, lekin xatoli yechim (diagramma, dekompozitsiya yoki kod) beriladi. Natijasi
-                kompetentlikning «xatoni top» ko'rsatkichiga kiradi. Boshlang'ich kodi bor SQL laboratoriyasi
-                avtomatik shunday hisoblanadi.
+                {t("Shartda talabaga tayyor, lekin xatoli yechim (diagramma, dekompozitsiya yoki kod) beriladi. Natijasi kompetentlikning «xatoni top» ko'rsatkichiga kiradi. Boshlang'ich kodi bor SQL laboratoriyasi avtomatik shunday hisoblanadi.")}
               </span>
             </span>
           </label>
-          <FormField id="lab_groups" label="Guruhlar" error={errors.groups}>
+          <FormField id="lab_groups" label={t('Guruhlar')} error={errors.groups}>
             <CheckList
               idPrefix="lab-group"
               options={groups.map((group) => ({ id: group.id, label: group.name }))}
               selected={groupIds}
               onChange={setGroupIds}
-              emptyText="Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling."
+              emptyText={t('Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling.')}
               invalid={Boolean(errors.groups)}
             />
           </FormField>
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
-              Bekor qilish
+              {t('Bekor qilish')}
             </Button>
             <Button type="submit" size="lg" disabled={mutation.isPending || !title.trim() || !description.trim()}>
               {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              {mutation.isPending ? (kind === 'sql' ? 'Kod tekshirilmoqda…' : 'Saqlanmoqda…') : 'Saqlash'}
+              {mutation.isPending ? (kind === 'sql' ? t('Kod tekshirilmoqda…') : t('Saqlanmoqda…')) : t('Saqlash')}
             </Button>
           </DialogFooter>
         </form>

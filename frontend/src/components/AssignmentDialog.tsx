@@ -16,6 +16,7 @@ import { toLocalInputValue } from '@/lib/format'
 import { useGroupOptions } from '@/lib/groups'
 import { RUBRIC_TOTAL, rubricTotal, type CriterionDraft, type StageDraft } from '@/lib/rubric'
 import type { Assignment } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const ASSIGNMENT_FIELDS = ['title', 'description', 'grading_criteria', 'groups', 'deadline', 'rubric', 'stages'] as const
 
@@ -81,7 +82,7 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
         : api<Assignment>('/assignments/', { method: 'POST', body })
     },
     onSuccess: (saved) => {
-      toast.success(assignment ? 'Topshiriq saqlandi' : 'Topshiriq yaratildi')
+      toast.success(assignment ? t('Topshiriq saqlandi') : t('Topshiriq yaratildi'))
       queryClient.setQueryData(['assignment', saved.id], saved)
       void queryClient.invalidateQueries({ queryKey: ['assignments'] })
       onClose()
@@ -92,12 +93,12 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     const problems: Record<string, string> = {}
-    if (!groupIds.length) problems.groups = 'Kamida bitta guruh tanlang.'
-    if (!stages.length && (!deadline || Number.isNaN(new Date(deadline).getTime()))) problems.deadline = 'Muddatni kiriting.'
+    if (!groupIds.length) problems.groups = t('Kamida bitta guruh tanlang.')
+    if (!stages.length && (!deadline || Number.isNaN(new Date(deadline).getTime()))) problems.deadline = t('Muddatni kiriting.')
     if (stages.some((stage) => !stage.title.trim() || Number.isNaN(new Date(stage.deadline).getTime())))
-      problems.stages = "Har bir bosqichning sarlavhasi va muddatini kiriting."
+      problems.stages = t('Har bir bosqichning sarlavhasi va muddatini kiriting.')
     if (rubric.length && rubricTotal(rubric) !== RUBRIC_TOTAL)
-      problems.rubric = `Mezonlar ballari yig'indisi ${RUBRIC_TOTAL} bo'lishi kerak.`
+      problems.rubric = t("Mezonlar ballari yig'indisi {total} bo'lishi kerak.", { total: RUBRIC_TOTAL })
     setErrors(problems)
     if (!Object.keys(problems).length) mutation.mutate()
   }
@@ -106,11 +107,11 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
     <Dialog open onOpenChange={(open) => (!open && !mutation.isPending ? onClose() : undefined)}>
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{assignment ? 'Topshiriqni tahrirlash' : 'Yangi topshiriq'}</DialogTitle>
-          <DialogDescription>Talabalar yechimni SQL kod ko'rinishida topshiradi.</DialogDescription>
+          <DialogTitle>{assignment ? t('Topshiriqni tahrirlash') : t('Yangi topshiriq')}</DialogTitle>
+          <DialogDescription>{t("Talabalar yechimni SQL kod ko'rinishida topshiradi.")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <FormField id="assignment_title" label="Sarlavha" error={errors.title}>
+          <FormField id="assignment_title" label={t('Sarlavha')} error={errors.title}>
             <Input
               id="assignment_title"
               className="h-10"
@@ -119,7 +120,7 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
               onChange={(event) => setTitle(event.target.value)}
             />
           </FormField>
-          <FormField id="assignment_description" label="Topshiriq sharti" error={errors.description}>
+          <FormField id="assignment_description" label={t('Topshiriq sharti')} error={errors.description}>
             <Textarea
               id="assignment_description"
               className="max-h-64 min-h-28"
@@ -130,9 +131,9 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
           </FormField>
           <FormField
             id="assignment_criteria"
-            label="Yashirin baholash izohlari"
+            label={t('Yashirin baholash izohlari')}
             error={errors.grading_criteria}
-            hint="Ixtiyoriy. Talabaga ko'rinmaydi; AI tahlilida va ball taklif qilishda ishlatiladi. Talabaga ko'rinadigan mezonlar uchun pastdagi rubrikadan foydalaning."
+            hint={t("Ixtiyoriy. Talabaga ko'rinmaydi; AI tahlilida va ball taklif qilishda ishlatiladi. Talabaga ko'rinadigan mezonlar uchun pastdagi rubrikadan foydalaning.")}
           >
             <Textarea
               id="assignment_criteria"
@@ -142,13 +143,13 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
               onChange={(event) => setCriteria(event.target.value)}
             />
           </FormField>
-          <FormField id="assignment_groups" label="Guruhlar" error={errors.groups}>
+          <FormField id="assignment_groups" label={t('Guruhlar')} error={errors.groups}>
             <CheckList
               idPrefix="assignment-group"
               options={groups.map((group) => ({ id: group.id, label: group.name }))}
               selected={groupIds}
               onChange={setGroupIds}
-              emptyText="Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling."
+              emptyText={t('Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling.')}
               invalid={Boolean(errors.groups)}
             />
           </FormField>
@@ -164,9 +165,9 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
           {!stages.length ? (
             <FormField
               id="assignment_deadline"
-              label="Muddat"
+              label={t('Muddat')}
               error={errors.deadline}
-              hint="Muddatdan keyin topshirilgan yechim «kechikkan» deb belgilanadi."
+              hint={t('Muddatdan keyin topshirilgan yechim «kechikkan» deb belgilanadi.')}
             >
               <Input
                 id="assignment_deadline"
@@ -180,11 +181,11 @@ export function AssignmentDialog({ assignment, onClose }: AssignmentDialogProps)
           ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
-              Bekor qilish
+              {t('Bekor qilish')}
             </Button>
             <Button type="submit" size="lg" disabled={mutation.isPending || !title.trim() || !description.trim()}>
               {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Saqlash
+              {t('Saqlash')}
             </Button>
           </DialogFooter>
         </form>

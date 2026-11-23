@@ -5,15 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import type { LabCheckQuery, LabRunResult } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** Talabaga laboratoriya shartida: migratsiyadan keyin ilova bajaradigan so'rovlar */
 export function CheckQueryList({ queries }: { queries: LabCheckQuery[] }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        Kodingizdan keyin shu so'rovlar bajariladi (har biri alohida, keyin orqaga qaytariladi): ular xatosiz ishlashi va
-        to'g'ri natija berishi kerak. Mavjud ma'lumotlar yo'qolmasin — tekshiruv boshqa (yashirin) ma'lumotlarda ham
-        takrorlanadi.
+        {t("Kodingizdan keyin shu so'rovlar bajariladi (har biri alohida, keyin orqaga qaytariladi): ular xatosiz ishlashi va to'g'ri natija berishi kerak. Mavjud ma'lumotlar yo'qolmasin — tekshiruv boshqa (yashirin) ma'lumotlarda ham takrorlanadi.")}
       </p>
       <ul className="grid gap-3">
         {queries.map((query) => (
@@ -34,7 +33,7 @@ export function CheckQueryResults({ result }: { result: LabRunResult }) {
   return (
     <div className="grid gap-2 rounded-lg border p-3">
       <div className="text-sm font-medium">
-        Tekshiruv so'rovlari: {items.filter((item) => item.passed).length} / {items.length} ishladi
+        {t("Tekshiruv so'rovlari: {length} / {items} ishladi", { length: items.filter((item) => item.passed).length, items: items.length })}
       </div>
       <ul className="grid gap-1.5">
         {items.map((item) => (
@@ -71,12 +70,12 @@ export function CheckQueriesEditor({ value, onChange }: { value: LabCheckQuery[]
     <div className="grid gap-3">
       {value.map((query, index) => (
         <fieldset key={query.id} className="grid gap-2 rounded-lg border p-3">
-          <legend className="sr-only">{`${index + 1}-so'rov`}</legend>
+          <legend className="sr-only">{t("{value}-so'rov", { value: index + 1 })}</legend>
           <div className="flex items-center gap-2">
             <Input
-              aria-label={`${index + 1}-so'rov nomi`}
+              aria-label={t("{value}-so'rov nomi", { value: index + 1 })}
               className="flex-1"
-              placeholder="masalan: Familiya bo'yicha qidiruv"
+              placeholder={t("masalan: Familiya bo'yicha qidiruv")}
               maxLength={200}
               value={query.title}
               onChange={(event) => update(index, { title: event.target.value })}
@@ -85,16 +84,16 @@ export function CheckQueriesEditor({ value, onChange }: { value: LabCheckQuery[]
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={`${index + 1}-so'rovni o'chirish`}
+              aria-label={t("{value}-so'rovni o'chirish", { value: index + 1 })}
               onClick={() => onChange(value.filter((_, position) => position !== index))}
             >
               <Trash2 aria-hidden="true" />
             </Button>
           </div>
           <Textarea
-            aria-label={`${index + 1}-so'rov SQL'i`}
+            aria-label={t("{value}-so'rov SQL'i", { value: index + 1 })}
             className="max-h-40 min-h-14 font-mono text-sm md:text-xs"
-            placeholder="SELECT ism, familiya FROM mijoz ORDER BY id"
+            placeholder={t('SELECT ism, familiya FROM mijoz ORDER BY id')}
             maxLength={2000}
             spellCheck={false}
             autoCapitalize="none"
@@ -113,7 +112,7 @@ export function CheckQueriesEditor({ value, onChange }: { value: LabCheckQuery[]
         onClick={() => onChange([...value, newQuery(value)])}
       >
         <Plus aria-hidden="true" />
-        So'rov qo'shish
+        {t("So'rov qo'shish")}
       </Button>
     </div>
   )

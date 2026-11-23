@@ -61,6 +61,7 @@ import {
 import { LabProgressBadge } from '@/pages/LabsPage'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { t } from '@/lib/i18n'
 
 function BackLink() {
   return (
@@ -69,7 +70,7 @@ function BackLink() {
       className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
-      Virtual laboratoriya
+      {t('Virtual laboratoriya')}
     </Link>
   )
 }
@@ -99,9 +100,9 @@ function GivenModelCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Berilgan ER-model</CardTitle>
+        <CardTitle>{t('Berilgan ER-model')}</CardTitle>
         <CardDescription>
-          Shu model bo'yicha jadvallarni yarating. Diagrammani surib va kattalashtirib ko'rish mumkin.
+          {t("Shu model bo'yicha jadvallarni yarating. Diagrammani surib va kattalashtirib ko'rish mumkin.")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -126,7 +127,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Laboratoriya sharti</CardTitle>
+        <CardTitle>{t('Laboratoriya sharti')}</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
         {lab.module_detail?.exam ? <ExamBanner exam={lab.module_detail.exam} /> : null}
@@ -134,22 +135,22 @@ function ConditionCard({ lab }: { lab: Lab }) {
         {lab.kind === 'norm' && lab.norm_task ? <NormTaskView task={lab.norm_task} /> : null}
         {lab.kind === 'sql' && lab.plan_query?.trim() ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Tekshiriladigan so'rov</h3>
+            <h3 className="mb-1 text-sm font-medium">{t("Tekshiriladigan so'rov")}</h3>
             <p className="mb-2 text-xs text-muted-foreground">
-              Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.
+              {t("Kodingizdan keyin shu so'rovning rejasi (EXPLAIN) tekshiriladi. So'rovning o'zini yozish shart emas.")}
             </p>
             <SqlCode code={lab.plan_query.trim()} />
           </div>
         ) : null}
         {lab.check_queries?.length ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Tekshiruv so'rovlari</h3>
+            <h3 className="mb-1 text-sm font-medium">{t("Tekshiruv so'rovlari")}</h3>
             <CheckQueryList queries={lab.check_queries} />
           </div>
         ) : null}
         {probes ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Cheklovlar sinovlari</h3>
+            <h3 className="mb-1 text-sm font-medium">{t('Cheklovlar sinovlari')}</h3>
             <ProbeList probes={probes.visible} hidden={probes.hidden} />
           </div>
         ) : null}
@@ -157,7 +158,7 @@ function ConditionCard({ lab }: { lab: Lab }) {
           <details open className="group rounded-lg border bg-muted/30 p-3">
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium select-none">
               <BookOpen className="size-4 shrink-0" aria-hidden="true" />
-              Nazariya va namuna
+              {t('Nazariya va namuna')}
             </summary>
             <div className="mt-3">
               <TheoryText text={lab.theory} />
@@ -166,25 +167,24 @@ function ConditionCard({ lab }: { lab: Lab }) {
         ) : null}
         {lab.kind === 'er' && lab.setup_sql.trim() ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Berilgan baza</h3>
+            <h3 className="mb-1 text-sm font-medium">{t('Berilgan baza')}</h3>
             <p className="mb-2 text-xs text-muted-foreground">
-              Shu jadvallar va kalitlar bo'yicha ER-diagrammani tiklang: jadval — obyekt, tashqi kalit (FOREIGN KEY) —
-              bog'lanish. Faqat ikkita tashqi kalitdan iborat oraliq jadvalni ko'p-ko'p (M:N) bog'lanish sifatida chizing.
+              {t("Shu jadvallar va kalitlar bo'yicha ER-diagrammani tiklang: jadval — obyekt, tashqi kalit (FOREIGN KEY) — bog'lanish. Faqat ikkita tashqi kalitdan iborat oraliq jadvalni ko'p-ko'p (M:N) bog'lanish sifatida chizing.")}
             </p>
             <SqlCode code={lab.setup_sql.trim()} />
           </div>
         ) : null}
         {lab.kind !== 'sql' ? null : lab.setup_sql.trim() ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium">Tayyor jadvallar</h3>
+            <h3 className="mb-1 text-sm font-medium">{t('Tayyor jadvallar')}</h3>
             <p className="mb-2 text-xs text-muted-foreground">
-              Har bir ishga tushirishdan oldin baza shu holatga qaytariladi. Bu kodni qayta yozish shart emas.
+              {t('Har bir ishga tushirishdan oldin baza shu holatga qaytariladi. Bu kodni qayta yozish shart emas.')}
             </p>
             <SqlCode code={lab.setup_sql.trim()} />
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Tayyor jadvallar yo'q: har bir ishga tushirish bo'sh bazadan boshlanadi.
+            {t("Tayyor jadvallar yo'q: har bir ishga tushirish bo'sh bazadan boshlanadi.")}
           </p>
         )}
       </CardContent>
@@ -212,10 +212,10 @@ function MistakesSummary({ labId, group }: { labId: number; group: string }) {
         onClick={() => summary.mutate()}
       >
         {summary.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
-        AI xulosasi: keyingi darsda nima qilish kerak
+        {t('AI xulosasi: keyingi darsda nima qilish kerak')}
       </Button>
       {summary.data ? <p className="text-sm whitespace-pre-wrap">{summary.data.summary}</p> : null}
-      <p className="text-xs text-muted-foreground">AI'ga faqat shu hisobotdagi sonlar yuboriladi, talabalar ismi emas.</p>
+      <p className="text-xs text-muted-foreground">{t("AI'ga faqat shu hisobotdagi sonlar yuboriladi, talabalar ismi emas.")}</p>
     </div>
   )
 }
@@ -238,7 +238,7 @@ function MistakesCard({ lab }: { lab: Lab }) {
     content = (
       <EmptyState
         icon={TriangleAlert}
-        title={report.data.attempted ? "Noto'g'ri urinishlar yo'q" : 'Hali hech kim urinib ko\'rmagan'}
+        title={report.data.attempted ? t("Noto'g'ri urinishlar yo'q") : t("Hali hech kim urinib ko'rmagan")}
       />
     )
   } else {
@@ -246,9 +246,8 @@ function MistakesCard({ lab }: { lab: Lab }) {
     content = (
       <div className="grid gap-4">
         <p className="text-sm text-muted-foreground">
-          {data.attempted} / {data.students} talaba urinib ko'rgan, {data.solved} tasi yechgan,{' '}
-          <span className={data.stuck ? 'font-medium text-foreground' : ''}>{data.stuck} tasi hali qiynalmoqda</span>.
-          Noto'g'ri urinishlar: {data.wrong_attempts}.
+          {t("{attempted} / {students} talaba urinib ko'rgan, {solved} tasi yechgan,", { attempted: data.attempted, students: data.students, solved: data.solved })}{' '}
+          <span className={data.stuck ? 'font-medium text-foreground' : ''}>{t('{stuck} tasi hali qiynalmoqda', { stuck: data.stuck })}</span>{t(". Noto'g'ri urinishlar: {wrong_attempts}.", { wrong_attempts: data.wrong_attempts })}
         </p>
         <ol className="grid gap-3">
           {data.items.map((item, index) => (
@@ -256,14 +255,14 @@ function MistakesCard({ lab }: { lab: Lab }) {
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="min-w-0 break-words">
                   <span className="mr-1.5 text-xs text-muted-foreground">
-                    {item.kind === 'error' ? 'SQL xatosi' : 'Natija farqi'}
+                    {item.kind === 'error' ? t('SQL xatosi') : t('Natija farqi')}
                   </span>
                   {item.text}
                 </span>
                 <span className="shrink-0 text-right tabular-nums">
                   <span className="font-medium">{item.share}%</span>
                   <span className="block text-xs text-muted-foreground">
-                    {item.students} talaba · {item.attempts} urinish
+                    {t('{students} talaba · {attempts} urinish', { students: item.students, attempts: item.attempts })}
                   </span>
                 </span>
               </div>
@@ -287,19 +286,18 @@ function MistakesCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Eng ko'p uchraydigan xatolar</CardTitle>
+        <CardTitle>{t("Eng ko'p uchraydigan xatolar")}</CardTitle>
         <CardDescription>
-          Foiz — urinib ko'rgan talabalarning qanchasi shu xatoga kamida bir marta duch kelgani. Keyingi darsda
-          nimani qayta tushuntirish kerakligini ko'rsatadi.
+          {t("Foiz — urinib ko'rgan talabalarning qanchasi shu xatoga kamida bir marta duch kelgani. Keyingi darsda nimani qayta tushuntirish kerakligini ko'rsatadi.")}
         </CardDescription>
         {labGroups.length > 1 ? (
           <select
-            aria-label="Guruh"
+            aria-label={t('Guruh')}
             className="mt-2 h-9 justify-self-start rounded-md border bg-background px-2 text-sm"
             value={group}
             onChange={(event) => setGroup(event.target.value)}
           >
-            <option value="">Barcha guruhlar</option>
+            <option value="">{t('Barcha guruhlar')}</option>
             {labGroups.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -327,17 +325,17 @@ function ProgressCard({ lab }: { lab: Lab }) {
   } else if (progress.isError) {
     content = <ErrorState error={progress.error} onRetry={() => void progress.refetch()} />
   } else if (!progress.data.length) {
-    content = <EmptyState icon={Users} title="Bu guruhlarda hali talaba yo'q" />
+    content = <EmptyState icon={Users} title={t("Bu guruhlarda hali talaba yo'q")} />
   } else {
     content = (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Talaba</TableHead>
-            <TableHead>Guruh</TableHead>
-            <TableHead>Holat</TableHead>
-            <TableHead className="text-right">Ball</TableHead>
-            <TableHead>Oxirgi urinish</TableHead>
+            <TableHead>{t('Talaba')}</TableHead>
+            <TableHead>{t('Guruh')}</TableHead>
+            <TableHead>{t('Holat')}</TableHead>
+            <TableHead className="text-right">{t('Ball')}</TableHead>
+            <TableHead>{t('Oxirgi urinish')}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -350,7 +348,7 @@ function ProgressCard({ lab }: { lab: Lab }) {
                 <span className="inline-flex flex-wrap items-center gap-1.5">
                   <LabProgressBadge progress={{ attempts: student.attempts, solved: student.solved }} />
                   {student.solved ? (
-                    <span className="text-xs text-muted-foreground">{student.attempts} ta urinish</span>
+                    <span className="text-xs text-muted-foreground">{t('{attempts} ta urinish', { attempts: student.attempts })}</span>
                   ) : null}
                   {student.explanation ? <VerdictBadge verdict={student.explanation.verdict} /> : null}
                 </span>
@@ -369,12 +367,12 @@ function ProgressCard({ lab }: { lab: Lab }) {
                 <span className="inline-flex flex-wrap justify-end gap-2">
                   {student.code || student.diagram ? (
                     <Button variant="outline" size="lg" onClick={() => setViewing(student)}>
-                      {lab.kind === 'er' ? "Diagrammani ko'rish" : "Kodni ko'rish"}
+                      {lab.kind === 'er' ? t("Diagrammani ko'rish") : t("Kodni ko'rish")}
                     </Button>
                   ) : null}
                   {lab.kind === 'er' ? (
                     <Button variant="outline" size="lg" onClick={() => setProcessOf(student)}>
-                      Jarayon
+                      {t('Jarayon')}
                     </Button>
                   ) : null}
                 </span>
@@ -392,10 +390,10 @@ function ProgressCard({ lab }: { lab: Lab }) {
     <Card>
       <CardHeader>
         <CardTitle>
-          Talabalar natijalari
-          {progress.data?.length ? ` (${solved} / ${progress.data.length} bajargan)` : ''}
+          {t('Talabalar natijalari')}
+          {progress.data?.length ? t(' ({solved} / {length} bajargan)', { solved, length: progress.data.length }) : ''}
         </CardTitle>
-        <CardDescription>Laboratoriya berilgan guruhlardagi barcha talabalar.</CardDescription>
+        <CardDescription>{t('Laboratoriya berilgan guruhlardagi barcha talabalar.')}</CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
       <Dialog open={Boolean(viewing)} onOpenChange={(open) => (!open ? setViewing(null) : undefined)}>
@@ -404,8 +402,10 @@ function ProgressCard({ lab }: { lab: Lab }) {
             <DialogTitle>{viewing ? fullName(viewing) : ''}</DialogTitle>
             <DialogDescription>
               {viewing?.solved
-                ? `Talabaning to'g'ri deb topilgan ${lab.kind === 'er' ? 'diagrammasi' : 'kodi'}.`
-                : 'Talabaning oxirgi urinishi (hali bajarilmagan).'}
+                ? lab.kind === 'er'
+                  ? t("Talabaning to'g'ri deb topilgan diagrammasi.")
+                  : t("Talabaning to'g'ri deb topilgan kodi.")
+                : t('Talabaning oxirgi urinishi (hali bajarilmagan).')}
             </DialogDescription>
           </DialogHeader>
           {viewing?.grade ? (
@@ -422,10 +422,10 @@ function ProgressCard({ lab }: { lab: Lab }) {
           {viewing?.explanation ? (
             <div className="grid gap-1.5 rounded-lg border p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2 font-medium">
-                Talabaning tushuntirishi <VerdictBadge verdict={viewing.explanation.verdict} />
+                {t('Talabaning tushuntirishi')}{' '}<VerdictBadge verdict={viewing.explanation.verdict} />
               </div>
               <p className="whitespace-pre-wrap">{viewing.explanation.text}</p>
-              <p className="text-xs whitespace-pre-wrap text-muted-foreground">AI: {viewing.explanation.feedback}</p>
+              <p className="text-xs whitespace-pre-wrap text-muted-foreground">{t('AI: {feedback}', { feedback: viewing.explanation.feedback })}</p>
             </div>
           ) : null}
         </DialogContent>
@@ -433,10 +433,9 @@ function ProgressCard({ lab }: { lab: Lab }) {
       <Dialog open={Boolean(processOf)} onOpenChange={(open) => (!open ? setProcessOf(null) : undefined)}>
         <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{processOf ? `${fullName(processOf)}: chizish jarayoni` : ''}</DialogTitle>
+            <DialogTitle>{processOf ? t('{processOf}: chizish jarayoni', { processOf: fullName(processOf) }) : ''}</DialogTitle>
             <DialogDescription>
-              Diagramma qanday tartibda chizilgani va namunaga qanday yaqinlashgani. Slayder yoki grafikdagi nuqta bilan
-              istalgan qadamni ko'ring.
+              {t("Diagramma qanday tartibda chizilgani va namunaga qanday yaqinlashgani. Slayder yoki grafikdagi nuqta bilan istalgan qadamni ko'ring.")}
             </DialogDescription>
           </DialogHeader>
           {processOf ? <ErProcessView labId={lab.id} studentId={processOf.id} /> : null}
@@ -448,9 +447,9 @@ function ProgressCard({ lab }: { lab: Lab }) {
 
 function formatGap(minutes: number | null) {
   if (minutes === null) return '—'
-  if (minutes < 60) return `${Math.round(minutes)} daqiqa`
-  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} soat`
-  return `${Math.round(minutes / 60 / 24)} kun`
+  if (minutes < 60) return t('{minutes} daqiqa', { minutes: Math.round(minutes) })
+  if (minutes < 60 * 24) return t('{n} soat', { n: Math.round(minutes / 60) })
+  return t('{n} kun', { n: Math.round(minutes / 60 / 24) })
 }
 
 function SimilarWorkView({ work, kind }: { work: SimilarWork; kind: Lab['kind'] }) {
@@ -459,7 +458,7 @@ function SimilarWorkView({ work, kind }: { work: SimilarWork; kind: Lab['kind'] 
       <div className="text-sm">
         <span className="font-medium">{fullName(work)}</span>{' '}
         <span className="text-muted-foreground">
-          · {work.group} · {work.solved ? 'bajargan' : 'bajarmagan'}
+          · {work.group} · {work.solved ? t('bajargan') : t('bajarmagan')}
         </span>
       </div>
       {kind === 'er' && work.diagram ? <ErEditor value={work.diagram} /> : <SqlCode code={work.code} />}
@@ -481,8 +480,8 @@ function SimilarityCard({ lab }: { lab: Lab }) {
     content = (
       <EmptyState
         icon={ShieldCheck}
-        title="Shubhali o'xshash yechim topilmadi"
-        description={`${report.data.compared} ta talaba yechimi solishtirildi.`}
+        title={t("Shubhali o'xshash yechim topilmadi")}
+        description={t('{compared} ta talaba yechimi solishtirildi.', { compared: report.data.compared })}
       />
     )
   else
@@ -490,10 +489,10 @@ function SimilarityCard({ lab }: { lab: Lab }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Talabalar</TableHead>
-            <TableHead className="text-right">O'xshashlik</TableHead>
-            {lab.kind === 'sql' ? <TableHead className="text-right">Bir xil xato</TableHead> : null}
-            <TableHead className="text-right">Yechimlar orasidagi vaqt</TableHead>
+            <TableHead>{t('Talabalar')}</TableHead>
+            <TableHead className="text-right">{t("O'xshashlik")}</TableHead>
+            {lab.kind === 'sql' ? <TableHead className="text-right">{t('Bir xil xato')}</TableHead> : null}
+            <TableHead className="text-right">{t('Yechimlar orasidagi vaqt')}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -510,13 +509,13 @@ function SimilarityCard({ lab }: { lab: Lab }) {
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {Math.round(pair.score * 100)}%
-                <span className="block text-xs text-muted-foreground">{pair.shared} ta umumiy bo'lak</span>
+                <span className="block text-xs text-muted-foreground">{t("{shared} ta umumiy bo'lak", { shared: pair.shared })}</span>
               </TableCell>
               {lab.kind === 'sql' ? <TableCell className="text-right tabular-nums">{pair.shared_wrong || '—'}</TableCell> : null}
               <TableCell className="text-right tabular-nums">{formatGap(pair.gap_minutes)}</TableCell>
               <TableCell className="text-right">
                 <Button variant="outline" size="lg" onClick={() => setViewing(pair)}>
-                  Solishtirish
+                  {t('Solishtirish')}
                 </Button>
               </TableCell>
             </TableRow>
@@ -528,21 +527,26 @@ function SimilarityCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>O'xshash yechimlar{report.data?.pairs.length ? ` (${report.data.pairs.length})` : ''}</CardTitle>
+        <CardTitle>{t("O'xshash yechimlar")}{report.data?.pairs.length ? ` (${report.data.pairs.length})` : ''}</CardTitle>
         <CardDescription>
-          Ko'chirish belgisi: namunaviy yechimda yo'q, talabaning o'zi tanlagan qismlar (nomlar, yozilish uslubi, izohlar)
-          {lab.kind === 'sql' ? ' va bir xil noodatiy xato urinishlar' : ''} solishtiriladi. Bu dalil emas — ishlarni
-          ko'rib, talabalar bilan gaplashib aniqlang.
+          {lab.kind === 'sql'
+            ? t("Ko'chirish belgisi: namunaviy yechimda yo'q, talabaning o'zi tanlagan qismlar (nomlar, yozilish uslubi, izohlar) va bir xil noodatiy xato urinishlar solishtiriladi. Bu dalil emas — ishlarni ko'rib, talabalar bilan gaplashib aniqlang.")
+            : t("Ko'chirish belgisi: namunaviy yechimda yo'q, talabaning o'zi tanlagan qismlar (nomlar, yozilish uslubi, izohlar) solishtiriladi. Bu dalil emas — ishlarni ko'rib, talabalar bilan gaplashib aniqlang.")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
       <Dialog open={Boolean(viewing)} onOpenChange={(open) => (!open ? setViewing(null) : undefined)}>
         <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Yechimlarni solishtirish</DialogTitle>
+            <DialogTitle>{t('Yechimlarni solishtirish')}</DialogTitle>
             <DialogDescription>
               {viewing
-                ? `O'xshashlik ${Math.round(viewing.score * 100)}%${viewing.shared_wrong ? `, ${viewing.shared_wrong} ta bir xil xato urinish` : ''}.`
+                ? viewing.shared_wrong
+                  ? t("O'xshashlik {score}%, {count} ta bir xil xato urinish.", {
+                      score: Math.round(viewing.score * 100),
+                      count: viewing.shared_wrong,
+                    })
+                  : t("O'xshashlik {score}%.", { score: Math.round(viewing.score * 100) })
                 : ''}
             </DialogDescription>
           </DialogHeader>
@@ -569,7 +573,7 @@ function StaffView({ lab }: { lab: Lab }) {
   const duplicate = useMutation({
     mutationFn: () => api<Lab>(`/labs/${lab.id}/duplicate/`, { method: 'POST' }),
     onSuccess: (copy) => {
-      toast.success('Nusxa yaratildi: endi uni tahrirlang')
+      toast.success(t('Nusxa yaratildi: endi uni tahrirlang'))
       queryClient.setQueryData(['lab', copy.id], copy)
       void queryClient.invalidateQueries({ queryKey: ['labs'] })
       void navigate(`/labs/${copy.id}`)
@@ -580,7 +584,7 @@ function StaffView({ lab }: { lab: Lab }) {
   const remove = useMutation({
     mutationFn: () => api(`/labs/${lab.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Laboratoriya o'chirildi")
+      toast.success(t("Laboratoriya o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['labs'] })
       void navigate('/labs', { replace: true })
     },
@@ -595,20 +599,20 @@ function StaffView({ lab }: { lab: Lab }) {
       <BackLink />
       <PageHeader
         title={lab.title}
-        description={`${fullName(lab.author)} · Guruhlar: ${groupNames(lab.groups, groups)}`}
+        description={`${fullName(lab.author)} · ${t('Guruhlar: {groups}', { groups: groupNames(lab.groups, groups) })}`}
         actions={
           <>
             <Button variant="outline" size="lg" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
-              Tahrirlash
+              {t('Tahrirlash')}
             </Button>
             <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>
               <Copy aria-hidden="true" />
-              Nusxa olish
+              {t('Nusxa olish')}
             </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />
-              O'chirish
+              {t("O'chirish")}
             </Button>
           </>
         }
@@ -631,9 +635,9 @@ function StaffView({ lab }: { lab: Lab }) {
       {editing ? <LabDialog lab={lab} onClose={() => setEditing(false)} /> : null}
       <ConfirmDialog
         open={confirmingDelete}
-        title="Laboratoriyani o'chirish"
-        description={`«${lab.title}» va unga tegishli barcha talabalar urinishlari o'chiriladi.`}
-        confirmLabel="O'chirish"
+        title={t("Laboratoriyani o'chirish")}
+        description={t("«{title}» va unga tegishli barcha talabalar urinishlari o'chiriladi.", { title: lab.title })}
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmingDelete(false)}
@@ -648,10 +652,10 @@ function ErStaffCards({ lab }: { lab: Lab }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Namunaviy ER-diagramma</CardTitle>
+          <CardTitle>{t('Namunaviy ER-diagramma')}</CardTitle>
           <CardDescription>
-            Talabaga ko'rinmaydi. Talaba diagrammasi shu diagramma bilan solishtiriladi.
-            {lab.setup_sql.trim() ? ' Berilgan bazadan avtomatik hosil qilingan.' : ''}
+            {t("Talabaga ko'rinmaydi. Talaba diagrammasi shu diagramma bilan solishtiriladi.")}
+            {lab.setup_sql.trim() ? t(' Berilgan bazadan avtomatik hosil qilingan.') : ''}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -660,9 +664,9 @@ function ErStaffCards({ lab }: { lab: Lab }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Sinab ko'rish</CardTitle>
+          <CardTitle>{t("Sinab ko'rish")}</CardTitle>
           <CardDescription>
-            Namunani o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Bu yerdagi tekshirishlar saqlanmaydi.
+            {t("Namunani o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Bu yerdagi tekshirishlar saqlanmaydi.")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -680,22 +684,21 @@ function NormStaffCards({ lab }: { lab: Lab }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Hisoblangan javob</CardTitle>
+          <CardTitle>{t('Hisoblangan javob')}</CardTitle>
           <CardDescription>
-            Talabaga ko'rinmaydi. Algoritm hisoblagan: talaba javobi xuddi shu algoritmlar bilan tekshiriladi, shuning
-            uchun boshqa to'g'ri dekompozitsiya ham qabul qilinadi.
+            {t("Talabaga ko'rinmaydi. Algoritm hisoblagan: talaba javobi xuddi shu algoritmlar bilan tekshiriladi, shuning uchun boshqa to'g'ri dekompozitsiya ham qabul qilinadi.")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {reference ? (
             <div className="grid gap-1 font-mono text-sm">
-              <div>Nomzod kalitlar: {reference.keys.map((key) => `{${key.join(', ')}}`).join('; ')}</div>
-              <div>Hozirgi normal forma: {reference.normal_form}</div>
-              <div>Dekompozitsiya:</div>
+              <div>{t('Nomzod kalitlar: {keys}', { keys: reference.keys.map((key) => `{${key.join(', ')}}`).join('; ') })}</div>
+              <div>{t('Hozirgi normal forma: {normal_form}', { normal_form: reference.normal_form })}</div>
+              <div>{t('Dekompozitsiya:')}</div>
               <ul className="pl-4">
                 {reference.decomposition.map((relation, index) => (
                   <li key={index}>
-                    R{index + 1}({relation.join(', ')})
+                    {t('R{value}({relation})', { value: index + 1, relation: relation.join(', ') })}
                   </li>
                 ))}
               </ul>
@@ -706,8 +709,8 @@ function NormStaffCards({ lab }: { lab: Lab }) {
       {lab.norm_task && reference ? (
         <Card>
           <CardHeader>
-            <CardTitle>Sinab ko'rish</CardTitle>
-            <CardDescription>Javobni o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Saqlanmaydi.</CardDescription>
+            <CardTitle>{t("Sinab ko'rish")}</CardTitle>
+            <CardDescription>{t("Javobni o'zgartirib, tekshiruv qanday xabar berishini ko'ring. Saqlanmaydi.")}</CardDescription>
           </CardHeader>
           <CardContent>
             <NormLabRunner key={JSON.stringify(lab.norm_task)} labId={lab.id} task={lab.norm_task} initialAnswer={reference} />
@@ -723,24 +726,24 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Namunaviy yechim</CardTitle>
-          <CardDescription>Talabaga ko'rinmaydi. Talaba natijasi shu kod natijasi bilan solishtiriladi.</CardDescription>
+          <CardTitle>{t('Namunaviy yechim')}</CardTitle>
+          <CardDescription>{t("Talabaga ko'rinmaydi. Talaba natijasi shu kod natijasi bilan solishtiriladi.")}</CardDescription>
         </CardHeader>
         <CardContent>
           {lab.solution_sql?.trim() ? (
             <SqlCode code={lab.solution_sql.trim()} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Kiritilmagan: xatosiz ishlagan har qanday kod to'g'ri hisoblanadi.
+              {t("Kiritilmagan: xatosiz ishlagan har qanday kod to'g'ri hisoblanadi.")}
             </p>
           )}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Sinab ko'rish</CardTitle>
+          <CardTitle>{t("Sinab ko'rish")}</CardTitle>
           <CardDescription>
-            Laboratoriyani talaba ko'rgandek tekshirib ko'ring. Bu yerdagi ishga tushirishlar saqlanmaydi.
+            {t("Laboratoriyani talaba ko'rgandek tekshirib ko'ring. Bu yerdagi ishga tushirishlar saqlanmaydi.")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -757,9 +760,9 @@ function SqlStaffCards({ lab }: { lab: Lab }) {
       {lab.probes?.some((probe) => probe.hidden) ? (
         <Card>
           <CardHeader>
-            <CardTitle>Yashirin sinovlar</CardTitle>
+            <CardTitle>{t('Yashirin sinovlar')}</CardTitle>
             <CardDescription>
-              Talabaga faqat soni ko'rinadi: ko'rinadigan misollarga moslab yozilgan tor cheklovni ushlaydi.
+              {t("Talabaga faqat soni ko'rinadi: ko'rinadigan misollarga moslab yozilgan tor cheklovni ushlaydi.")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -781,9 +784,9 @@ function CoachCard({ labId, getWork }: { labId: number; getWork: () => LabWork }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Murabbiy</CardTitle>
+        <CardTitle>{t('Murabbiy')}</CardTitle>
         <CardDescription>
-          Savollar bilan yo'l ko'rsatadigan AI murabbiy. U namunaviy yechimni ko'rmaydi va tayyor javob bermaydi.
+          {t("Savollar bilan yo'l ko'rsatadigan AI murabbiy. U namunaviy yechimni ko'rmaydi va tayyor javob bermaydi.")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -800,8 +803,8 @@ function InterviewCard({ lab }: { lab: Lab }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Buyurtmachi talablari</CardTitle>
-          <CardDescription>Buyurtmachi bilan kelishilgan talablar. Shular asosida ER-diagramma chizing.</CardDescription>
+          <CardTitle>{t('Buyurtmachi talablari')}</CardTitle>
+          <CardDescription>{t('Buyurtmachi bilan kelishilgan talablar. Shular asosida ER-diagramma chizing.')}</CardDescription>
         </CardHeader>
         <CardContent>
           <RequirementList items={lab.interview.requirements ?? []} />
@@ -812,12 +815,9 @@ function InterviewCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Buyurtmachi bilan suhbat</CardTitle>
+        <CardTitle>{t('Buyurtmachi bilan suhbat')}</CardTitle>
         <CardDescription>
-          Shartda talablar ro'yxati yo'q: ularni buyurtmachidan (AI) o'zingiz aniqlaysiz. U faqat so'ralgan narsani,
-          texnik bo'lmagan tilda aytadi — kimlar va nimalar haqida ma'lumot saqlanishini, ular haqida nima yozilishini va
-          ular qanday bog'langanini («bittami yoki bir nechta?») so'rang. Barcha {lab.interview.total} ta talabni
-          aniqlashga harakat qiling.
+          {t("Shartda talablar ro'yxati yo'q: ularni buyurtmachidan (AI) o'zingiz aniqlaysiz. U faqat so'ralgan narsani, texnik bo'lmagan tilda aytadi — kimlar va nimalar haqida ma'lumot saqlanishini, ular haqida nima yozilishini va ular qanday bog'langanini («bittami yoki bir nechta?») so'rang. Barcha {total} ta talabni aniqlashga harakat qiling.", { total: lab.interview.total })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -871,7 +871,7 @@ function StudentView({ lab }: { lab: Lab }) {
         <BackLink />
         <PageHeader
           title={lab.title}
-          description={`O'qituvchi: ${fullName(lab.author)}`}
+          description={t("O'qituvchi: {author}", { author: fullName(lab.author) })}
           actions={<LabProgressBadge progress={progress} />}
         />
         <LabSteps lab={lab} />
@@ -880,10 +880,9 @@ function StudentView({ lab }: { lab: Lab }) {
           <InterviewCard lab={lab} />
           <Card>
             <CardHeader>
-              <CardTitle>Mening ER-diagrammam</CardTitle>
+              <CardTitle>{t('Mening ER-diagrammam')}</CardTitle>
               <CardDescription>
-                Obyektlar, atributlar va bog'lanishlarni chizing. Xohlagancha tekshirish mumkin; tayyor bo'lgach
-                baholashga topshiring.
+                {t("Obyektlar, atributlar va bog'lanishlarni chizing. Xohlagancha tekshirish mumkin; tayyor bo'lgach baholashga topshiring.")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -902,10 +901,9 @@ function StudentView({ lab }: { lab: Lab }) {
           {examActive ? null : (
           <Card>
             <CardHeader>
-              <CardTitle>O'zaro baholash</CardTitle>
+              <CardTitle>{t("O'zaro baholash")}</CardTitle>
               <CardDescription>
-                Laboratoriyani to'g'ri yechgach, guruhdoshlaringizning diagrammalarini rubrika bo'yicha baholang. Ikkala
-                tomon ham bir-birining ismini ko'rmaydi.
+                {t("Laboratoriyani to'g'ri yechgach, guruhdoshlaringizning diagrammalarini rubrika bo'yicha baholang. Ikkala tomon ham bir-birining ismini ko'rmaydi.")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -926,7 +924,7 @@ function StudentView({ lab }: { lab: Lab }) {
         <BackLink />
         <PageHeader
           title={lab.title}
-          description={`O'qituvchi: ${fullName(lab.author)}`}
+          description={t("O'qituvchi: {author}", { author: fullName(lab.author) })}
           actions={<LabProgressBadge progress={progress} />}
         />
         <LabSteps lab={lab} />
@@ -934,10 +932,9 @@ function StudentView({ lab }: { lab: Lab }) {
           <ConditionCard lab={lab} />
           <Card>
             <CardHeader>
-              <CardTitle>Mening javobim</CardTitle>
+              <CardTitle>{t('Mening javobim')}</CardTitle>
               <CardDescription>
-                Funksional bog'liqliklar bo'yicha kalitlarni, normal formani va dekompozitsiyani toping. Javob hisoblab
-                tekshiriladi: boshqa to'g'ri dekompozitsiya ham qabul qilinadi.
+                {t("Funksional bog'liqliklar bo'yicha kalitlarni, normal formani va dekompozitsiyani toping. Javob hisoblab tekshiriladi: boshqa to'g'ri dekompozitsiya ham qabul qilinadi.")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -965,7 +962,7 @@ function StudentView({ lab }: { lab: Lab }) {
       <BackLink />
       <PageHeader
         title={lab.title}
-        description={`O'qituvchi: ${fullName(lab.author)}`}
+        description={t("O'qituvchi: {author}", { author: fullName(lab.author) })}
         actions={<LabProgressBadge progress={progress} />}
       />
       <LabSteps lab={lab} />
@@ -974,9 +971,9 @@ function StudentView({ lab }: { lab: Lab }) {
         <ConditionCard lab={lab} />
         <Card>
           <CardHeader>
-            <CardTitle>Mening kodim</CardTitle>
+            <CardTitle>{t('Mening kodim')}</CardTitle>
             <CardDescription>
-              Kodni yozib, ishga tushiring. Xohlagancha urinish mumkin; tayyor bo'lgach baholashga topshiring.
+              {t("Kodni yozib, ishga tushiring. Xohlagancha urinish mumkin; tayyor bo'lgach baholashga topshiring.")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1013,11 +1010,11 @@ function LockedView({ blockedBy }: { blockedBy: { id: number; title: string } })
       <BackLink />
       <EmptyState
         icon={Lock}
-        title="Bu laboratoriya hali yopiq"
-        description={`Laboratoriyalar soddadan murakkabga ketma-ket ochiladi. Avval «${blockedBy.title}» laboratoriyasini yeching. Qiynalsangiz, o'sha laboratoriyada tavsiya so'rang.`}
+        title={t('Bu laboratoriya hali yopiq')}
+        description={t("Laboratoriyalar soddadan murakkabga ketma-ket ochiladi. Avval «{title}» laboratoriyasini yeching. Qiynalsangiz, o'sha laboratoriyada tavsiya so'rang.", { title: blockedBy.title })}
         action={
           <Button asChild size="lg">
-            <Link to={`/labs/${blockedBy.id}`}>«{blockedBy.title}» ga o'tish</Link>
+            <Link to={`/labs/${blockedBy.id}`}>{t("«{title}» ga o'tish", { title: blockedBy.title })}</Link>
           </Button>
         }
       />

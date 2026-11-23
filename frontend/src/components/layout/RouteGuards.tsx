@@ -7,10 +7,11 @@ import { useAuth } from '@/lib/auth'
 import type { Role } from '@/lib/types'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { t } from '@/lib/i18n'
 
 export function FullPageLoader() {
   return (
-    <div className="flex min-h-svh items-center justify-center" role="status" aria-label="Yuklanmoqda">
+    <div className="flex min-h-svh items-center justify-center" role="status" aria-label={t('Yuklanmoqda')}>
       <Loader2 className="size-6 animate-spin text-muted-foreground" />
     </div>
   )
@@ -36,9 +37,9 @@ export function RequireRole({ roles }: { roles: Role[] }) {
 export function RouteError() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-4 text-center" role="alert">
-      <p className="text-sm text-muted-foreground">Sahifani ochib bo'lmadi. Internet aloqasini tekshirib, sahifani yangilang.</p>
+      <p className="text-sm text-muted-foreground">{t("Sahifani ochib bo'lmadi. Internet aloqasini tekshirib, sahifani yangilang.")}</p>
       <Button variant="outline" onClick={() => window.location.reload()}>
-        Yangilash
+        {t('Yangilash')}
       </Button>
     </div>
   )

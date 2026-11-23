@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t } from '@/lib/i18n'
 
 /** Ishonch shkalasi: 1 — umuman ishonmayman, 5 — to'liq ishonaman */
 export const CONFIDENCE_LEVELS = [1, 2, 3, 4, 5] as const
@@ -7,13 +8,13 @@ export const CONFIDENCE_LEVELS = [1, 2, 3, 4, 5] as const
 export function confidenceNote(confidence: number | null, correct: boolean): string | null {
   if (confidence === null) return null
   if (confidence >= 4 && !correct) {
-    return "Javobingizga ishongan edingiz, lekin xato bor: qaysi taxminingiz noto'g'ri bo'lganini o'ylab ko'ring."
+    return t("Javobingizga ishongan edingiz, lekin xato bor: qaysi taxminingiz noto'g'ri bo'lganini o'ylab ko'ring.")
   }
   if (confidence <= 2 && correct) {
-    return "To'g'ri! Siz ishonmagan edingiz: nimaga shubhalanganingizni o'ylab ko'ring — bilimingiz o'zingiz o'ylagandan mustahkamroq."
+    return t("To'g'ri! Siz ishonmagan edingiz: nimaga shubhalanganingizni o'ylab ko'ring — bilimingiz o'zingiz o'ylagandan mustahkamroq.")
   }
-  if (confidence >= 4 && correct) return "To'g'ri, va siz buni oldindan to'g'ri baholadingiz."
-  if (confidence <= 2 && !correct) return "Shubhangiz o'rinli edi: xatoni toping va qayta tekshiring."
+  if (confidence >= 4 && correct) return t("To'g'ri, va siz buni oldindan to'g'ri baholadingiz.")
+  if (confidence <= 2 && !correct) return t("Shubhangiz o'rinli edi: xatoni toping va qayta tekshiring.")
   return null
 }
 

@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { api } from '@/lib/api'
 import type { Quiz, QuizAnalysis, QuizQuestionAnalysis, ScaleLabel, SurveyScaleAnalysis } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 function format(value: number | null | undefined, digits = 2) {
   return value === null || value === undefined ? '—' : value.toFixed(digits)
@@ -22,7 +23,7 @@ const VERDICT_VARIANT = { good: 'secondary', review: 'outline', replace: 'destru
 function AlphaTile({ name, alpha, interpretation, hint }: { name: string; alpha: number | null; interpretation: ScaleLabel | null; hint: string }) {
   return (
     <div className="rounded-xl border bg-card p-3">
-      <div className="text-sm text-muted-foreground">Ishonchlilik ({name})</div>
+      <div className="text-sm text-muted-foreground">{t('Ishonchlilik ({name})', { name })}</div>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-2xl font-semibold tabular-nums">{format(alpha, 3)}</span>
         {interpretation ? <Badge variant="outline">{interpretation.label}</Badge> : null}
@@ -38,17 +39,17 @@ function Choices({ question, groups }: { question: QuizQuestionAnalysis; groups:
     <details className="group mt-1">
       <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
-        Variantlar
+        {t('Variantlar')}
       </summary>
       <table className="mt-2 w-full text-xs">
         <thead className="text-muted-foreground">
           <tr>
-            <th className="py-1 text-left font-normal">Variant</th>
-            <th className="py-1 text-right font-normal">Hammasi</th>
+            <th className="py-1 text-left font-normal">{t('Variant')}</th>
+            <th className="py-1 text-right font-normal">{t('Hammasi')}</th>
             {groups ? (
               <>
-                <th className="py-1 text-right font-normal">Kuchli</th>
-                <th className="py-1 text-right font-normal">Kuchsiz</th>
+                <th className="py-1 text-right font-normal">{t('Kuchli')}</th>
+                <th className="py-1 text-right font-normal">{t('Kuchsiz')}</th>
               </>
             ) : null}
           </tr>
@@ -88,38 +89,38 @@ function TestView({ data }: { data: Extract<QuizAnalysis, { kind: 'test' }> }) {
           name={reliability.coefficient}
           alpha={reliability.alpha}
           interpretation={reliability.interpretation}
-          hint={`${reliability.questions} ta savol, ${data.students} ta talaba. 0.70 dan yuqori — maqbul.`}
+          hint={t('{questions} ta savol, {students} ta talaba. 0.70 dan yuqori — maqbul.', { questions: reliability.questions, students: data.students })}
         />
         <div className="rounded-xl border bg-card p-3">
-          <div className="text-sm text-muted-foreground">Umumiy ball</div>
+          <div className="text-sm text-muted-foreground">{t('Umumiy ball')}</div>
           <div className="mt-1 text-2xl font-semibold tabular-nums">
             {format(reliability.mean, 1)} <span className="text-base font-normal text-muted-foreground">/ {reliability.max}</span>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            SD {format(reliability.sd)} · o'lchov xatosi (SEM) {format(reliability.sem)}
+            {t("SD {sd} · o'lchov xatosi (SEM) {sem}", { sd: format(reliability.sd), sem: format(reliability.sem) })}
           </div>
         </div>
       </div>
       {data.students < data.reliable_students ? (
         <p className="text-xs text-muted-foreground">
-          {data.reliable_students} tadan kam talaba: ko'rsatkichlar dastlabki, savollarni faqat ular asosida almashtirmang.
+          {t("{reliable_students} tadan kam talaba: ko'rsatkichlar dastlabki, savollarni faqat ular asosida almashtirmang.", { reliable_students: data.reliable_students })}
         </p>
       ) : null}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Savol</TableHead>
-            <TableHead className="text-right" title="O'rtacha ball ulushi: qancha katta bo'lsa, shuncha oson">
-              Qiyinlik p
+            <TableHead>{t('Savol')}</TableHead>
+            <TableHead className="text-right" title={t("O'rtacha ball ulushi: qancha katta bo'lsa, shuncha oson")}>
+              {t('Qiyinlik p')}
             </TableHead>
-            <TableHead className="text-right" title="Savol bali va qolgan savollar yig'indisi korrelyatsiyasi">
-              Ajratish r
+            <TableHead className="text-right" title={t("Savol bali va qolgan savollar yig'indisi korrelyatsiyasi")}>
+              {t('Ajratish r')}
             </TableHead>
-            <TableHead className="text-right" title="Kuchli va kuchsiz 27% talabalar farqi">
-              D
+            <TableHead className="text-right" title={t('Kuchli va kuchsiz 27% talabalar farqi')}>
+              {t('D')}
             </TableHead>
-            <TableHead className="text-right">α olib tashlansa</TableHead>
-            <TableHead>Xulosa</TableHead>
+            <TableHead className="text-right">{t('α olib tashlansa')}</TableHead>
+            <TableHead>{t('Xulosa')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -163,15 +164,15 @@ function ScaleView({ scale }: { scale: SurveyScaleAnalysis }) {
         name={`Cronbach α · ${scale.label}`}
         alpha={scale.alpha}
         interpretation={scale.interpretation}
-        hint={`${scale.items.length} ta fikr, hammasiga javob bergan ${scale.students} ta talaba`}
+        hint={t('{length} ta fikr, hammasiga javob bergan {students} ta talaba', { length: scale.items.length, students: scale.students })}
       />
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Fikr</TableHead>
-            <TableHead className="text-right">O'rtacha (1-5)</TableHead>
-            <TableHead className="text-right">Bog'liqlik r</TableHead>
-            <TableHead className="text-right">α olib tashlansa</TableHead>
+            <TableHead>{t('Fikr')}</TableHead>
+            <TableHead className="text-right">{t("O'rtacha (1-5)")}</TableHead>
+            <TableHead className="text-right">{t("Bog'liqlik r")}</TableHead>
+            <TableHead className="text-right">{t('α olib tashlansa')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -217,14 +218,14 @@ export function QuizAnalysisCard({ quiz }: { quiz: Quiz }) {
           <p className="flex items-start gap-2 text-sm text-muted-foreground">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              Tadqiqotga rozi bo'lgan {data.students} ta talabaning javoblari tahlil qilindi
-              {data.excluded_no_consent ? ` (${data.excluded_no_consent} tasi kirmadi: rozilik yo'q)` : ''}.
+              {t("Tadqiqotga rozi bo'lgan {students} ta talabaning javoblari tahlil qilindi", { students: data.students })}
+              {data.excluded_no_consent ? t(" ({excluded_no_consent} tasi kirmadi: rozilik yo'q)", { excluded_no_consent: data.excluded_no_consent }) : ''}.
             </span>
           </p>
         ) : null}
         {!data.enough ? (
           <p className="text-sm text-muted-foreground">
-            Tahlil uchun kamida {data.min_students} ta talaba topshirgan va kamida 2 ta savol bo'lishi kerak.
+            {t("Tahlil uchun kamida {min_students} ta talaba topshirgan va kamida 2 ta savol bo'lishi kerak.", { min_students: data.min_students })}
           </p>
         ) : data.kind === 'test' ? (
           <TestView data={data} />
@@ -238,11 +239,11 @@ export function QuizAnalysisCard({ quiz }: { quiz: Quiz }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{survey ? "So'rovnoma ishonchliligi" : 'Test sifati (psixometrik tahlil)'}</CardTitle>
+        <CardTitle>{survey ? t("So'rovnoma ishonchliligi") : t('Test sifati (psixometrik tahlil)')}</CardTitle>
         <CardDescription>
           {survey
-            ? "Cronbach α — fikrlar bitta narsani izchil o'lchayotganini ko'rsatadi (0.70 dan yuqori — maqbul). Qolgan fikrlar bilan bog'liqligi past fikr boshqa narsani o'lchayotgan yoki teskari ifodalangan bo'lishi mumkin."
-            : "Dissertatsiyada test ishonchliligi va savollar sifati sifatida keltiriladi. p — qiyinlik (0.20-0.90 oralig'i yaxshi), r — ajratish (0.30 dan yuqori yaxshi, manfiy — kalitni tekshiring). Natija tadqiqot eksportida ham bor (testlar_tahlili.csv)."}
+            ? t("Cronbach α — fikrlar bitta narsani izchil o'lchayotganini ko'rsatadi (0.70 dan yuqori — maqbul). Qolgan fikrlar bilan bog'liqligi past fikr boshqa narsani o'lchayotgan yoki teskari ifodalangan bo'lishi mumkin.")
+            : t("Dissertatsiyada test ishonchliligi va savollar sifati sifatida keltiriladi. p — qiyinlik (0.20-0.90 oralig'i yaxshi), r — ajratish (0.30 dan yuqori yaxshi, manfiy — kalitni tekshiring). Natija tadqiqot eksportida ham bor (testlar_tahlili.csv).")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>

@@ -27,8 +27,9 @@ import { timeAgo, useDashboard } from '@/lib/dashboard'
 import { navItemsFor } from '@/lib/nav'
 import { ROLE_LABELS, type DashboardCard, type DashboardTone, type Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { localized, t } from '@/lib/i18n'
 
-const DESCRIPTIONS: Record<Role, Record<string, string>> = {
+const DESCRIPTIONS: Record<Role, Record<string, string>> = localized({
   admin: {
     '/users': "O'qituvchi va talabalar hisoblarini yaratish, bloklash.",
     '/groups': "Guruhlar va ularga o'qituvchilarni biriktirish.",
@@ -54,19 +55,21 @@ const DESCRIPTIONS: Record<Role, Record<string, string>> = {
     '/quizzes': "O'qituvchi bergan testlarni topshirish.",
     '/profile': 'Parol va Telegram bildirishnomalari.',
   },
-}
+})
 
 function roleSummary(user: ReturnType<typeof useUser>): string {
   if (user.role === 'student') {
     return user.group
-      ? `Guruhingiz: ${user.group.name}`
-      : 'Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.'
+      ? t('Guruhingiz: {name}', { name: user.group.name })
+      : t('Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.')
   }
   if (user.role === 'teacher') {
     const names = user.teaching_groups.map((group) => group.name).join(', ')
-    return names ? `Guruhlaringiz: ${names}` : 'Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling.'
+    return names
+      ? t('Guruhlaringiz: {names}', { names })
+      : t('Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling.')
   }
-  return `Rolingiz: ${ROLE_LABELS[user.role]}`
+  return t('Rolingiz: {role}', { role: ROLE_LABELS[user.role] })
 }
 
 // NiceAdmin info-kartalari: har biriga o'z rangli doira belgisi
@@ -86,7 +89,7 @@ function InfoCard({ card }: { card: DashboardCard }) {
   const body = (
     <Card className="h-full gap-0 pb-3 transition-shadow group-hover:shadow-[0_0_30px_rgb(1_41_112/18%)]">
       <CardHeader className="pb-1">
-        <CardTitle>{card.label}</CardTitle>
+        <CardTitle>{t(card.label)}</CardTitle>
       </CardHeader>
       <CardContent className="flex items-center gap-4 pt-2">
         <div className={cn('flex size-16 shrink-0 items-center justify-center rounded-full', style.tone)}>
@@ -116,13 +119,13 @@ const BADGE_TONE: Record<DashboardTone, string> = {
   danger: 'text-destructive',
 }
 
-const KIND_LABEL = { submission: 'Yechim', lab_attempt: 'Laboratoriya', quiz_attempt: 'Test' } as const
+const KIND_LABEL = localized({ submission: 'Yechim', lab_attempt: 'Laboratoriya', quiz_attempt: 'Test' } as const)
 
 function RecentActivity() {
   const { data } = useDashboard()
   const items = data?.recent ?? []
   if (items.length === 0) {
-    return <EmptyState icon={Inbox} title="Hali harakat yo'q" description="Yechim, laboratoriya yoki test topshirilganda shu yerda ko'rinadi." />
+    return <EmptyState icon={Inbox} title={t("Hali harakat yo'q")} description={t("Yechim, laboratoriya yoki test topshirilganda shu yerda ko'rinadi.")} />
   }
   return (
     <ol className="text-sm">
@@ -185,7 +188,7 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeader title={`Xush kelibsiz, ${fullName(user)}`} description={roleSummary(user)} />
+      <PageHeader title={t('Xush kelibsiz, {user}', { user: fullName(user) })} description={roleSummary(user)} />
 
       {dashboard.isError ? (
         <div className="mb-5">
@@ -195,7 +198,7 @@ export function HomePage() {
 
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="grid content-start gap-5 xl:col-span-2">
-          <section aria-label="Asosiy ko'rsatkichlar" className="grid gap-5 sm:grid-cols-2">
+          <section aria-label={t("Asosiy ko'rsatkichlar")} className="grid gap-5 sm:grid-cols-2">
             {dashboard.isPending
               ? Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-36 rounded-md" />)
               : dashboard.data?.cards.map((card) => <InfoCard key={card.key} card={card} />)}
@@ -204,13 +207,13 @@ export function HomePage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Faollik <span>| so'nggi 14 kun</span>
+                {t('Faollik')}{' '}<span>{t("| so'nggi 14 kun")}</span>
               </CardTitle>
               {dashboard.data ? (
                 <CardAction>
                   <Button variant="ghost" size="sm" onClick={() => setShowTable((value) => !value)} aria-pressed={showTable}>
                     {showTable ? <BarChart3 aria-hidden="true" /> : <Table2 aria-hidden="true" />}
-                    {showTable ? 'Grafik' : 'Jadval'}
+                    {showTable ? t('Grafik') : t('Jadval')}
                   </Button>
                 </CardAction>
               ) : null}
@@ -227,7 +230,7 @@ export function HomePage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Bo'limlar <span>| tez o'tish</span>
+                {t("Bo'limlar")}{' '}<span>{t("| tez o'tish")}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -239,7 +242,7 @@ export function HomePage() {
         <Card className="content-start self-start">
           <CardHeader>
             <CardTitle>
-              So'nggi harakatlar <span>| {user.role === 'student' ? 'sizniki' : 'talabalar'}</span>
+              {t("So'nggi harakatlar")}{' '}<span>| {user.role === 'student' ? t('sizniki') : t('talabalar')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

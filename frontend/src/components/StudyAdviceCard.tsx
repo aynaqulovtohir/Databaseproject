@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { api, errorMessage } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import type { StudyAdviceState } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** Qiynalayotgan laboratoriya: qaysi joyini tushunmagani va qanday bajarish bo'yicha tavsiya.
  *  Kamida bir necha noto'g'ri urinishdan keyin ko'rinadi. AI yoqilgan guruhda AI, nazorat guruhida xato turlari bo'yicha. */
@@ -38,7 +39,7 @@ export function StudyAdviceCard({ labId, solved }: { labId: number; solved: bool
       ) : (
         <Lightbulb aria-hidden="true" />
       )}
-      {request.isPending ? 'Tahlil qilinmoqda…' : advice ? "Yangi urinishlar bo'yicha yangilash" : 'Qayerda qiynalayotganimni tahlil qil'}
+      {request.isPending ? t('Tahlil qilinmoqda…') : advice ? t("Yangi urinishlar bo'yicha yangilash") : t('Qayerda qiynalayotganimni tahlil qil')}
     </Button>
   ) : null
 
@@ -46,15 +47,20 @@ export function StudyAdviceCard({ labId, solved }: { labId: number; solved: bool
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          Tavsiya: qanday bajarish kerak
+          {t('Tavsiya: qanday bajarish kerak')}
           {advice ? (
-            <Badge variant="outline">{advice.source === 'ai' ? 'AI tahlili' : "Xato turlari bo'yicha"}</Badge>
+            <Badge variant="outline">{advice.source === 'ai' ? t('AI tahlili') : t("Xato turlari bo'yicha")}</Badge>
           ) : null}
         </CardTitle>
         <CardDescription>
           {advice
-            ? `${advice.attempts} ta urinishingiz tahlili · ${formatDateTime(advice.created_at)}`
-            : `${data.wrong_attempts} ta urinishda xato bo'ldi. ${data.ai ? 'AI' : 'Tizim'} urinishlaringizni tahlil qilib, qaysi joyini tushunmaganingizni va laboratoriyani qanday bajarishni ko'rsatadi. Tayyor javob berilmaydi.`}
+            ? t('{attempts} ta urinishingiz tahlili · {created_at}', { attempts: advice.attempts, created_at: formatDateTime(advice.created_at) })
+            : t(
+                data.ai
+                  ? "{count} ta urinishda xato bo'ldi. AI urinishlaringizni tahlil qilib, qaysi joyini tushunmaganingizni va laboratoriyani qanday bajarishni ko'rsatadi. Tayyor javob berilmaydi."
+                  : "{count} ta urinishda xato bo'ldi. Tizim urinishlaringizni tahlil qilib, qaysi joyini tushunmaganingizni va laboratoriyani qanday bajarishni ko'rsatadi. Tayyor javob berilmaydi.",
+                { count: data.wrong_attempts },
+              )}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -63,7 +69,7 @@ export function StudyAdviceCard({ labId, solved }: { labId: number; solved: bool
             <p className="text-sm font-medium">{advice.summary}</p>
             {advice.struggles.length ? (
               <div className="grid gap-2">
-                <h3 className="text-sm font-semibold">Qiyinchiliklar</h3>
+                <h3 className="text-sm font-semibold">{t('Qiyinchiliklar')}</h3>
                 <ul className="grid gap-2">
                   {advice.struggles.map((item, index) => (
                     <li key={index} className="rounded-lg border bg-muted/30 p-3 text-sm">
@@ -75,7 +81,7 @@ export function StudyAdviceCard({ labId, solved }: { labId: number; solved: bool
               </div>
             ) : null}
             <div className="grid gap-2">
-              <h3 className="text-sm font-semibold">Qadamlar</h3>
+              <h3 className="text-sm font-semibold">{t('Qadamlar')}</h3>
               <ol className="list-decimal space-y-1 pl-5 text-sm">
                 {advice.steps.map((step, index) => (
                   <li key={index}>{step}</li>
@@ -86,7 +92,7 @@ export function StudyAdviceCard({ labId, solved }: { labId: number; solved: bool
               <div className="flex flex-wrap items-start gap-2 text-sm">
                 <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span>
-                  <span className="text-muted-foreground">Qayta o'qing: </span>
+                  <span className="text-muted-foreground">{t("Qayta o'qing:")}{' '}</span>
                   {advice.review.join('; ')}
                 </span>
               </div>

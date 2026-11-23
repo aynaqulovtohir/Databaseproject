@@ -1,6 +1,8 @@
 // Backend bilan ishlash: access token faqat xotirada turadi (localStorage'ga yozilmaydi),
 // refresh token esa httpOnly cookie'da, uni JavaScript o'qiy olmaydi.
 
+import { getLang, localized, t } from '@/lib/i18n'
+
 const API_BASE = '/api'
 
 let accessToken: string | null = null
@@ -63,7 +65,8 @@ interface RequestOptions {
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  // Server xabarlarini tanlangan tilda qaytarishi uchun
+  const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': getLang() }
   let body: BodyInit | undefined
   if (options.body instanceof FormData) {
     body = options.body
@@ -109,7 +112,7 @@ export async function apiFetch(path: string, options: RequestOptions = {}): Prom
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
-    throw new ApiError(0, null, "Serverga ulanib bo'lmadi. Internet aloqasini tekshiring.")
+    throw new ApiError(0, null, t("Serverga ulanib bo'lmadi. Internet aloqasini tekshiring."))
   }
   return response
 }
@@ -123,19 +126,19 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return data as T
 }
 
-const STATUS_MESSAGES: Record<number, string> = {
+const STATUS_MESSAGES: Record<number, string> = localized({
   401: 'Sessiya tugagan. Qayta kiring.',
   403: "Bu amal uchun ruxsatingiz yo'q.",
   404: "Ma'lumot topilmadi.",
   413: 'Yuborilgan fayl yoki matn juda katta.',
   429: "So'rovlar juda ko'p. Birozdan keyin qayta urinib ko'ring.",
-}
+})
 
-// Backend'ning ba'zi standart xabarlari inglizcha: ularni o'zbekchaga almashtiramiz
-const KNOWN_MESSAGES: Record<string, string> = {
+// Backend'ning ba'zi standart xabarlari inglizcha: ularni o'zbekchaga (so'ng tanlangan tilga) almashtiramiz
+const KNOWN_MESSAGES: Record<string, string> = localized({
   'No active account found with the given credentials': "Login yoki parol noto'g'ri.",
   'Authentication credentials were not provided.': 'Sessiya tugagan. Qayta kiring.',
-}
+})
 
 function firstString(value: unknown): string | null {
   if (typeof value === 'string') return value
@@ -153,19 +156,20 @@ function extractMessage(status: number, data: unknown): string {
     const record = data as Record<string, unknown>
     const detail = firstString(record.detail)
     if (detail) {
-      if (KNOWN_MESSAGES[detail]) return KNOWN_MESSAGES[detail]
+      if (Object.hasOwn(KNOWN_MESSAGES, detail)) return KNOWN_MESSAGES[detail]
       // Limit xabari inglizcha keladi ("Request was throttled...")
       if (status === 429 && detail.startsWith('Request was throttled')) return STATUS_MESSAGES[429]
-      return detail
+      // Serverning o'zbekcha xabari lug'atda bo'lsa, tanlangan tilga o'giriladi
+      return t(detail)
     }
     // Maydon xatolari: {"username": ["..."]}
     for (const value of Object.values(record)) {
       const message = firstString(value)
-      if (message) return message
+      if (message) return t(message)
     }
   }
-  if (status >= 500) return "Serverda xato yuz berdi. Keyinroq qayta urinib ko'ring."
-  return STATUS_MESSAGES[status] ?? `Xato yuz berdi (${status}).`
+  if (status >= 500) return t("Serverda xato yuz berdi. Keyinroq qayta urinib ko'ring.")
+  return STATUS_MESSAGES[status] ?? t('Xato yuz berdi ({status}).', { status })
 }
 
 /** Forma maydonlari bo'yicha xatolar: {"username": "Bu login band"} */
@@ -174,7 +178,7 @@ export function fieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ApiError && error.data && typeof error.data === 'object' && !Array.isArray(error.data)) {
     for (const [field, value] of Object.entries(error.data as Record<string, unknown>)) {
       const message = firstString(value)
-      if (message && field !== 'detail') result[field] = message
+      if (message && field !== 'detail') result[field] = t(message)
     }
   }
   return result
@@ -182,5 +186,5 @@ export function fieldErrors(error: unknown): Record<string, string> {
 
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
-  return 'Kutilmagan xato yuz berdi.'
+  return t('Kutilmagan xato yuz berdi.')
 }

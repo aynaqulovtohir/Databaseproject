@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useGroupOptions } from '@/lib/groups'
 import type { RiskLevel, RiskReport } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** Daraja belgisi: ikonka + matn (faqat rangga tayanmaydi) */
 function LevelBadge({ level, label }: { level: RiskLevel; label: string }) {
@@ -54,7 +55,7 @@ export function RiskPage() {
   if (isPending || (groupId && report.isPending)) {
     content = <ListSkeleton />
   } else if (!groups.length) {
-    content = <EmptyState icon={ShieldAlert} title="Hali guruh yo'q" description="Erta ogohlantirish o'zingiz o'qitadigan guruhlar bo'yicha hisoblanadi." />
+    content = <EmptyState icon={ShieldAlert} title={t("Hali guruh yo'q")} description={t("Erta ogohlantirish o'zingiz o'qitadigan guruhlar bo'yicha hisoblanadi.")} />
   } else if (report.isError) {
     content = <ErrorState error={report.error} onRetry={() => void report.refetch()} />
   } else if (report.data) {
@@ -66,8 +67,14 @@ export function RiskPage() {
         <CardHeader>
           <CardTitle>{data.group.name}</CardTitle>
           <CardDescription>
-            Yuqori xavf: {counts.high} · O'rta: {counts.medium} · Past: {counts.low} · Xavf yo'q: {counts.none}. Guruhda{' '}
-            {data.labs} ta laboratoriya, yechilganlar medianasi — {data.median_solved}.
+            {t("Yuqori xavf: {high} · O'rta: {medium} · Past: {low} · Xavf yo'q: {none}. Guruhda {labs} ta laboratoriya, yechilganlar medianasi — {median_solved}.", {
+              high: counts.high,
+              medium: counts.medium,
+              low: counts.low,
+              none: counts.none,
+              labs: data.labs,
+              median_solved: data.median_solved,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -76,11 +83,11 @@ export function RiskPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Talaba</TableHead>
-                    <TableHead>Xavf</TableHead>
-                    <TableHead>Sabablar</TableHead>
-                    <TableHead>Yechgan</TableHead>
-                    <TableHead>Oxirgi faollik</TableHead>
+                    <TableHead>{t('Talaba')}</TableHead>
+                    <TableHead>{t('Xavf')}</TableHead>
+                    <TableHead>{t('Sabablar')}</TableHead>
+                    <TableHead>{t('Yechgan')}</TableHead>
+                    <TableHead>{t('Oxirgi faollik')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -111,7 +118,7 @@ export function RiskPage() {
               </Table>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Guruhda talaba yo'q.</p>
+            <p className="text-sm text-muted-foreground">{t("Guruhda talaba yo'q.")}</p>
           )}
         </CardContent>
       </Card>
@@ -121,12 +128,12 @@ export function RiskPage() {
   return (
     <>
       <PageHeader
-        title="Erta ogohlantirish"
-        description="E'tibor kerak bo'lgan talabalar: uzoq vaqt faol emas, guruhdan orqada, bir laboratoriyada qolib ketgan, past o'zlashtirish yoki test natijasi, AI maslahatlariga haddan tashqari tayanish. Bu baho emas — qaror o'qituvchida. Telegram'ni bog'lagan o'qituvchiga haftasiga bir marta yuqori xavfli talabalar ro'yxati yuboriladi."
+        title={t('Erta ogohlantirish')}
+        description={t("E'tibor kerak bo'lgan talabalar: uzoq vaqt faol emas, guruhdan orqada, bir laboratoriyada qolib ketgan, past o'zlashtirish yoki test natijasi, AI maslahatlariga haddan tashqari tayanish. Bu baho emas — qaror o'qituvchida. Telegram'ni bog'lagan o'qituvchiga haftasiga bir marta yuqori xavfli talabalar ro'yxati yuboriladi.")}
         actions={
           groups.length > 1 ? (
             <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Guruh</span>
+              <span className="text-muted-foreground">{t('Guruh')}</span>
               <select className="h-10 rounded-md border bg-background px-2" value={groupId} onChange={(event) => setChosen(event.target.value)}>
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>

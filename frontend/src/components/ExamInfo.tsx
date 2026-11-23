@@ -3,12 +3,13 @@ import { Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/format'
 import type { LabExamInfo } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const STATE_LABELS: Record<LabExamInfo['state'], string> = {
+const STATE_LABELS: Record<LabExamInfo['state'], string> = localized({
   upcoming: 'Imtihon kutilmoqda',
   active: 'Imtihon davom etmoqda',
   finished: 'Imtihon tugagan',
-}
+})
 
 /** Modul sarlavhasi yonida: imtihon holati va vaqti */
 export function ExamBadge({ exam }: { exam: LabExamInfo }) {
@@ -24,10 +25,15 @@ export function ExamBadge({ exam }: { exam: LabExamInfo }) {
 export function ExamBanner({ exam }: { exam: LabExamInfo }) {
   const text =
     exam.state === 'active'
-      ? `Imtihon ${formatDateTime(exam.ends_at)} da tugaydi. Imtihon davomida AI yordami, murabbiy va o'zaro baholash o'chirilgan; ball avtomatik qo'yiladi, tuzatilgan diagramma imtihon tugagach ko'rsatiladi.`
+      ? t(
+          "Imtihon {time} da tugaydi. Imtihon davomida AI yordami, murabbiy va o'zaro baholash o'chirilgan; ball avtomatik qo'yiladi, tuzatilgan diagramma imtihon tugagach ko'rsatiladi.",
+          { time: formatDateTime(exam.ends_at) },
+        )
       : exam.state === 'finished'
-        ? `Imtihon ${formatDateTime(exam.ends_at)} da tugagan: yechimni ko'rishingiz mumkin, lekin endi tekshirib yoki topshirib bo'lmaydi.`
-        : `Imtihon ${formatDateTime(exam.starts_at)} da boshlanadi.`
+        ? t("Imtihon {time} da tugagan: yechimni ko'rishingiz mumkin, lekin endi tekshirib yoki topshirib bo'lmaydi.", {
+            time: formatDateTime(exam.ends_at),
+          })
+        : t('Imtihon {time} da boshlanadi.', { time: formatDateTime(exam.starts_at) })
   return (
     <div
       className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"

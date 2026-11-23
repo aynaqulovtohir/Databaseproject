@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { ErChiTest, ErProcessStatistics, ExperimentCohort } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const COHORTS: { key: ExperimentCohort; color: string }[] = [
   { key: 'experimental', color: 'var(--series-1)' },
@@ -29,12 +30,12 @@ function ChiLine({ title, test }: { title: string; test: ErChiTest | null }) {
       <span className="font-medium">{title}: </span>
       {test ? (
         <>
-          χ²({test.df}) = {test.chi2.toFixed(2)}, {pText(test.p)}, Kramer V = {test.cramers_v.toFixed(2)}
-          {test.effect_label ? ` (${test.effect_label})` : ''} — {test.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
-          {test.reliable ? '' : ' · kutilgan son 5 dan kam, natija taxminiy'}
+          χ²({test.df}) = {test.chi2.toFixed(2)}, {pText(test.p)}{t(', Kramer V = {cramers_v}', { cramers_v: test.cramers_v.toFixed(2) })}
+          {test.effect_label ? ` (${test.effect_label})` : ''} — {test.significant ? t('ahamiyatli') : t('ahamiyatsiz')}
+          {test.reliable ? '' : t(' · kutilgan son 5 dan kam, natija taxminiy')}
         </>
       ) : (
-        <span className="text-muted-foreground">ma'lumot kam</span>
+        <span className="text-muted-foreground">{t("ma'lumot kam")}</span>
       )}
     </li>
   )
@@ -50,11 +51,11 @@ function CurvesChart({ data }: { data: ErProcessStatistics }) {
 
   return (
     <div className="grid gap-2">
-      <ul className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label="Belgilar">
+      <ul className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label={t('Belgilar')}>
         {series.map((item) => (
           <li key={item.key} className="flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded-full" style={{ background: item.color }} aria-hidden="true" />
-            {data.cohorts[item.key]} (n = {data.cohort_comparison.curves[item.key].n})
+            {t('{value} (n = {n})', { value: data.cohorts[item.key], n: data.cohort_comparison.curves[item.key].n })}
           </li>
         ))}
       </ul>
@@ -63,7 +64,7 @@ function CurvesChart({ data }: { data: ErProcessStatistics }) {
           viewBox={`0 0 ${CHART.width} ${CHART.height}`}
           className="w-full min-w-[30rem]"
           role="img"
-          aria-label="Namunaga moslik: ishlash vaqtining ulushi bo'yicha"
+          aria-label={t("Namunaga moslik: ishlash vaqtining ulushi bo'yicha")}
         >
           {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
             <g key={tick} className="text-muted-foreground">
@@ -82,7 +83,7 @@ function CurvesChart({ data }: { data: ErProcessStatistics }) {
               fontSize={11}
               className="fill-muted-foreground"
             >
-              {tick === 0 ? 'boshlanishi' : tick === 1 ? 'oxiri' : 'yarmi'}
+              {tick === 0 ? t('boshlanishi') : tick === 1 ? t('oxiri') : t('yarmi')}
             </text>
           ))}
           {series.map((item) => {
@@ -119,8 +120,8 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
     content = (
       <EmptyState
         icon={History}
-        title="Chizish jarayoni hali yozilmagan"
-        description="Talabalar ER laboratoriyalarini bajargach (tadqiqotga rozi bo'lganlari) shu yerda tahlil paydo bo'ladi."
+        title={t('Chizish jarayoni hali yozilmagan')}
+        description={t("Talabalar ER laboratoriyalarini bajargach (tadqiqotga rozi bo'lganlari) shu yerda tahlil paydo bo'ladi.")}
       />
     )
   } else {
@@ -130,7 +131,7 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
       <div className="grid gap-6">
         <div className="grid gap-1 text-sm">
           <p className="text-muted-foreground">
-            {data.works} ta ish, {data.students} ta talaba.
+            {t('{works} ta ish, {students} ta talaba.', { works: data.works, students: data.students })}
           </p>
           <ul className="list-disc space-y-0.5 pl-5">
             {data.conclusions.map((line) => (
@@ -140,16 +141,16 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
         </div>
 
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">Strategiyalar va natija</h3>
+          <h3 className="text-sm font-medium">{t('Strategiyalar va natija')}</h3>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Strategiya</TableHead>
-                <TableHead className="text-right">Ishlar</TableHead>
-                <TableHead className="text-right">Tajriba</TableHead>
-                <TableHead className="text-right">Nazorat</TableHead>
-                <TableHead className="text-right">O'rtacha baho</TableHead>
-                <TableHead className="text-right">Yechganlar</TableHead>
+                <TableHead>{t('Strategiya')}</TableHead>
+                <TableHead className="text-right">{t('Ishlar')}</TableHead>
+                <TableHead className="text-right">{t('Tajriba')}</TableHead>
+                <TableHead className="text-right">{t('Nazorat')}</TableHead>
+                <TableHead className="text-right">{t("O'rtacha baho")}</TableHead>
+                <TableHead className="text-right">{t('Yechganlar')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -168,46 +169,45 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
             </TableBody>
           </Table>
           <ul className="grid gap-0.5 text-xs">
-            <ChiLine title="Strategiya × yechildi" test={strategies.solved_test} />
+            <ChiLine title={t('Strategiya × yechildi')} test={strategies.solved_test} />
             <li>
-              <span className="font-medium">Strategiyalar bo'yicha baholar (Kraskel–Uollis): </span>
+              <span className="font-medium">{t("Strategiyalar bo'yicha baholar (Kraskel–Uollis):")}{' '}</span>
               {strategies.grade_test ? (
                 <>
-                  H({strategies.grade_test.df}) = {strategies.grade_test.h.toFixed(2)}, {pText(strategies.grade_test.p)}, ε² ={' '}
+                  {t('H({df}) = {h},', { df: strategies.grade_test.df, h: strategies.grade_test.h.toFixed(2) })}{' '}{pText(strategies.grade_test.p)}, ε² ={' '}
                   {strategies.grade_test.epsilon2.toFixed(2)}
                   {strategies.grade_test.effect_label ? ` (${strategies.grade_test.effect_label})` : ''} —{' '}
-                  {strategies.grade_test.significant ? 'ahamiyatli' : 'ahamiyatsiz'}
+                  {strategies.grade_test.significant ? t('ahamiyatli') : t('ahamiyatsiz')}
                 </>
               ) : (
-                <span className="text-muted-foreground">ma'lumot kam (kamida ikki strategiyada 3 tadan baho)</span>
+                <span className="text-muted-foreground">{t("ma'lumot kam (kamida ikki strategiyada 3 tadan baho)")}</span>
               )}
             </li>
-            <ChiLine title="Strategiya × guruh (AI ta'siri)" test={strategies.cohort_test} />
+            <ChiLine title={t("Strategiya × guruh (AI ta'siri)")} test={strategies.cohort_test} />
           </ul>
         </section>
 
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">Namunaga yaqinlashish: tajriba va nazorat guruhlari</h3>
+          <h3 className="text-sm font-medium">{t('Namunaga yaqinlashish: tajriba va nazorat guruhlari')}</h3>
           <p className="text-xs text-muted-foreground">
-            Har bir ishning vaqti 0–100% ga keltirilgan; chiziq — shu paytgacha erishilgan moslikning o'rtachasi.
+            {t("Har bir ishning vaqti 0–100% ga keltirilgan; chiziq — shu paytgacha erishilgan moslikning o'rtachasi.")}
           </p>
           <CurvesChart data={data} />
         </section>
 
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">Jarayon ko'rsatkichlari: tajriba va nazorat</h3>
+          <h3 className="text-sm font-medium">{t("Jarayon ko'rsatkichlari: tajriba va nazorat")}</h3>
           <p className="text-xs text-muted-foreground">
-            Har bir talaba bitta kuzatuv (bir nechta laboratoriyada ishlagan bo'lsa, o'rtachasi). Mezon taqsimot va
-            dispersiyalarga qarab avtomatik tanlanadi.
+            {t("Har bir talaba bitta kuzatuv (bir nechta laboratoriyada ishlagan bo'lsa, o'rtachasi). Mezon taqsimot va dispersiyalarga qarab avtomatik tanlanadi.")}
           </p>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Ko'rsatkich</TableHead>
-                <TableHead>Mezon</TableHead>
-                <TableHead className="text-right">Statistika</TableHead>
-                <TableHead className="text-right">p</TableHead>
-                <TableHead className="text-right">Effekt</TableHead>
+                <TableHead>{t("Ko'rsatkich")}</TableHead>
+                <TableHead>{t('Mezon')}</TableHead>
+                <TableHead className="text-right">{t('Statistika@@ustun')}</TableHead>
+                <TableHead className="text-right">{t('p')}</TableHead>
+                <TableHead className="text-right">{t('Effekt')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -218,7 +218,7 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
                     <>
                       <div>{item.label}</div>
                       <div className="text-xs font-normal text-muted-foreground tabular-nums">
-                        tajriba {item.experimental.mean ?? '—'} (n = {item.experimental.n}) · nazorat {item.control.mean ?? '—'} (n ={' '}
+                        {t('tajriba')}{' '}{item.experimental.mean ?? '—'}{' '}{t('(n = {n}) · nazorat', { n: item.experimental.n })}{' '}{item.control.mean ?? '—'}{' '}{t('(n =')}{' '}
                         {item.control.n})
                       </div>
                     </>
@@ -231,12 +231,12 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
         </section>
 
         <section className="grid gap-2">
-          <h3 className="text-sm font-medium">Strategiya o'zgarishi: birinchi → oxirgi laboratoriya</h3>
+          <h3 className="text-sm font-medium">{t("Strategiya o'zgarishi: birinchi → oxirgi laboratoriya")}</h3>
           {transitions.students ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Birinchisida \ oxirgisida</TableHead>
+                  <TableHead>{t('Birinchisida \\ oxirgisida')}</TableHead>
                   {transitions.strategies.map((item) => (
                     <TableHead key={item.strategy} className="max-w-40 text-right whitespace-normal">
                       {item.label}
@@ -258,7 +258,7 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">Kamida ikkita ER laboratoriyasida ishlagan talaba hali yo'q.</p>
+            <p className="text-sm text-muted-foreground">{t("Kamida ikkita ER laboratoriyasida ishlagan talaba hali yo'q.")}</p>
           )}
         </section>
       </div>
@@ -269,17 +269,16 @@ export function ErProcessStatisticsCard({ groupId }: { groupId: string }) {
     <Card>
       <CardHeader className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1.5">
-          <CardTitle>ER-diagramma chizish jarayoni</CardTitle>
+          <CardTitle>{t('ER-diagramma chizish jarayoni')}</CardTitle>
           <CardDescription>
-            Talabalar qanday strategiya bilan loyihalaydi, AI jarayonni qanday o'zgartiradi. Faqat tadqiqotga rozi
-            bo'lgan talabalar.
+            {t("Talabalar qanday strategiya bilan loyihalaydi, AI jarayonni qanday o'zgartiradi. Faqat tadqiqotga rozi bo'lgan talabalar.")}
           </CardDescription>
         </div>
         {statistics.data && statistics.data.labs.length > 1 ? (
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Laboratoriya</span>
+            <span className="text-muted-foreground">{t('Laboratoriya')}</span>
             <select className="h-10 rounded-md border bg-background px-2" value={labId} onChange={(event) => setLabId(event.target.value)}>
-              <option value="">Barcha ER laboratoriyalari</option>
+              <option value="">{t('Barcha ER laboratoriyalari')}</option>
               {statistics.data.labs.map((lab) => (
                 <option key={lab.id} value={lab.id}>
                   {lab.title}

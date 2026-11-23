@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError, errorMessage } from '@/lib/api'
 import { MAX_SCORE, type Analysis, type AnalysisIssue } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const SEVERITY_LABELS: Record<AnalysisIssue['severity'], string> = {
+const SEVERITY_LABELS: Record<AnalysisIssue['severity'], string> = localized({
   high: 'Jiddiy',
   medium: "O'rtacha",
   low: 'Kichik',
-}
+})
 
 const SEVERITY_CLASSES: Record<AnalysisIssue['severity'], string> = {
   high: 'bg-red-100 text-red-800',
@@ -55,7 +56,7 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
   if (query.isPending) return <Skeleton className="h-24 w-full" />
   if (query.isError) {
     if (query.error instanceof ApiError && query.error.status === 404) {
-      return <p className="text-sm text-muted-foreground">Bu yechim uchun AI tahlili yo'q.</p>
+      return <p className="text-sm text-muted-foreground">{t("Bu yechim uchun AI tahlili yo'q.")}</p>
     }
     return <ErrorState error={query.error} onRetry={() => void query.refetch()} />
   }
@@ -66,7 +67,7 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        {analysis.status === 'pending' ? 'Tahlil navbatda turibdi…' : 'AI yechimni tahlil qilmoqda…'}
+        {analysis.status === 'pending' ? t('Tahlil navbatda turibdi…') : t('AI yechimni tahlil qilmoqda…')}
       </div>
     )
   }
@@ -77,8 +78,10 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
         <AlertDescription className="grid gap-2">
           <span>
             {staff
-              ? `AI tahlili xato bilan tugadi${analysis.error_message ? `: ${analysis.error_message}` : '.'}`
-              : "AI tahlilini bajarib bo'lmadi. O'qituvchi yechimni o'zi tekshiradi."}
+              ? analysis.error_message
+                ? t('AI tahlili xato bilan tugadi: {error}', { error: analysis.error_message })
+                : t('AI tahlili xato bilan tugadi.')
+              : t("AI tahlilini bajarib bo'lmadi. O'qituvchi yechimni o'zi tekshiradi.")}
           </span>
           {staff ? (
             <Button
@@ -89,7 +92,7 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
               onClick={() => retry.mutate()}
             >
               <RefreshCw className={retry.isPending ? 'animate-spin' : undefined} aria-hidden="true" />
-              Qayta tahlil qilish
+              {t('Qayta tahlil qilish')}
             </Button>
           ) : null}
         </AlertDescription>
@@ -102,13 +105,13 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
       {staff && analysis.suggested_score != null ? (
         <div className="rounded-lg border bg-muted/40 p-3">
           <div className="font-medium">
-            AI taklif qilgan ball: {analysis.suggested_score} / {MAX_SCORE}
+            {t('AI taklif qilgan ball: {suggested_score} / {MAX_SCORE}', { suggested_score: analysis.suggested_score, MAX_SCORE })}
           </div>
           {analysis.score_rationale ? (
             <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{analysis.score_rationale}</p>
           ) : null}
           <p className="mt-2 text-xs text-muted-foreground">
-            Bu faqat taklif: yakuniy bahoni siz qo'yasiz. Talaba bu ballni ko'rmaydi.
+            {t("Bu faqat taklif: yakuniy bahoni siz qo'yasiz. Talaba bu ballni ko'rmaydi.")}
           </p>
         </div>
       ) : null}
@@ -116,7 +119,7 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
       {analysis.summary ? <p className="whitespace-pre-wrap">{analysis.summary}</p> : null}
 
       <div>
-        <h4 className="mb-2 font-medium">Topilgan muammolar</h4>
+        <h4 className="mb-2 font-medium">{t('Topilgan muammolar')}</h4>
         {analysis.issues.length ? (
           <ul className="grid gap-2">
             {analysis.issues.map((issue, index) => (
@@ -130,13 +133,13 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
             ))}
           </ul>
         ) : (
-          <p className="text-muted-foreground">Muammo topilmadi.</p>
+          <p className="text-muted-foreground">{t('Muammo topilmadi.')}</p>
         )}
       </div>
 
       {analysis.recommendations.length ? (
         <div>
-          <h4 className="mb-2 font-medium">Tavsiyalar</h4>
+          <h4 className="mb-2 font-medium">{t('Tavsiyalar')}</h4>
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
             {analysis.recommendations.map((item, index) => (
               <li key={index}>{item}</li>
@@ -146,7 +149,7 @@ export function AnalysisPanel({ submissionId, staff = false }: AnalysisPanelProp
       ) : null}
 
       {staff && analysis.model_name ? (
-        <p className="text-xs text-muted-foreground">Model: {analysis.model_name}</p>
+        <p className="text-xs text-muted-foreground">{t('Model: {model_name}', { model_name: analysis.model_name })}</p>
       ) : null}
     </div>
   )

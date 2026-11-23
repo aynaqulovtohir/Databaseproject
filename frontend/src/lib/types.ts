@@ -1,3 +1,4 @@
+import { localized } from '@/lib/i18n'
 // Backend API qaytaradigan ma'lumot turlari
 
 export type Role = 'admin' | 'teacher' | 'student'
@@ -46,11 +47,11 @@ export interface TelegramLink {
   expires_at: string
 }
 
-export const ROLE_LABELS: Record<Role, string> = {
+export const ROLE_LABELS: Record<Role, string> = localized({
   admin: 'Admin',
   teacher: "O'qituvchi",
   student: 'Talaba',
-}
+})
 
 export interface PersonShort {
   id: number
@@ -212,10 +213,10 @@ export interface LabGrade {
   graded_at: string
 }
 
-export const GRADE_SOURCE_LABELS: Record<LabGrade['source'], string> = {
+export const GRADE_SOURCE_LABELS: Record<LabGrade['source'], string> = localized({
   ai: 'AI bahosi',
   auto: 'Avtomatik baho',
-}
+})
 
 /** ER-diagramma: obyektlar (atributlari bilan) va bog'lanishlar. Kardinallik har bir uchida "1" yoki "N". */
 export type ErKey = 'pk' | 'fk' | ''
@@ -526,11 +527,11 @@ export interface LabProbeResult {
 
 export type ExplanationVerdict = 'ok' | 'partial' | 'wrong'
 
-export const EXPLANATION_VERDICTS: Record<ExplanationVerdict, { label: string; className: string }> = {
+export const EXPLANATION_VERDICTS: Record<ExplanationVerdict, { label: string; className: string }> = localized({
   ok: { label: 'Tushuntirish mos', className: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' },
   partial: { label: 'Qisman mos', className: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
   wrong: { label: 'Mos emas', className: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200' },
-}
+})
 
 /** O'qituvchi uchun: AI yozgan, qum qutida tekshirilgan xatoli kod */
 export interface BuggyCode {
@@ -706,13 +707,13 @@ export type QuizKind = 'pre' | 'post' | 'delayed' | 'practice' | 'survey'
 /** Parallel variant: kirish va chiqish testiga turli variant beriladi ('' — variantsiz) */
 export type QuizForm = '' | 'A' | 'B'
 
-export const QUIZ_KIND_LABELS: Record<QuizKind, string> = {
+export const QUIZ_KIND_LABELS: Record<QuizKind, string> = localized({
   pre: 'Kirish testi',
   post: 'Chiqish testi',
   delayed: 'Kechiktirilgan test',
   practice: 'Oddiy test',
   survey: "So'rovnoma",
-}
+})
 
 /** likert — so'rovnoma fikri: 1-5 shkala, ball qo'yilmaydi, variantlar serverda qo'shiladi */
 export type QuestionKind = 'single' | 'multiple' | 'likert'

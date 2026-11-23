@@ -1,22 +1,23 @@
 // Ko'rinish sozlamalari (mavzu, yozuv o'lchami): faqat shu brauzerda saqlanadi, serverga yuborilmaydi.
 // Dastlabki qiymatni public/theme-init.js qo'yadi: sahifa chizilishidan oldin ishlashi kerak.
 import { useSyncExternalStore } from 'react'
+import { localized } from '@/lib/i18n'
 
-export const THEMES = [
+export const THEMES = localized([
   { value: 'light', label: "Yorug'" },
   { value: 'dark', label: "Qorong'i" },
   { value: 'system', label: "Qurilma bo'yicha" },
   { value: 'violet', label: 'Binafsha' },
   { value: 'green', label: 'Yashil' },
   { value: 'wine', label: 'Bordo' },
-] as const
+] as const)
 
-export const TEXT_SIZES = [
+export const TEXT_SIZES = localized([
   { value: 'md', label: 'Odatiy' },
   { value: 'lg', label: 'Katta' },
   { value: 'xl', label: 'Juda katta' },
   { value: 'xxl', label: 'Eng katta' },
-] as const
+] as const)
 
 export type Theme = (typeof THEMES)[number]['value']
 export type TextSize = (typeof TEXT_SIZES)[number]['value']

@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import type { Lab, LabModule } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 interface Draft {
   title: string
@@ -92,7 +93,7 @@ function ModuleEditor({
       return api<LabModule>(`/lab-modules/${saved.id}/reorder/`, { method: 'POST', body: { labs: draft.labs } })
     },
     onSuccess: (saved) => {
-      toast.success('Modul saqlandi')
+      toast.success(t('Modul saqlandi'))
       invalidate()
       onSaved(saved)
     },
@@ -102,7 +103,7 @@ function ModuleEditor({
   const remove = useMutation({
     mutationFn: () => api(`/lab-modules/${module!.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Modul o'chirildi. Laboratoriyalari o'chmadi, «Boshqa laboratoriyalar»ga o'tdi.")
+      toast.success(t("Modul o'chirildi. Laboratoriyalari o'chmadi, «Boshqa laboratoriyalar»ga o'tdi."))
       invalidate()
       onDeleted()
     },
@@ -123,17 +124,17 @@ function ModuleEditor({
 
   return (
     <div className="grid content-start gap-4">
-      <FormField id="module_title" label="Modul nomi">
+      <FormField id="module_title" label={t('Modul nomi')}>
         <Input
           id="module_title"
           className="h-10"
           maxLength={200}
-          placeholder="Masalan: 1-modul. ER-model"
+          placeholder={t('Masalan: 1-modul. ER-model')}
           value={draft.title}
           onChange={(event) => setDraft({ ...draft, title: event.target.value })}
         />
       </FormField>
-      <FormField id="module_description" label="Izoh (ixtiyoriy)">
+      <FormField id="module_description" label={t('Izoh (ixtiyoriy)')}>
         <Textarea
           id="module_description"
           rows={2}
@@ -143,7 +144,7 @@ function ModuleEditor({
         />
       </FormField>
       <div className="flex flex-wrap items-end gap-4">
-        <FormField id="module_order" label="Modul tartibi" hint="Kichigi oldin turadi">
+        <FormField id="module_order" label={t('Modul tartibi')} hint={t('Kichigi oldin turadi')}>
           <Input
             id="module_order"
             type="number"
@@ -158,14 +159,14 @@ function ModuleEditor({
             checked={draft.sequential}
             onCheckedChange={(checked) => setDraft({ ...draft, sequential: checked === true })}
           />
-          Ketma-ket: oldingi laboratoriya yechilmaguncha keyingisi yopiq
+          {t('Ketma-ket: oldingi laboratoriya yechilmaguncha keyingisi yopiq')}
         </label>
       </div>
 
       <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-medium">Imtihon rejimi (ixtiyoriy)</legend>
+        <legend className="mb-1 text-sm font-medium">{t('Imtihon rejimi (ixtiyoriy)')}</legend>
         <div className="flex flex-wrap items-end gap-4">
-          <FormField id="module_exam_start" label="Boshlanishi">
+          <FormField id="module_exam_start" label={t('Boshlanishi')}>
             <Input
               id="module_exam_start"
               type="datetime-local"
@@ -174,7 +175,7 @@ function ModuleEditor({
               onChange={(event) => setDraft({ ...draft, examStart: event.target.value })}
             />
           </FormField>
-          <FormField id="module_exam_end" label="Tugashi">
+          <FormField id="module_exam_end" label={t('Tugashi')}>
             <Input
               id="module_exam_end"
               type="datetime-local"
@@ -185,18 +186,17 @@ function ModuleEditor({
           </FormField>
           {draft.examStart || draft.examEnd ? (
             <Button type="button" variant="ghost" size="lg" onClick={() => setDraft({ ...draft, examStart: '', examEnd: '' })}>
-              Imtihonni bekor qilish
+              {t('Imtihonni bekor qilish')}
             </Button>
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          Boshlanishidan oldin laboratoriyalar talabalarga yopiq; imtihon paytida AI yordami, murabbiy va o'zaro baholash
-          o'chiriladi, ball avtomatik qo'yiladi; tugagach yechimni faqat ko'rish mumkin.
+          {t("Boshlanishidan oldin laboratoriyalar talabalarga yopiq; imtihon paytida AI yordami, murabbiy va o'zaro baholash o'chiriladi, ball avtomatik qo'yiladi; tugagach yechimni faqat ko'rish mumkin.")}
         </p>
       </fieldset>
 
       <div className="grid gap-2">
-        <div className="text-sm font-medium">Laboratoriyalar (soddadan murakkabga)</div>
+        <div className="text-sm font-medium">{t('Laboratoriyalar (soddadan murakkabga)')}</div>
         {draft.labs.length ? (
           <ol className="grid gap-1.5">
             {draft.labs.map((id, index) => {
@@ -208,14 +208,14 @@ function ModuleEditor({
                     {lab?.title ?? `#${id}`}
                   </span>
                   {lab?.level ? <LabLevelBadge level={lab.level} /> : null}
-                  <Button type="button" variant="ghost" size="icon" aria-label="Yuqoriga" disabled={index === 0} onClick={() => move(index, -1)}>
+                  <Button type="button" variant="ghost" size="icon" aria-label={t('Yuqoriga')} disabled={index === 0} onClick={() => move(index, -1)}>
                     <ArrowUp />
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label="Pastga"
+                    aria-label={t('Pastga')}
                     disabled={index === draft.labs.length - 1}
                     onClick={() => move(index, 1)}
                   >
@@ -225,7 +225,7 @@ function ModuleEditor({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label="Moduldan chiqarish"
+                    aria-label={t('Moduldan chiqarish')}
                     onClick={() => setDraft({ ...draft, labs: draft.labs.filter((item) => item !== id) })}
                   >
                     <X />
@@ -235,21 +235,21 @@ function ModuleEditor({
             })}
           </ol>
         ) : (
-          <p className="text-sm text-muted-foreground">Modulda hali laboratoriya yo'q.</p>
+          <p className="text-sm text-muted-foreground">{t("Modulda hali laboratoriya yo'q.")}</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <select
-            aria-label="Qo'shiladigan laboratoriya"
+            aria-label={t("Qo'shiladigan laboratoriya")}
             className="h-10 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
             value={adding}
             onChange={(event) => setAdding(event.target.value)}
           >
-            <option value="">Laboratoriyani tanlang…</option>
+            <option value="">{t('Laboratoriyani tanlang…')}</option>
             {available.map((lab) => (
               <option key={lab.id} value={lab.id}>
                 {lab.title}
-                {lab.level ? ` (murakkablik ${lab.level})` : ''}
-                {lab.module_detail ? ` — hozir «${lab.module_detail.title}» modulida` : ''}
+                {lab.level ? t(' (murakkablik {level})', { level: lab.level }) : ''}
+                {lab.module_detail ? t(' — hozir «{title}» modulida', { title: lab.module_detail.title }) : ''}
               </option>
             ))}
           </select>
@@ -264,7 +264,7 @@ function ModuleEditor({
             }}
           >
             <Plus aria-hidden="true" />
-            Qo'shish
+            {t("Qo'shish")}
           </Button>
         </div>
       </div>
@@ -273,22 +273,22 @@ function ModuleEditor({
         {module ? (
           <Button type="button" variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
             <Trash2 aria-hidden="true" />
-            O'chirish
+            {t("O'chirish")}
           </Button>
         ) : (
           <span />
         )}
         <Button type="button" size="lg" disabled={save.isPending || !draft.title.trim()} onClick={() => save.mutate()}>
           {save.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-          Saqlash
+          {t('Saqlash')}
         </Button>
       </div>
 
       <ConfirmDialog
         open={confirmingDelete}
-        title="Modulni o'chirish"
-        description={`«${module?.title ?? ''}» o'chiriladi. Laboratoriyalar va talabalar natijalari saqlanadi.`}
-        confirmLabel="O'chirish"
+        title={t("Modulni o'chirish")}
+        description={t("«{title}» o'chiriladi. Laboratoriyalar va talabalar natijalari saqlanadi.", { title: module?.title ?? '' })}
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmingDelete(false)}
@@ -313,7 +313,7 @@ export function ModulesDialog({ labs, onClose }: { labs: Lab[]; onClose: () => v
   else
     content = (
       <div className="grid gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
-        <nav aria-label="Modullar" className="grid content-start gap-1">
+        <nav aria-label={t('Modullar')} className="grid content-start gap-1">
           {list.map((item) => (
             <button
               key={item.id}
@@ -325,12 +325,12 @@ export function ModulesDialog({ labs, onClose }: { labs: Lab[]; onClose: () => v
               )}
             >
               <span className="block truncate">{item.title}</span>
-              <span className="text-xs text-muted-foreground">{item.labs.length} ta laboratoriya</span>
+              <span className="text-xs text-muted-foreground">{t('{length} ta laboratoriya', { length: item.labs.length })}</span>
             </button>
           ))}
           <Button type="button" variant="outline" size="lg" className="mt-1 justify-start" onClick={() => setSelected(null)}>
             <Plus aria-hidden="true" />
-            Yangi modul
+            {t('Yangi modul')}
           </Button>
         </nav>
         {/* Modul tanlanmagan yoki hali yo'q bo'lsa — yangi modul formasi */}
@@ -349,16 +349,15 @@ export function ModulesDialog({ labs, onClose }: { labs: Lab[]; onClose: () => v
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Laboratoriyalar modullari</DialogTitle>
+          <DialogTitle>{t('Laboratoriyalar modullari')}</DialogTitle>
           <DialogDescription>
-            Laboratoriyalarni modullarga ajrating va soddadan murakkabga tartiblang. Ketma-ket modulda talaba oldingi
-            laboratoriyani yechmaguncha keyingisi ochilmaydi; modullar ham tartib bo'yicha bir-biridan keyin ochiladi.
+            {t("Laboratoriyalarni modullarga ajrating va soddadan murakkabga tartiblang. Ketma-ket modulda talaba oldingi laboratoriyani yechmaguncha keyingisi ochilmaydi; modullar ham tartib bo'yicha bir-biridan keyin ochiladi.")}
           </DialogDescription>
         </DialogHeader>
         {content}
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={onClose}>
-            Yopish
+            {t('Yopish')}
           </Button>
         </DialogFooter>
       </DialogContent>

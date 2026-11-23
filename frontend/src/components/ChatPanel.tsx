@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import type { ChatReply, ChatState } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 const MAX_MESSAGE_LENGTH = 4000
 
@@ -86,8 +87,7 @@ export function ChatPanel({ assignmentId }: { assignmentId: number }) {
       <div className="grid max-h-[28rem] min-h-40 content-start gap-2 overflow-y-auto rounded-lg border p-3" aria-live="polite">
         {messages.length || send.isPending ? null : (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            Topshiriq bo'yicha savol bering. Yordamchi tayyor yechimni yozib bermaydi, lekin tushuntirib, yo'l
-            ko'rsatadi.
+            {t("Topshiriq bo'yicha savol bering. Yordamchi tayyor yechimni yozib bermaydi, lekin tushuntirib, yo'l ko'rsatadi.")}
           </p>
         )}
         {messages.map((message) => (
@@ -100,7 +100,7 @@ export function ChatPanel({ assignmentId }: { assignmentId: number }) {
             <Bubble role="user">{send.variables}</Bubble>
             <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Yordamchi javob yozmoqda…
+              {t('Yordamchi javob yozmoqda…')}
             </div>
           </>
         ) : null}
@@ -110,22 +110,22 @@ export function ChatPanel({ assignmentId }: { assignmentId: number }) {
       <form onSubmit={handleSubmit} className="grid gap-2">
         <div className="flex items-end gap-2">
           <Textarea
-            aria-label="Savolingiz"
+            aria-label={t('Savolingiz')}
             className="max-h-40 min-h-10"
-            placeholder={limitReached ? 'Bugungi limit tugadi' : 'Savolingizni yozing…'}
+            placeholder={limitReached ? t('Bugungi limit tugadi') : t('Savolingizni yozing…')}
             maxLength={MAX_MESSAGE_LENGTH}
             disabled={limitReached}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <Button type="submit" size="icon-lg" className="size-10" aria-label="Yuborish" disabled={!canSend}>
+          <Button type="submit" size="icon-lg" className="size-10" aria-label={t('Yuborish')} disabled={!canSend}>
             <SendHorizontal />
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Bugun {usedToday} / {dailyLimit} ta xabar ishlatildi.
-          {limitReached ? ' Limit tugadi, ertaga davom etishingiz mumkin.' : null}
+          {t('Bugun {usedToday} / {dailyLimit} ta xabar ishlatildi.', { usedToday, dailyLimit })}
+          {limitReached ? t(' Limit tugadi, ertaga davom etishingiz mumkin.') : null}
         </p>
       </form>
     </div>

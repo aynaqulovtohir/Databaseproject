@@ -13,16 +13,17 @@ import { useUser } from '@/lib/auth'
 import { groupNames, useGroupOptions } from '@/lib/groups'
 import { quizTiming } from '@/lib/quiz'
 import { QUIZ_KIND_LABELS, type Quiz } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function QuizStatusBadge({ quiz }: { quiz: Quiz }) {
   const attempt = quiz.my_attempt
   if (attempt?.status === 'submitted') {
-    if (quiz.kind === 'survey') return <Badge className="bg-emerald-100 text-emerald-800">Javob berilgan</Badge>
-    return <Badge className="bg-emerald-100 text-emerald-800 tabular-nums">Natija: {attempt.percent}%</Badge>
+    if (quiz.kind === 'survey') return <Badge className="bg-emerald-100 text-emerald-800">{t('Javob berilgan')}</Badge>
+    return <Badge className="bg-emerald-100 text-emerald-800 tabular-nums">{t('Natija: {percent}%', { percent: attempt.percent })}</Badge>
   }
-  if (attempt?.status === 'in_progress') return <Badge className="bg-amber-100 text-amber-800">Boshlangan</Badge>
-  if (quiz.is_open === false) return <Badge variant="outline">Yopiq</Badge>
-  return <Badge variant="outline">Topshirilmagan</Badge>
+  if (attempt?.status === 'in_progress') return <Badge className="bg-amber-100 text-amber-800">{t('Boshlangan')}</Badge>
+  if (quiz.is_open === false) return <Badge variant="outline">{t('Yopiq')}</Badge>
+  return <Badge variant="outline">{t('Topshirilmagan')}</Badge>
 }
 
 export function QuizzesPage() {
@@ -35,7 +36,7 @@ export function QuizzesPage() {
   const addButton = isStaff ? (
     <Button size="lg" onClick={() => setCreating(true)}>
       <Plus aria-hidden="true" />
-      Test qo'shish
+      {t("Test qo'shish")}
     </Button>
   ) : null
 
@@ -48,11 +49,11 @@ export function QuizzesPage() {
     content = (
       <EmptyState
         icon={ClipboardCheck}
-        title="Hali test yo'q"
+        title={t("Hali test yo'q")}
         description={
           isStaff
-            ? "Tajriba uchun avval kirish testini yarating: u o'qitishdan oldingi bilimni o'lchaydi."
-            : "O'qituvchi test berganda shu yerda ko'rinadi."
+            ? t("Tajriba uchun avval kirish testini yarating: u o'qitishdan oldingi bilimni o'lchaydi.")
+            : t("O'qituvchi test berganda shu yerda ko'rinadi.")
         }
         action={addButton}
       />
@@ -74,14 +75,14 @@ export function QuizzesPage() {
                   </Badge>
                 </h2>
                 {isStaff ? (
-                  <span className="text-xs text-muted-foreground">{quiz.attempt_count} ta talaba boshlagan</span>
+                  <span className="text-xs text-muted-foreground">{t('{attempt_count} ta talaba boshlagan', { attempt_count: quiz.attempt_count })}</span>
                 ) : (
                   <QuizStatusBadge quiz={quiz} />
                 )}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {quizTiming(quiz)}
-                {isStaff ? ` · Guruhlar: ${groupNames(quiz.groups, groups)}` : ''}
+                {isStaff ? ` · ${t('Guruhlar: {groups}', { groups: groupNames(quiz.groups, groups) })}` : ''}
               </p>
             </Link>
           </li>
@@ -93,11 +94,11 @@ export function QuizzesPage() {
   return (
     <>
       <PageHeader
-        title="Testlar"
+        title={t('Testlar')}
         description={
           isStaff
-            ? "Kirish va chiqish testlari: o'qitish samaradorligini o'lchash uchun."
-            : 'Har bir test bir marta topshiriladi. Boshlaganingizdan keyin vaqt hisoblanadi.'
+            ? t("Kirish va chiqish testlari: o'qitish samaradorligini o'lchash uchun.")
+            : t('Har bir test bir marta topshiriladi. Boshlaganingizdan keyin vaqt hisoblanadi.')
         }
         actions={isStaff && quizzes.data?.length ? addButton : null}
       />
