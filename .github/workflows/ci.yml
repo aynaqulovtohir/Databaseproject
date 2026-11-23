@@ -88,6 +88,8 @@ jobs:
       - run: npm ci
       # Ogohlantirishlar ham xato: tozalangan holat saqlansin
       - run: npm run lint -- --deny-warnings
+      # Har bir t('...') matnining inglizcha va ruscha tarjimasi bor
+      - run: npm run i18n
       # tsc -b va vite build
       - run: npm run build
 

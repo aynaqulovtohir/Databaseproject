@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage, fieldErrors } from '@/lib/api'
 import { useConfidence } from '@/lib/confidence'
 import type { LabRunResult, NormAnswer, NormalForm, NormTask } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const FORMS: NormalForm[] = ['1NF', '2NF', '3NF', 'BCNF']
 const INPUT_PROPS = { spellCheck: false, autoCapitalize: 'none', autoCorrect: 'off' } as const
@@ -31,7 +32,7 @@ function splitLines(text: string) {
 export function NormTaskView({ task }: { task: NormTask }) {
   return (
     <div className="grid gap-2 rounded-lg border bg-muted/30 p-3 font-mono text-sm">
-      <div className="break-words">R({task.attributes.join(', ')})</div>
+      <div className="break-words">{t('R({attributes})', { attributes: task.attributes.join(', ') })}</div>
       <ul className="grid gap-0.5">
         {task.fds.map((fd, index) => (
           <li key={index}>
@@ -39,7 +40,7 @@ export function NormTaskView({ task }: { task: NormTask }) {
           </li>
         ))}
       </ul>
-      <div className="font-sans text-xs text-muted-foreground">Maqsad: {task.target}</div>
+      <div className="font-sans text-xs text-muted-foreground">{t('Maqsad: {target}', { target: task.target })}</div>
     </div>
   )
 }
@@ -94,7 +95,7 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
   return (
     <div className="grid gap-4">
       <NormTaskView task={task} />
-      <FormField id="norm_keys" label="Nomzod kalitlar" hint="Har bir qatorda bitta kalit, atributlar vergul bilan: talaba_id, fan_id">
+      <FormField id="norm_keys" label={t('Nomzod kalitlar')} hint={t('Har bir qatorda bitta kalit, atributlar vergul bilan: talaba_id, fan_id')}>
         <Textarea
           id="norm_keys"
           className="min-h-16 font-mono text-sm md:text-xs"
@@ -107,7 +108,7 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
           {...INPUT_PROPS}
         />
       </FormField>
-      <FormField id="norm_form" label="Munosabatning hozirgi normal formasi">
+      <FormField id="norm_form" label={t('Munosabatning hozirgi normal formasi')}>
         <select
           id="norm_form"
           className="h-10 justify-self-start rounded-md border bg-background px-2 text-sm"
@@ -118,7 +119,7 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
             onAnswerChange?.(summary({ form: event.target.value }))
           }}
         >
-          <option value="">Tanlang…</option>
+          <option value="">{t('Tanlang…')}</option>
           {FORMS.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -128,8 +129,8 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
       </FormField>
       <FormField
         id="norm_decomposition"
-        label={`${task.target} dagi dekompozitsiya`}
-        hint="Har bir qatorda bitta jadval: talaba(talaba_id, ism) yoki shunchaki talaba_id, ism"
+        label={t('{target} dagi dekompozitsiya', { target: task.target })}
+        hint={t('Har bir qatorda bitta jadval: talaba(talaba_id, ism) yoki shunchaki talaba_id, ism')}
       >
         <Textarea
           id="norm_decomposition"
@@ -152,12 +153,12 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" variant={gradable ? 'outline' : 'default'} disabled={!canRun} onClick={() => run('run')}>
           {mutation.isPending && !submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}
-          Tekshirish
+          {t('Tekshirish')}
         </Button>
         {gradable ? (
           <Button size="lg" disabled={!canRun} onClick={() => run('submit')}>
             {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-            Baholashga topshirish
+            {t('Baholashga topshirish')}
           </Button>
         ) : null}
       </div>
@@ -169,9 +170,9 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
             <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-emerald-900" role="status">
               <div className="flex items-center gap-2 font-medium">
                 <CircleCheck className="size-5 shrink-0" aria-hidden="true" />
-                To'g'ri!
+                {t("To'g'ri!")}
               </div>
-              <p className="mt-1 text-sm">Kalitlar, normal forma va dekompozitsiya to'g'ri.</p>
+              <p className="mt-1 text-sm">{t("Kalitlar, normal forma va dekompozitsiya to'g'ri.")}</p>
               {result.ai_explain && result.attempt_id ? (
                 <div className="mt-3">
                   <SelfExplain attemptId={result.attempt_id} kind="sql" />
@@ -182,7 +183,7 @@ export function NormLabRunner({ labId, task, initialAnswer, gradable = false, on
             <div className="grid gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900" role="alert">
               <div className="flex items-center gap-2 font-medium">
                 <CircleX className="size-5 shrink-0" aria-hidden="true" />
-                Javobda xatolar bor
+                {t('Javobda xatolar bor')}
               </div>
               <ul className="list-disc space-y-1 pl-5 text-sm">
                 {result.differences.map((difference, index) => (

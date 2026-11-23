@@ -1,12 +1,13 @@
 import { Badge } from '@/components/ui/badge'
 import { isPast } from '@/lib/format'
 import type { Submission, SubmissionStatus } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const STATUS_LABELS: Record<SubmissionStatus, string> = {
+const STATUS_LABELS: Record<SubmissionStatus, string> = localized({
   submitted: 'Tekshirilmoqda',
   graded: 'Baholangan',
   returned: 'Qaytarilgan',
-}
+})
 
 const STATUS_CLASSES: Record<SubmissionStatus, string> = {
   submitted: 'bg-sky-100 text-sky-800',
@@ -18,15 +19,15 @@ export function SubmissionStatusBadge({ submission }: { submission: Pick<Submiss
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge className={STATUS_CLASSES[submission.status]}>{STATUS_LABELS[submission.status]}</Badge>
-      {submission.is_late ? <Badge variant="destructive">Kechikkan</Badge> : null}
+      {submission.is_late ? <Badge variant="destructive">{t('Kechikkan')}</Badge> : null}
     </span>
   )
 }
 
 export function DeadlineBadge({ deadline }: { deadline: string }) {
   return isPast(deadline) ? (
-    <Badge variant="destructive">Muddat o'tgan</Badge>
+    <Badge variant="destructive">{t("Muddat o'tgan")}</Badge>
   ) : (
-    <Badge variant="secondary">Ochiq</Badge>
+    <Badge variant="secondary">{t('Ochiq')}</Badge>
   )
 }

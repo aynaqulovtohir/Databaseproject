@@ -15,6 +15,7 @@ import { api, errorMessage, fieldErrors } from '@/lib/api'
 import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import { ROLE_LABELS, type TelegramLink, type TelegramStatus } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -30,19 +31,19 @@ function AccountCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Hisob ma'lumotlari</CardTitle>
-        <CardDescription>Ma'lumotlarni o'zgartirish uchun administratorga murojaat qiling.</CardDescription>
+        <CardTitle>{t("Hisob ma'lumotlari")}</CardTitle>
+        <CardDescription>{t("Ma'lumotlarni o'zgartirish uchun administratorga murojaat qiling.")}</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="divide-y">
-          <InfoRow label="Ism familiya" value={fullName(user)} />
-          <InfoRow label="Login" value={user.username} />
-          <InfoRow label="Rol" value={ROLE_LABELS[user.role]} />
-          {user.role === 'student' ? <InfoRow label="Guruh" value={user.group?.name ?? 'Biriktirilmagan'} /> : null}
+          <InfoRow label={t('Ism familiya')} value={fullName(user)} />
+          <InfoRow label={t('Login')} value={user.username} />
+          <InfoRow label={t('Rol')} value={ROLE_LABELS[user.role]} />
+          {user.role === 'student' ? <InfoRow label={t('Guruh')} value={user.group?.name ?? t('Biriktirilmagan')} /> : null}
           {user.role === 'teacher' ? (
             <InfoRow
-              label="Guruhlar"
-              value={user.teaching_groups.map((group) => group.name).join(', ') || 'Biriktirilmagan'}
+              label={t('Guruhlar')}
+              value={user.teaching_groups.map((group) => group.name).join(', ') || t('Biriktirilmagan')}
             />
           ) : null}
         </dl>
@@ -64,7 +65,7 @@ function PasswordCard() {
         body: { old_password: oldPassword, new_password: newPassword },
       }),
     onSuccess: () => {
-      toast.success("Parol o'zgartirildi")
+      toast.success(t("Parol o'zgartirildi"))
       setOldPassword('')
       setNewPassword('')
       setRepeatPassword('')
@@ -80,7 +81,7 @@ function PasswordCard() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (newPassword !== repeatPassword) {
-      setErrors({ repeat_password: 'Parollar bir xil emas.' })
+      setErrors({ repeat_password: t('Parollar bir xil emas.') })
       return
     }
     setErrors({})
@@ -90,12 +91,12 @@ function PasswordCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Parolni o'zgartirish</CardTitle>
-        <CardDescription>Kamida 8 belgi; faqat raqamlardan iborat bo'lmasin.</CardDescription>
+        <CardTitle>{t("Parolni o'zgartirish")}</CardTitle>
+        <CardDescription>{t("Kamida 8 belgi; faqat raqamlardan iborat bo'lmasin.")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <FormField id="old_password" label="Joriy parol" error={errors.old_password}>
+          <FormField id="old_password" label={t('Joriy parol')} error={errors.old_password}>
             <PasswordInput
               id="old_password"
               autoComplete="current-password"
@@ -105,7 +106,7 @@ function PasswordCard() {
               onChange={(event) => setOldPassword(event.target.value)}
             />
           </FormField>
-          <FormField id="new_password" label="Yangi parol" error={errors.new_password}>
+          <FormField id="new_password" label={t('Yangi parol')} error={errors.new_password}>
             <PasswordInput
               id="new_password"
               autoComplete="new-password"
@@ -115,7 +116,7 @@ function PasswordCard() {
               onChange={(event) => setNewPassword(event.target.value)}
             />
           </FormField>
-          <FormField id="repeat_password" label="Yangi parolni takrorlang" error={errors.repeat_password}>
+          <FormField id="repeat_password" label={t('Yangi parolni takrorlang')} error={errors.repeat_password}>
             <PasswordInput
               id="repeat_password"
               autoComplete="new-password"
@@ -132,7 +133,7 @@ function PasswordCard() {
             disabled={mutation.isPending || !oldPassword || !newPassword || !repeatPassword}
           >
             {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            Saqlash
+            {t('Saqlash')}
           </Button>
         </form>
       </CardContent>
@@ -161,7 +162,7 @@ function TelegramCard() {
     mutationFn: () => api('/telegram/', { method: 'DELETE' }),
     onSuccess: () => {
       setLink(null)
-      toast.success("Telegram bog'lanishi uzildi")
+      toast.success(t("Telegram bog'lanishi uzildi"))
       void queryClient.invalidateQueries({ queryKey: ['telegram'] })
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -179,7 +180,7 @@ function TelegramCard() {
   } else if (!status.data.configured) {
     content = (
       <p className="text-sm text-muted-foreground">
-        Telegram bot hali sozlanmagan. Sozlangach, shu yerdan ulashingiz mumkin bo'ladi.
+        {t("Telegram bot hali sozlanmagan. Sozlangach, shu yerdan ulashingiz mumkin bo'ladi.")}
       </p>
     )
   } else if (status.data.linked) {
@@ -188,11 +189,11 @@ function TelegramCard() {
         <div className="flex items-center gap-2 text-sm">
           <CheckCircle2 className="size-4 text-emerald-600" aria-hidden="true" />
           <span>
-            Ulangan <span className="text-muted-foreground">({formatDateTime(status.data.linked_at)})</span>
+            {t('Ulangan')}{' '}<span className="text-muted-foreground">({formatDateTime(status.data.linked_at)})</span>
           </span>
         </div>
         <Button variant="outline" size="lg" disabled={unlink.isPending} onClick={() => unlink.mutate()}>
-          Uzish
+          {t('Uzish')}
         </Button>
       </div>
     )
@@ -200,18 +201,18 @@ function TelegramCard() {
     content = (
       <div className="grid gap-3">
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>Quyidagi tugma orqali botni oching.</li>
-          <li>Botda «Start» tugmasini bosing.</li>
-          <li>Bu sahifa o'zi yangilanadi.</li>
+          <li>{t('Quyidagi tugma orqali botni oching.')}</li>
+          <li>{t('Botda «Start» tugmasini bosing.')}</li>
+          <li>{t("Bu sahifa o'zi yangilanadi.")}</li>
         </ol>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild size="lg">
             <a href={link.url} target="_blank" rel="noopener noreferrer">
               <ExternalLink aria-hidden="true" />
-              Botni ochish
+              {t('Botni ochish')}
             </a>
           </Button>
-          <span className="text-xs text-muted-foreground">Havola {formatDateTime(link.expires_at)} gacha amal qiladi</span>
+          <span className="text-xs text-muted-foreground">{t('Havola {expires_at} gacha amal qiladi', { expires_at: formatDateTime(link.expires_at) })}</span>
         </div>
       </div>
     )
@@ -219,7 +220,7 @@ function TelegramCard() {
     content = (
       <Button size="lg" disabled={createLink.isPending} onClick={() => createLink.mutate()}>
         {createLink.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-        Telegramni ulash
+        {t('Telegramni ulash')}
       </Button>
     )
   }
@@ -227,9 +228,9 @@ function TelegramCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Telegram bildirishnomalari</CardTitle>
+        <CardTitle>{t('Telegram bildirishnomalari')}</CardTitle>
         <CardDescription>
-          Yangi topshiriq, baho va muddat haqida botdan xabar olasiz. Xabarlarda ball va ismingiz yozilmaydi.
+          {t('Yangi topshiriq, baho va muddat haqida botdan xabar olasiz. Xabarlarda ball va ismingiz yozilmaydi.')}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
@@ -241,7 +242,7 @@ export function ProfilePage() {
   const user = useUser()
   return (
     <>
-      <PageHeader title="Profil" />
+      <PageHeader title={t('Profil')} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="grid content-start gap-4">
           <AccountCard />

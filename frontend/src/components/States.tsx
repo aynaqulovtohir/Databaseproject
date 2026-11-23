@@ -5,10 +5,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { errorMessage } from '@/lib/api'
+import { t } from '@/lib/i18n'
 
 export function ListSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="grid gap-3" role="status" aria-label="Yuklanmoqda">
+    <div className="grid gap-3" role="status" aria-label={t('Yuklanmoqda')}>
       {Array.from({ length: rows }, (_, index) => (
         <Skeleton key={index} className="h-20 w-full" />
       ))}
@@ -23,7 +24,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
         <span>{errorMessage(error)}</span>
         {onRetry ? (
           <Button variant="outline" size="sm" onClick={onRetry}>
-            Qayta urinish
+            {t('Qayta urinish')}
           </Button>
         ) : null}
       </AlertDescription>

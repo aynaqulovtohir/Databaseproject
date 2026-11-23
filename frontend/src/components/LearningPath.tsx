@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { api } from '@/lib/api'
 import { fullName } from '@/lib/auth'
 import type { GroupMastery, LearningPath as LearningPathData } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** O'zlashtirish ko'rsatkichi: bitta rang, qiymat matn bilan ham yoziladi (rang yagona belgi emas) */
 function Meter({ value, label }: { value: number; label: string }) {
@@ -35,10 +36,9 @@ export function LearningPathCard() {
   return (
     <Card className="mb-4">
       <CardHeader>
-        <CardTitle>Mening o'quv yo'lim</CardTitle>
+        <CardTitle>{t("Mening o'quv yo'lim")}</CardTitle>
         <CardDescription>
-          Har bir mavzu bo'yicha ko'nikmani egallaganingiz ehtimoli: urinishlaringizdan hisoblanadi (Bayesian Knowledge
-          Tracing). 95% — mavzu o'zlashtirilgan.
+          {t("Har bir mavzu bo'yicha ko'nikmani egallaganingiz ehtimoli: urinishlaringizdan hisoblanadi (Bayesian Knowledge Tracing). 95% — mavzu o'zlashtirilgan.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -48,7 +48,7 @@ export function LearningPathCard() {
             className="flex items-center gap-3 rounded-lg border bg-primary/5 p-3 outline-none hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-xs text-muted-foreground">Keyingi tavsiya</div>
+              <div className="text-xs text-muted-foreground">{t('Keyingi tavsiya')}</div>
               <div className="font-medium">{next.title}</div>
               <p className="mt-0.5 text-xs text-muted-foreground">{next.reason}</p>
             </div>
@@ -61,10 +61,10 @@ export function LearningPathCard() {
               <div className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="flex items-center gap-1.5">
                   {topic.label}
-                  {topic.mastered ? <CircleCheck className="size-3.5 text-emerald-600" aria-label="o'zlashtirilgan" /> : null}
+                  {topic.mastered ? <CircleCheck className="size-3.5 text-emerald-600" aria-label={t("o'zlashtirilgan")} /> : null}
                 </span>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {topic.mastery}% · {topic.solved}/{topic.labs} lab.
+                  {t('{mastery}% · {solved}/{labs} lab.', { mastery: topic.mastery, solved: topic.solved, labs: topic.labs })}
                 </span>
               </div>
               <Meter value={topic.mastery} label={`${topic.label}: ${topic.mastery}%`} />
@@ -87,17 +87,16 @@ export function GroupMasteryCard({ groupId }: { groupId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Mavzular bo'yicha o'zlashtirish</CardTitle>
+        <CardTitle>{t("Mavzular bo'yicha o'zlashtirish")}</CardTitle>
         <CardDescription>
-          Bayesian Knowledge Tracing bo'yicha foizlar: kim qaysi mavzuda qiynalayotganini ko'rsatadi. 95% va undan
-          yuqori — o'zlashtirilgan, 50% dan past — yordam kerak. Taxminiy ko'rsatkich: baho emas.
+          {t("Bayesian Knowledge Tracing bo'yicha foizlar: kim qaysi mavzuda qiynalayotganini ko'rsatadi. 95% va undan yuqori — o'zlashtirilgan, 50% dan past — yordam kerak. Taxminiy ko'rsatkich: baho emas.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Talaba</TableHead>
+              <TableHead>{t('Talaba')}</TableHead>
               {topics.map((topic) => (
                 <TableHead key={topic.topic} className="text-right">
                   {topic.label}

@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 
 import { useAuth } from '@/lib/auth'
 import { navItemForPath } from '@/lib/nav'
+import { t } from '@/lib/i18n'
 
 interface PageHeaderProps {
   title: string
@@ -18,14 +19,14 @@ function Breadcrumbs({ title }: { title: string }) {
   const { pathname } = useLocation()
   if (!user) return null
   const section = navItemForPath(user.role, pathname)
-  const crumbs: { label: string; to?: string }[] = [{ label: 'Bosh sahifa', to: pathname === '/' ? undefined : '/' }]
+  const crumbs: { label: string; to?: string }[] = [{ label: t('Bosh sahifa'), to: pathname === '/' ? undefined : '/' }]
   if (section) {
     const onSection = pathname === section.to
     crumbs.push({ label: section.label, to: onSection ? undefined : section.to })
     if (!onSection) crumbs.push({ label: title })
   }
   return (
-    <nav aria-label="Joylashuv" className="mt-1">
+    <nav aria-label={t('Joylashuv')} className="mt-1">
       <ol className="flex flex-wrap items-center gap-1 font-heading text-sm font-semibold text-muted-foreground">
         {crumbs.map((crumb, index) => (
           <li key={index} className="flex min-w-0 items-center gap-1">

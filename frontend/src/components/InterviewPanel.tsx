@@ -10,15 +10,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import type { InterviewRequirement, InterviewState } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
 const MAX_QUESTION_LENGTH = 1000
 
-const REQUIREMENT_KINDS: Record<InterviewRequirement['kind'], string> = {
+const REQUIREMENT_KINDS: Record<InterviewRequirement['kind'], string> = localized({
   entity: 'Obyektlar',
   attribute: 'Saqlanadigan ma\'lumotlar',
   relationship: 'Bog\'lanishlar',
   rule: 'Biznes qoidalari',
-}
+})
 
 /** Talablar turlari bo'yicha guruhlangan ro'yxat (talabaning yozuvlari) */
 export function RequirementList({ items, muted = false }: { items: InterviewRequirement[]; muted?: boolean }) {
@@ -95,7 +96,7 @@ export function InterviewPanel({ labId }: { labId: number }) {
         <div className="grid max-h-[28rem] min-h-48 content-start gap-2 overflow-y-auto rounded-lg border p-3" aria-live="polite">
           {data.messages.length || send.isPending ? null : (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              Buyurtmachi bilan tanishing va savol bering. Masalan: «Kimlar yoki nimalar haqida ma'lumot saqlash kerak?»
+              {t("Buyurtmachi bilan tanishing va savol bering. Masalan: «Kimlar yoki nimalar haqida ma'lumot saqlash kerak?»")}
             </p>
           )}
           {data.messages.map((message) => (
@@ -108,7 +109,7 @@ export function InterviewPanel({ labId }: { labId: number }) {
               <Bubble role="user">{send.variables}</Bubble>
               <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                Buyurtmachi javob yozmoqda…
+                {t('Buyurtmachi javob yozmoqda…')}
               </div>
             </>
           ) : null}
@@ -117,20 +118,20 @@ export function InterviewPanel({ labId }: { labId: number }) {
         <form onSubmit={handleSubmit} className="grid gap-2">
           <div className="flex items-end gap-2">
             <Textarea
-              aria-label="Buyurtmachiga savol"
+              aria-label={t('Buyurtmachiga savol')}
               className="max-h-40 min-h-10"
-              placeholder={limitReached ? 'Savollar soni tugadi' : "Masalan: bitta shifokor nechta bo'limda ishlaydi?"}
+              placeholder={limitReached ? t('Savollar soni tugadi') : t("Masalan: bitta shifokor nechta bo'limda ishlaydi?")}
               maxLength={MAX_QUESTION_LENGTH}
               disabled={limitReached}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
             />
-            <Button type="submit" size="icon-lg" className="size-10" aria-label="Yuborish" disabled={!canSend}>
+            <Button type="submit" size="icon-lg" className="size-10" aria-label={t('Yuborish')} disabled={!canSend}>
               <SendHorizontal />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Bu laboratoriyada yana {data.questions_left} ta savol berish mumkin.</p>
+          <p className="text-xs text-muted-foreground">{t('Bu laboratoriyada yana {questions_left} ta savol berish mumkin.', { questions_left: data.questions_left })}</p>
         </form>
       </div>
 
@@ -138,7 +139,7 @@ export function InterviewPanel({ labId }: { labId: number }) {
         <div className="grid gap-1.5">
           <div className="flex items-baseline justify-between gap-2">
             <h3 id={`interview-found-${labId}`} className="text-sm font-medium">
-              Aniqlangan talablar
+              {t('Aniqlangan talablar')}
             </h3>
             <span className="text-sm tabular-nums">
               {data.found.length} / {data.total}
@@ -150,7 +151,7 @@ export function InterviewPanel({ labId }: { labId: number }) {
             aria-valuemin={0}
             aria-valuemax={data.total}
             aria-valuenow={data.found.length}
-            aria-label="Aniqlangan talablar"
+            aria-label={t('Aniqlangan talablar')}
           >
             <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
           </div>
@@ -158,13 +159,13 @@ export function InterviewPanel({ labId }: { labId: number }) {
         {data.found.length ? (
           <RequirementList items={data.found} />
         ) : (
-          <p className="text-sm text-muted-foreground">Buyurtmachi aytgan talablar shu yerda yig'iladi.</p>
+          <p className="text-sm text-muted-foreground">{t("Buyurtmachi aytgan talablar shu yerda yig'iladi.")}</p>
         )}
         {data.missed?.length ? (
           <div className="grid gap-2 border-t pt-3">
-            <h3 className="text-sm font-medium">Aniqlanmagan talablar</h3>
+            <h3 className="text-sm font-medium">{t('Aniqlanmagan talablar')}</h3>
             <p className="text-xs text-muted-foreground">
-              Laboratoriya yechilgandan keyin ko'rsatiladi: keyingi suhbatda qanday savol berish kerakligini o'ylab ko'ring.
+              {t("Laboratoriya yechilgandan keyin ko'rsatiladi: keyingi suhbatda qanday savol berish kerakligini o'ylab ko'ring.")}
             </p>
             <RequirementList items={data.missed} muted />
           </div>

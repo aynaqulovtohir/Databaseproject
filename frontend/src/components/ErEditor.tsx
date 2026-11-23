@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input'
 import { useIsDark } from '@/lib/appearance'
 import { cn } from '@/lib/utils'
 import type { ErAttribute, ErCardinality, ErDiagram, ErEntity, ErKey, ErRelationship, ErStatus } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const MAX_NAME_LENGTH = 64
 const MAX_ENTITIES = 40
@@ -105,7 +106,7 @@ function EntityNodeView({ data, selected }: NodeProps<EntityNode>) {
           ))}
         </ul>
       ) : (
-        <p className="px-2 py-1 text-xs text-muted-foreground italic">atribut yo'q</p>
+        <p className="px-2 py-1 text-xs text-muted-foreground italic">{t("atribut yo'q")}</p>
       )}
     </div>
   )
@@ -236,7 +237,7 @@ function EntityPanel({
     <div className="grid gap-3">
       <div className="grid gap-1.5">
         <label htmlFor="er-entity-name" className="text-sm font-medium">
-          Obyekt nomi
+          {t('Obyekt nomi')}
         </label>
         <Input
           id="er-entity-name"
@@ -246,31 +247,31 @@ function EntityPanel({
         />
       </div>
       <div className="grid gap-1.5">
-        <span className="text-sm font-medium">Atributlar</span>
+        <span className="text-sm font-medium">{t('Atributlar')}</span>
         {entity.attributes.map((attribute, index) => (
           <div key={index} className="flex items-center gap-1.5">
             <Input
-              aria-label={`${index + 1}-atribut nomi`}
+              aria-label={t('{value}-atribut nomi', { value: index + 1 })}
               value={attribute.name}
               maxLength={MAX_NAME_LENGTH}
               className="h-8 min-w-0 flex-1 text-sm"
               onChange={(event) => updateAttribute(index, { name: event.target.value })}
             />
             <select
-              aria-label={`${attribute.name || `${index + 1}-atribut`} kaliti`}
+              aria-label={t('{name} kaliti', { name: attribute.name || t('{number}-atribut', { number: index + 1 }) })}
               className="h-8 rounded-md border bg-background px-1 text-xs"
               value={attribute.key}
               onChange={(event) => updateAttribute(index, { key: event.target.value as ErKey })}
             >
               <option value="">—</option>
-              <option value="pk">PK</option>
-              <option value="fk">FK</option>
+              <option value="pk">{t('PK')}</option>
+              <option value="fk">{t('FK')}</option>
             </select>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={`«${attribute.name}» atributini o'chirish`}
+              aria-label={t("«{name}» atributini o'chirish", { name: attribute.name })}
               onClick={() => onChange({ ...entity, attributes: entity.attributes.filter((_, position) => position !== index) })}
             >
               <Trash2 aria-hidden="true" />
@@ -284,16 +285,16 @@ function EntityPanel({
           onClick={() => onChange({ ...entity, attributes: [...entity.attributes, { name: '', key: '' }] })}
         >
           <Plus aria-hidden="true" />
-          Atribut qo'shish
+          {t("Atribut qo'shish")}
         </Button>
         <p className="text-xs text-muted-foreground">
           <KeyRound className="mr-1 inline size-3" aria-hidden="true" />
-          PK — asosiy kalit, FK — tashqi kalit (ixtiyoriy: bog'lanish uni ifodalaydi).
+          {t("PK — asosiy kalit, FK — tashqi kalit (ixtiyoriy: bog'lanish uni ifodalaydi).")}
         </p>
       </div>
       <Button type="button" variant="destructive" onClick={onDelete}>
         <Trash2 aria-hidden="true" />
-        Obyektni o'chirish
+        {t("Obyektni o'chirish")}
       </Button>
     </div>
   )
@@ -321,8 +322,8 @@ function CardinalitySelect({
         value={value}
         onChange={(event) => onChange(event.target.value as ErCardinality)}
       >
-        <option value="1">1 (bitta)</option>
-        <option value="N">N (ko'p)</option>
+        <option value="1">{t('1 (bitta)')}</option>
+        <option value="N">{t("N (ko'p)")}</option>
       </select>
     </div>
   )
@@ -348,11 +349,11 @@ function RelationshipPanel({
       </p>
       <div className="grid gap-1.5">
         <label htmlFor="er-relationship-name" className="text-sm font-medium">
-          Bog'lanish nomi
+          {t("Bog'lanish nomi")}
         </label>
         <Input
           id="er-relationship-name"
-          placeholder="masalan: o'qiydi"
+          placeholder={t("masalan: o'qiydi")}
           value={relationship.name}
           maxLength={MAX_NAME_LENGTH}
           onChange={(event) => onChange({ ...relationship, name: event.target.value })}
@@ -361,23 +362,23 @@ function RelationshipPanel({
       <div className="grid grid-cols-2 gap-2">
         <CardinalitySelect
           id="er-source-card"
-          label={`«${source}» tomonida`}
+          label={t('«{source}» tomonida', { source })}
           value={relationship.source_card}
           onChange={(value) => onChange({ ...relationship, source_card: value })}
         />
         <CardinalitySelect
           id="er-target-card"
-          label={`«${target}» tomonida`}
+          label={t('«{target}» tomonida', { target })}
           value={relationship.target_card}
           onChange={(value) => onChange({ ...relationship, target_card: value })}
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        Masalan, «Talaba» tomonida N va «Guruh» tomonida 1: bitta guruhda ko'p talaba, har bir talaba bitta guruhda.
+        {t("Masalan, «Talaba» tomonida N va «Guruh» tomonida 1: bitta guruhda ko'p talaba, har bir talaba bitta guruhda.")}
       </p>
       <Button type="button" variant="destructive" onClick={onDelete}>
         <Trash2 aria-hidden="true" />
-        Bog'lanishni o'chirish
+        {t("Bog'lanishni o'chirish")}
       </Button>
     </div>
   )
@@ -434,7 +435,7 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
     // Uch ustunli to'r, qo'shni ustunlar biroz pastga surilgan: chiziqlar obyektlar ustidan kamroq o'tadi
     const entity: ErEntity = {
       id: newId('e'),
-      name: `Obyekt ${index + 1}`,
+      name: t('Obyekt {number}', { number: index + 1 }),
       x: 40 + (index % 3) * 300,
       y: 40 + Math.floor(index / 3) * 260 + (index % 3 === 1 ? 120 : 0),
       attributes: [{ name: 'id', key: 'pk' }],
@@ -523,17 +524,16 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
   return (
     <div className="grid gap-3">
       <p className="rounded-lg border bg-muted/40 p-2 text-xs text-muted-foreground sm:hidden">
-        Kichik ekranda chizish noqulay bo'lishi mumkin: imkon bo'lsa, kompyuterdan foydalaning. Kattalashtirish — ikki
-        barmoq bilan.
+        {t("Kichik ekranda chizish noqulay bo'lishi mumkin: imkon bo'lsa, kompyuterdan foydalaning. Kattalashtirish — ikki barmoq bilan.")}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" disabled={value.entities.length >= MAX_ENTITIES} onClick={addEntity}>
           <Plus aria-hidden="true" />
-          Obyekt qo'shish
+          {t("Obyekt qo'shish")}
         </Button>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <Link2 className="size-3.5" aria-hidden="true" />
-          Bog'lanish: obyekt chetidagi nuqtani boshqa obyektga sudrang. Tahrirlash uchun obyekt yoki chiziqni bosing.
+          {t("Bog'lanish: obyekt chetidagi nuqtani boshqa obyektga sudrang. Tahrirlash uchun obyekt yoki chiziqni bosing.")}
         </span>
       </div>
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
@@ -565,17 +565,16 @@ function ErEditorInner({ value, onChange, className }: ErEditorProps) {
             />
           ) : (
             <div className="grid gap-2 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Qanday chiziladi</p>
+              <p className="font-medium text-foreground">{t('Qanday chiziladi')}</p>
               <ol className="list-decimal space-y-1 pl-4">
-                <li>«Obyekt qo'shish» bilan obyekt yarating va uni bosib nomi va atributlarini yozing.</li>
-                <li>Asosiy kalit atributiga PK belgisini qo'ying.</li>
+                <li>{t("«Obyekt qo'shish» bilan obyekt yarating va uni bosib nomi va atributlarini yozing.")}</li>
+                <li>{t("Asosiy kalit atributiga PK belgisini qo'ying.")}</li>
                 <li>
-                  Obyekt ustiga kursorni olib boring (telefonda nuqtalar doim ko'rinadi): chetidagi nuqtani boshqa
-                  obyektga sudrang.
+                  {t("Obyekt ustiga kursorni olib boring (telefonda nuqtalar doim ko'rinadi): chetidagi nuqtani boshqa obyektga sudrang.")}
                 </li>
-                <li>Chiziqni bosib, bog'lanish nomi va ikki tomondagi kardinallikni (1 yoki N) tanlang.</li>
+                <li>{t("Chiziqni bosib, bog'lanish nomi va ikki tomondagi kardinallikni (1 yoki N) tanlang.")}</li>
               </ol>
-              <p>{value.entities.length} ta obyekt, {value.relationships.length} ta bog'lanish.</p>
+              <p>{t("{length} ta obyekt, {length2} ta bog'lanish.", { length: value.entities.length, length2: value.relationships.length })}</p>
             </div>
           )}
         </div>
@@ -598,13 +597,13 @@ export function ErFixLegend() {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       <li className="flex items-center gap-1.5">
-        <span className="size-3 rounded-sm border-2 border-emerald-500" aria-hidden="true" /> qo'shilgan
+        <span className="size-3 rounded-sm border-2 border-emerald-500" aria-hidden="true" />{' '}{t("qo'shilgan")}
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-3 rounded-sm border-2 border-dashed border-red-400" aria-hidden="true" /> olib tashlangan
+        <span className="size-3 rounded-sm border-2 border-dashed border-red-400" aria-hidden="true" />{' '}{t('olib tashlangan')}
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-3 rounded-sm border-2 border-amber-500" aria-hidden="true" /> o'zgartirilgan
+        <span className="size-3 rounded-sm border-2 border-amber-500" aria-hidden="true" />{' '}{t("o'zgartirilgan")}
       </li>
     </ul>
   )

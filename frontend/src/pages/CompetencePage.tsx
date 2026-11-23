@@ -22,6 +22,7 @@ import type {
   CompetenceStage,
   CompetenceSummary,
 } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
 // Darajalar tartibli: bitta ko'k tusning pog'onalari (index.css dagi --level-* tokenlari, ikkala mavzu uchun tekshirilgan)
 const LEVEL_ORDER: CompetenceLevel[] = ['low', 'medium', 'high', 'creative']
@@ -31,18 +32,18 @@ const LEVEL_COLORS: Record<CompetenceLevel, string> = {
   high: 'var(--level-high)',
   creative: 'var(--level-creative)',
 }
-const STAGE_LABELS: Record<CompetenceStage, string> = {
+const STAGE_LABELS: Record<CompetenceStage, string> = localized({
   initial: 'Tajriba boshida',
   final: 'Tajriba oxirida',
   delayed: 'Tajribadan keyin',
-}
+})
 const STAGE_ORDER: CompetenceStage[] = ['initial', 'final', 'delayed']
 
 /** Modelda kamida bitta komponent o'lchanadigan kesimlar (kechiktirilgan test bog'lanmagan bo'lsa, u ko'rsatilmaydi) */
 function usedStages(components: CompetenceComponent[]) {
   return STAGE_ORDER.filter((stage) => components.some((component) => component.stages.includes(stage)))
 }
-const COHORT_LABELS = { experimental: 'Tajriba guruhi (AI yoqilgan)', control: 'Nazorat guruhi' } as const
+const COHORT_LABELS = localized({ experimental: 'Tajriba guruhi (AI yoqilgan)', control: 'Nazorat guruhi' } as const)
 
 type LevelLabels = Record<CompetenceLevel, string>
 
@@ -52,7 +53,7 @@ function Swatch({ level }: { level: CompetenceLevel }) {
 
 function Legend({ labels }: { labels: LevelLabels }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Darajalar">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={t('Darajalar')}>
       {LEVEL_ORDER.map((level) => (
         <li key={level} className="flex items-center gap-1.5">
           <Swatch level={level} />
@@ -66,7 +67,7 @@ function Legend({ labels }: { labels: LevelLabels }) {
 /** 100% li ustun: darajalar ulushi. Raqamlar ustun ostida yoziladi (rangga tayanmaydi). */
 function LevelBar({ distribution, labels }: { distribution: CompetenceDistribution; labels: LevelLabels }) {
   if (!distribution.measured) {
-    return <p className="text-xs text-muted-foreground">O'lchanmagan</p>
+    return <p className="text-xs text-muted-foreground">{t("O'lchanmagan")}</p>
   }
   const segments = LEVEL_ORDER.filter((level) => distribution.counts[level] > 0)
   return (
@@ -77,13 +78,13 @@ function LevelBar({ distribution, labels }: { distribution: CompetenceDistributi
             key={level}
             className={index === 0 ? (segments.length === 1 ? 'rounded' : 'rounded-l') : index === segments.length - 1 ? 'rounded-r' : ''}
             style={{ width: `${distribution.percents[level]}%`, background: LEVEL_COLORS[level] }}
-            title={`${labels[level]}: ${distribution.counts[level]} talaba (${distribution.percents[level]}%)`}
+            title={t('{value}: {value2} talaba ({value3}%)', { value: labels[level], value2: distribution.counts[level], value3: distribution.percents[level] })}
           />
         ))}
       </div>
       <p className="text-xs text-muted-foreground tabular-nums">
         {LEVEL_ORDER.map((level) => `${labels[level]} ${distribution.counts[level]} (${distribution.percents[level]}%)`).join(' · ')}
-        {distribution.unmeasured ? ` · o'lchanmagan ${distribution.unmeasured}` : ''}
+        {distribution.unmeasured ? t(" · o'lchanmagan {unmeasured}", { unmeasured: distribution.unmeasured }) : ''}
       </p>
     </div>
   )
@@ -97,7 +98,7 @@ function stageBadges(stages: CompetenceStage[]) {
       </Badge>
     ))
   ) : (
-    <Badge variant="destructive">O'lchanmaydi</Badge>
+    <Badge variant="destructive">{t("O'lchanmaydi")}</Badge>
   )
 }
 
@@ -105,10 +106,9 @@ function ModelCard({ model }: { model: CompetenceModel }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Kompetentlik modeli</CardTitle>
+        <CardTitle>{t('Kompetentlik modeli')}</CardTitle>
         <CardDescription>
-          Komponent bali — ko'rsatkichlarning vaznli o'rtachasi (0–100). Komponentlar, ko'rsatkichlar, vaznlar va daraja
-          chegaralari admin panelda («Kompetentlik modeli» bo'limi) o'zgartiriladi.
+          {t("Komponent bali — ko'rsatkichlarning vaznli o'rtachasi (0–100). Komponentlar, ko'rsatkichlar, vaznlar va daraja chegaralari admin panelda («Kompetentlik modeli» bo'limi) o'zgartiriladi.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
@@ -117,7 +117,7 @@ function ModelCard({ model }: { model: CompetenceModel }) {
             <summary className="flex cursor-pointer flex-wrap items-center gap-2 text-sm font-medium select-none">
               {component.name}
               <span className="font-normal text-muted-foreground">
-                · past &lt; {component.medium_from}% ≤ o'rta &lt; {component.high_from}% ≤ yuqori &lt; {component.creative_from}% ≤ ijodiy-amaliy
+                {t("· past < {medium_from}% ≤ o'rta < {high_from}% ≤ yuqori < {creative_from}% ≤ ijodiy-amaliy", { medium_from: component.medium_from, high_from: component.high_from, creative_from: component.creative_from })}
               </span>
             </summary>
             {component.description ? <p className="mt-2 text-sm text-muted-foreground">{component.description}</p> : null}
@@ -127,13 +127,13 @@ function ModelCard({ model }: { model: CompetenceModel }) {
                   <span>{indicator.name}</span>
                   <span className="text-xs text-muted-foreground">
                     {indicator.source_label}
-                    {indicator.topics.length ? ` (${indicator.topics.join(', ')})` : ''} · vazn {indicator.weight}
+                    {indicator.topics.length ? ` (${indicator.topics.join(', ')})` : ''}{' '}{t('· vazn {weight}', { weight: indicator.weight })}
                   </span>
                   {stageBadges(indicator.stages)}
-                  {indicator.ai_only ? <Badge variant="secondary">Faqat AI yoqilgan guruhlarda</Badge> : null}
+                  {indicator.ai_only ? <Badge variant="secondary">{t('Faqat AI yoqilgan guruhlarda')}</Badge> : null}
                 </li>
               ))}
-              {!component.indicators.length ? <li className="text-sm text-muted-foreground">Ko'rsatkich yo'q</li> : null}
+              {!component.indicators.length ? <li className="text-sm text-muted-foreground">{t("Ko'rsatkich yo'q")}</li> : null}
             </ul>
           </details>
         ))}
@@ -149,17 +149,33 @@ function comparabilityWarnings(components: CompetenceComponent[]) {
   const partial = components.filter((component) => component.stages.length && component.stages.length < stages.length)
   if (partial.length) {
     warnings.push(
-      `Umumiy ball kesimlar o'rtasida taqqoslanmaydi: ${partial
-        .map((component) => `«${component.name}» faqat ${component.stages.map((stage) => STAGE_LABELS[stage].toLowerCase()).join(' va ')}`)
-        .join(', ')} o'lchanadi. Shuning uchun o'sish va bilim saqlanishi jadvallarida umumiy ball har bir talaba uchun faqat ikkala kesimda ham o'lchangan komponentlar bo'yicha hisoblanadi. Komponentlar bo'yicha solishtiring yoki ikkala kesimga ham o'lchov qo'shing.`,
+      t(
+        "Umumiy ball kesimlar o'rtasida taqqoslanmaydi: {list} o'lchanadi. Shuning uchun o'sish va bilim saqlanishi jadvallarida umumiy ball har bir talaba uchun faqat ikkala kesimda ham o'lchangan komponentlar bo'yicha hisoblanadi. Komponentlar bo'yicha solishtiring yoki ikkala kesimga ham o'lchov qo'shing.",
+        {
+          list: partial
+            .map((component) =>
+              t('«{name}» faqat {stages}', {
+                name: component.name,
+                stages: component.stages.map((stage) => STAGE_LABELS[stage].toLowerCase()).join(t(' va ')),
+              }),
+            )
+            .join(', '),
+        },
+      ),
     )
   }
   const missing = components.filter((component) => !component.stages.length)
   if (missing.length) {
-    warnings.push(`Hech qaysi kesimda o'lchanmaydi: ${missing.map((component) => `«${component.name}»`).join(', ')} — testlarni bog'lang.`)
+    warnings.push(
+      t("Hech qaysi kesimda o'lchanmaydi: {list} — testlarni bog'lang.", {
+        list: missing.map((component) => `«${component.name}»`).join(', '),
+      }),
+    )
   }
   if (components.some((component) => component.indicators.some((indicator) => indicator.ai_only))) {
-    warnings.push("AI baholaydigan ko'rsatkichlar nazorat guruhida o'lchanmaydi: bunday komponentlarda guruhlar boshqa ko'rsatkichlar bo'yicha solishtiriladi.")
+    warnings.push(
+      t("AI baholaydigan ko'rsatkichlar nazorat guruhida o'lchanmaydi: bunday komponentlarda guruhlar boshqa ko'rsatkichlar bo'yicha solishtiriladi."),
+    )
   }
   return warnings
 }
@@ -168,7 +184,7 @@ function summaryRows(model: CompetenceModel, summary: CompetenceSummary) {
   const byId = new Map(summary.components.map((item) => [item.component, item]))
   return [
     ...model.components.map((component) => ({ key: String(component.id), name: component.name, item: byId.get(component.id) })),
-    { key: 'overall', name: 'Umumiy', item: summary.overall },
+    { key: 'overall', name: t('Umumiy'), item: summary.overall },
   ]
 }
 
@@ -179,10 +195,9 @@ function ComparisonCard({ model, comparison, labels }: { model: CompetenceModel;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tajriba va nazorat guruhlari</CardTitle>
+        <CardTitle>{t('Tajriba va nazorat guruhlari')}</CardTitle>
         <CardDescription>
-          Kompetentlik darajalari taqsimoti har bir kesimda (ulush o'lchangan talabalar ichida). Tajriba guruhi —
-          AI yordamchisi yoqilgan guruhlar, nazorat guruhi — o'chirilganlar (Guruhlar sahifasida sozlanadi).
+          {t("Kompetentlik darajalari taqsimoti har bir kesimda (ulush o'lchangan talabalar ichida). Tajriba guruhi — AI yordamchisi yoqilgan guruhlar, nazorat guruhi — o'chirilganlar (Guruhlar sahifasida sozlanadi).")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -197,7 +212,7 @@ function ComparisonCard({ model, comparison, labels }: { model: CompetenceModel;
           <Alert>
             <TriangleAlert aria-hidden="true" />
             <AlertDescription>
-              Nazorat guruhi yo'q: solishtirish uchun kamida bitta guruhda AI yordamchisini o'chiring.
+              {t("Nazorat guruhi yo'q: solishtirish uchun kamida bitta guruhda AI yordamchisini o'chiring.")}
             </AlertDescription>
           </Alert>
         ) : null}
@@ -205,12 +220,12 @@ function ComparisonCard({ model, comparison, labels }: { model: CompetenceModel;
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-48">Komponent</TableHead>
-                <TableHead className="w-36">Kesim</TableHead>
+                <TableHead className="w-48">{t('Komponent')}</TableHead>
+                <TableHead className="w-36">{t('Kesim')}</TableHead>
                 {cohorts.map((cohort) => (
                   <TableHead key={cohort} className="min-w-72">
                     {COHORT_LABELS[cohort]}
-                    <span className="ml-1 font-normal text-muted-foreground">({comparison.cohorts[cohort].students} talaba)</span>
+                    <span className="ml-1 font-normal text-muted-foreground">{t('({students} talaba)', { students: comparison.cohorts[cohort].students })}</span>
                   </TableHead>
                 ))}
               </TableRow>
@@ -237,7 +252,7 @@ function ComparisonCard({ model, comparison, labels }: { model: CompetenceModel;
                             <div className="grid gap-1">
                               <LevelBar distribution={item.distribution} labels={labels} />
                               {item.mean !== null ? (
-                                <span className="text-xs text-muted-foreground tabular-nums">O'rtacha ball: {item.mean}</span>
+                                <span className="text-xs text-muted-foreground tabular-nums">{t("O'rtacha ball: {mean}", { mean: item.mean })}</span>
                               ) : null}
                             </div>
                           ) : null}
@@ -284,18 +299,18 @@ function GroupCard({ model, comparison, labels }: { model: CompetenceModel; comp
   } else if (report.isError) {
     content = <ErrorState error={report.error} onRetry={() => void report.refetch()} />
   } else if (!report.data.students.length) {
-    content = <p className="text-sm text-muted-foreground">Guruhda talaba yo'q.</p>
+    content = <p className="text-sm text-muted-foreground">{t("Guruhda talaba yo'q.")}</p>
   } else {
     content = (
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Talaba</TableHead>
+              <TableHead>{t('Talaba')}</TableHead>
               {model.components.map((component) => (
                 <TableHead key={component.id}>{component.name}</TableHead>
               ))}
-              <TableHead>Umumiy</TableHead>
+              <TableHead>{t('Umumiy')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -321,23 +336,23 @@ function GroupCard({ model, comparison, labels }: { model: CompetenceModel; comp
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Guruh talabalari</CardTitle>
-        <CardDescription>Har bir talabaning komponentlar bo'yicha bali (0–100) va darajasi. «—» — bu kesimda o'lchanmagan.</CardDescription>
+        <CardTitle>{t('Guruh talabalari')}</CardTitle>
+        <CardDescription>{t("Har bir talabaning komponentlar bo'yicha bali (0–100) va darajasi. «—» — bu kesimda o'lchanmagan.")}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Guruh</span>
+            <span className="text-muted-foreground">{t('Guruh')}</span>
             <select className="h-10 rounded-md border bg-background px-2" value={groupId} onChange={(event) => setGroupId(event.target.value)}>
               {comparison.groups.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
-                  {group.ai_enabled ? '' : ' (nazorat)'}
+                  {group.ai_enabled ? '' : t(' (nazorat)')}
                 </option>
               ))}
             </select>
           </label>
-          <div className="inline-flex rounded-lg border p-0.5" role="group" aria-label="Kesim">
+          <div className="inline-flex rounded-lg border p-0.5" role="group" aria-label={t('Kesim')}>
             {usedStages(model.components).map((item) => (
               <Button
                 key={item}
@@ -383,12 +398,12 @@ export function CompetencePage() {
     content = (
       <EmptyState
         icon={Gauge}
-        title="Kompetentlik modeli hali yaratilmagan"
-        description="Namunaviy modelni yaratish: python manage.py seed_competence_model. Keyin uni admin panelda metodikangizga moslang."
+        title={t('Kompetentlik modeli hali yaratilmagan')}
+        description={t('Namunaviy modelni yaratish: python manage.py seed_competence_model. Keyin uni admin panelda metodikangizga moslang.')}
       />
     )
   } else if (!comparison.data.groups.length) {
-    content = <EmptyState icon={Gauge} title="Hali guruh yo'q" description="Kompetentlik guruhlaringiz talabalari bo'yicha hisoblanadi." />
+    content = <EmptyState icon={Gauge} title={t("Hali guruh yo'q")} description={t("Kompetentlik guruhlaringiz talabalari bo'yicha hisoblanadi.")} />
   } else {
     const labels = Object.fromEntries(model.data.levels.map((level) => [level.key, level.label])) as LevelLabels
     content = (
@@ -404,8 +419,8 @@ export function CompetencePage() {
   return (
     <>
       <PageHeader
-        title="Kompetentlik"
-        description="Talabalarning ma'lumotlar bazasini loyihalash kompetentligi: komponentlar bo'yicha darajalar, tajriba boshida va oxirida. Anonim ma'lumotlar — «Tadqiqot ma'lumotlari» arxividagi kompetentlik.csv."
+        title={t('Kompetentlik')}
+        description={t("Talabalarning ma'lumotlar bazasini loyihalash kompetentligi: komponentlar bo'yicha darajalar, tajriba boshida va oxirida. Anonim ma'lumotlar — «Tadqiqot ma'lumotlari» arxividagi kompetentlik.csv.")}
       />
       {content}
     </>

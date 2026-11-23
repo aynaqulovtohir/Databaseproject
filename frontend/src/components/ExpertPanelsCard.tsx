@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import type { ExpertInvite, ExpertPanel, ExpertResults, Quiz } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function num(value: number | null, digits = 2) {
   return value === null ? '—' : value.toFixed(digits)
@@ -32,28 +33,27 @@ function LinkDialog({ link, label, onClose }: { link: string; label: string; onC
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>«{label}» uchun havola</DialogTitle>
+          <DialogTitle>{t('«{label}» uchun havola', { label })}</DialogTitle>
           <DialogDescription>
-            Havolani hozir nusxalang va ekspertga yuboring: xavfsizlik uchun u boshqa ko'rsatilmaydi (yo'qolsa, «Yangi havola»
-            bilan qayta yaratasiz). Havolada test javoblari bor — faqat shu ekspertga bering.
+            {t("Havolani hozir nusxalang va ekspertga yuboring: xavfsizlik uchun u boshqa ko'rsatilmaydi (yo'qolsa, «Yangi havola» bilan qayta yaratasiz). Havolada test javoblari bor — faqat shu ekspertga bering.")}
           </DialogDescription>
         </DialogHeader>
-        <Input readOnly className="h-10 font-mono text-xs" value={link} onFocus={(event) => event.target.select()} aria-label="Ekspert havolasi" />
+        <Input readOnly className="h-10 font-mono text-xs" value={link} onFocus={(event) => event.target.select()} aria-label={t('Ekspert havolasi')} />
         <DialogFooter>
           <Button
             size="lg"
             onClick={() => {
               void navigator.clipboard.writeText(link).then(
-                () => toast.success('Havola nusxalandi'),
-                () => toast.error("Nusxalab bo'lmadi: havolani qo'lda belgilab oling"),
+                () => toast.success(t('Havola nusxalandi')),
+                () => toast.error(t("Nusxalab bo'lmadi: havolani qo'lda belgilab oling")),
               )
             }}
           >
             <Copy aria-hidden="true" />
-            Nusxalash
+            {t('Nusxalash')}
           </Button>
           <Button variant="outline" size="lg" onClick={onClose}>
-            Yopish
+            {t('Yopish')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -79,39 +79,39 @@ function CreatePanelDialog({ quiz, onClose, onCreated }: { quiz: Quiz; onClose: 
     <Dialog open onOpenChange={(open) => (open || create.isPending ? undefined : onClose())}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ekspert baholashini boshlash</DialogTitle>
+          <DialogTitle>{t('Ekspert baholashini boshlash')}</DialogTitle>
           <DialogDescription>
-            Testning hozirgi savollari nusxalanadi: ekspertlar shu versiyani baholaydi. Savollarni tuzatgach, yangi bosqich oching.
+            {t('Testning hozirgi savollari nusxalanadi: ekspertlar shu versiyani baholaydi. Savollarni tuzatgach, yangi bosqich oching.')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <FormField id="panel_title" label="Nomi">
+          <FormField id="panel_title" label={t('Nomi')}>
             <Input id="panel_title" className="h-10" maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} />
           </FormField>
-          <FormField id="panel_construct" label="Test nimani o'lchaydi" hint="Ekspert savollarning shu tushunchaga mosligini baholaydi">
+          <FormField id="panel_construct" label={t("Test nimani o'lchaydi")} hint={t('Ekspert savollarning shu tushunchaga mosligini baholaydi')}>
             <Textarea
               id="panel_construct"
               rows={2}
               maxLength={2000}
-              placeholder="Masalan: talabaning ma'lumotlar bazasini loyihalash bo'yicha bilimi (ER-model, kalitlar, normallashtirish)"
+              placeholder={t("Masalan: talabaning ma'lumotlar bazasini loyihalash bo'yicha bilimi (ER-model, kalitlar, normallashtirish)")}
               value={construct}
               onChange={(event) => setConstruct(event.target.value)}
             />
           </FormField>
-          <FormField id="panel_instructions" label="Ekspertga qo'shimcha ko'rsatma (ixtiyoriy)">
+          <FormField id="panel_instructions" label={t("Ekspertga qo'shimcha ko'rsatma (ixtiyoriy)")}>
             <Textarea id="panel_instructions" rows={3} maxLength={3000} value={instructions} onChange={(event) => setInstructions(event.target.value)} />
           </FormField>
-          <FormField id="panel_closes" label="Tugash vaqti (ixtiyoriy)">
+          <FormField id="panel_closes" label={t('Tugash vaqti (ixtiyoriy)')}>
             <Input id="panel_closes" type="datetime-local" className="h-10 w-auto" value={closesAt} onChange={(event) => setClosesAt(event.target.value)} />
           </FormField>
         </div>
         <DialogFooter>
           <Button variant="outline" size="lg" disabled={create.isPending} onClick={onClose}>
-            Bekor qilish
+            {t('Bekor qilish')}
           </Button>
           <Button size="lg" disabled={create.isPending || !title.trim() || !construct.trim()} onClick={() => create.mutate()}>
             {create.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            Boshlash
+            {t('Boshlash')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -120,10 +120,10 @@ function CreatePanelDialog({ quiz, onClose, onCreated }: { quiz: Quiz; onClose: 
 }
 
 function InviteStatus({ invite }: { invite: ExpertInvite }) {
-  if (invite.revoked) return <Badge variant="outline">Bekor qilingan</Badge>
-  if (invite.submitted_at) return <Badge>Yuborgan · {formatDateTime(invite.submitted_at)}</Badge>
-  if (invite.started) return <Badge variant="secondary">Baholamoqda ({invite.rated} ta savol)</Badge>
-  return <Badge variant="outline">Ochmagan</Badge>
+  if (invite.revoked) return <Badge variant="outline">{t('Bekor qilingan')}</Badge>
+  if (invite.submitted_at) return <Badge>{t('Yuborgan · {submitted_at}', { submitted_at: formatDateTime(invite.submitted_at) })}</Badge>
+  if (invite.started) return <Badge variant="secondary">{t('Baholamoqda ({rated} ta savol)', { rated: invite.rated })}</Badge>
+  return <Badge variant="outline">{t('Ochmagan')}</Badge>
 }
 
 function ResultsView({ results }: { results: ExpertResults }) {
@@ -131,8 +131,7 @@ function ResultsView({ results }: { results: ExpertResults }) {
   if (results.experts < results.min_experts) {
     return (
       <p className="text-sm text-muted-foreground">
-        Natija kamida {results.min_experts} ta ekspert baholarini yuborgach hisoblanadi (tavsiya: {results.recommended_experts}–10 ta).
-        Hozir: {results.experts} ta.
+        {t('Natija kamida {min_experts} ta ekspert baholarini yuborgach hisoblanadi (tavsiya: {recommended_experts}–10 ta). Hozir: {experts} ta.', { min_experts: results.min_experts, recommended_experts: results.recommended_experts, experts: results.experts })}
       </p>
     )
   }
@@ -140,49 +139,49 @@ function ResultsView({ results }: { results: ExpertResults }) {
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card p-3">
-          <div className="text-sm text-muted-foreground">S-CVI/Ave</div>
+          <div className="text-sm text-muted-foreground">{t('S-CVI/Ave')}</div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-2xl font-semibold tabular-nums">{num(summary.s_cvi_ave)}</span>
-            <Badge variant={summary.s_cvi_ave_ok ? 'secondary' : 'outline'}>{summary.s_cvi_ave_ok ? 'yetarli' : `talab ≥ ${summary.s_cvi_ave_target}`}</Badge>
+            <Badge variant={summary.s_cvi_ave_ok ? 'secondary' : 'outline'}>{summary.s_cvi_ave_ok ? t('yetarli') : t('talab ≥ {s_cvi_ave_target}', { s_cvi_ave_target: summary.s_cvi_ave_target })}</Badge>
           </div>
         </div>
         <div className="rounded-xl border bg-card p-3">
-          <div className="text-sm text-muted-foreground">S-CVI/UA</div>
+          <div className="text-sm text-muted-foreground">{t('S-CVI/UA')}</div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-2xl font-semibold tabular-nums">{num(summary.s_cvi_ua)}</span>
-            <Badge variant={summary.s_cvi_ua_ok ? 'secondary' : 'outline'}>{summary.s_cvi_ua_ok ? 'yetarli' : `talab ≥ ${summary.s_cvi_ua_target}`}</Badge>
+            <Badge variant={summary.s_cvi_ua_ok ? 'secondary' : 'outline'}>{summary.s_cvi_ua_ok ? t('yetarli') : t('talab ≥ {s_cvi_ua_target}', { s_cvi_ua_target: summary.s_cvi_ua_target })}</Badge>
           </div>
         </div>
         <div className="rounded-xl border bg-card p-3">
-          <div className="text-sm text-muted-foreground">Savollar</div>
+          <div className="text-sm text-muted-foreground">{t('Savollar')}</div>
           <div className="mt-1 text-sm tabular-nums">
-            {summary.keep} qoldirish · {summary.revise} qayta ko'rish · {summary.remove} olib tashlash
+            {t("{keep} qoldirish · {revise} qayta ko'rish · {remove} olib tashlash", { keep: summary.keep, revise: summary.revise, remove: summary.remove })}
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">CVI (CVR o'rtachasi): {num(summary.cvi)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{t("CVI (CVR o'rtachasi):")}{' '}{num(summary.cvi)}</div>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        {results.experts} ta ekspert.{' '}
+        {t('{experts} ta ekspert.', { experts: results.experts })}{' '}
         {results.cvr_testable
-          ? `CVR kritik qiymati ${num(results.cvr_critical)} (α = 0.05, Ayre & Scally, 2014).`
-          : "5 tadan kam ekspert: CVR ning statistik ahamiyatini tekshirib bo'lmaydi, hamma ekspert «zarur» deyishi talab qilinadi."}{' '}
-        I-CVI talabi: ≥ {num(results.i_cvi_target)} (Lynn, 1986).
+          ? t('CVR kritik qiymati {value} (α = 0.05, Ayre & Scally, 2014).', { value: num(results.cvr_critical) })
+          : t("5 tadan kam ekspert: CVR ning statistik ahamiyatini tekshirib bo'lmaydi, hamma ekspert «zarur» deyishi talab qilinadi.")}{' '}
+        {t('I-CVI talabi: ≥')}{' '}{num(results.i_cvi_target)}{' '}{t('(Lynn, 1986).')}
       </p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Savol</TableHead>
-            <TableHead className="text-right" title="«Zarur» deganlar soni va Lawshe CVR">
-              CVR
+            <TableHead>{t('Savol')}</TableHead>
+            <TableHead className="text-right" title={t('«Zarur» deganlar soni va Lawshe CVR')}>
+              {t('CVR')}
             </TableHead>
-            <TableHead className="text-right" title="Mosligini 3-4 deganlar ulushi">
-              I-CVI
+            <TableHead className="text-right" title={t('Mosligini 3-4 deganlar ulushi')}>
+              {t('I-CVI')}
             </TableHead>
-            <TableHead className="text-right" title="Modifikatsiyalangan kappa: tasodifiy kelishuv hisobga olingan">
-              k*
+            <TableHead className="text-right" title={t('Modifikatsiyalangan kappa: tasodifiy kelishuv hisobga olingan')}>
+              {t('k*')}
             </TableHead>
-            <TableHead className="text-right">Aniqlik</TableHead>
-            <TableHead>Xulosa</TableHead>
+            <TableHead className="text-right">{t('Aniqlik')}</TableHead>
+            <TableHead>{t('Xulosa')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -203,7 +202,7 @@ function ResultsView({ results }: { results: ExpertResults }) {
               <TableCell className="text-right tabular-nums">
                 {num(item.cvr)}
                 <span className="block text-xs text-muted-foreground">
-                  {item.essential} / {results.experts} zarur
+                  {t('{essential} / {experts} zarur', { essential: item.essential, experts: results.experts })}
                 </span>
               </TableCell>
               <TableCell className="text-right tabular-nums">{num(item.i_cvi)}</TableCell>
@@ -218,7 +217,7 @@ function ResultsView({ results }: { results: ExpertResults }) {
         </TableBody>
       </Table>
       <details className="rounded-xl border bg-card p-3">
-        <summary className="cursor-pointer text-sm font-medium">Ekspertlar ro'yxati (dissertatsiya ilovasi uchun)</summary>
+        <summary className="cursor-pointer text-sm font-medium">{t("Ekspertlar ro'yxati (dissertatsiya ilovasi uchun)")}</summary>
         <ol className="mt-2 grid list-decimal gap-1 pl-5 text-sm">
           {results.panel_experts.map((expert, index) => (
             <li key={index}>
@@ -226,7 +225,7 @@ function ResultsView({ results }: { results: ExpertResults }) {
               {[expert.degree, expert.position, expert.workplace].filter(Boolean).length
                 ? ` — ${[expert.degree, expert.position, expert.workplace].filter(Boolean).join(', ')}`
                 : ''}
-              {expert.experience_years !== null && expert.experience_years !== undefined ? `, staj ${expert.experience_years} yil` : ''}
+              {expert.experience_years !== null && expert.experience_years !== undefined ? t(', staj {experience_years} yil', { experience_years: expert.experience_years }) : ''}
             </li>
           ))}
         </ol>
@@ -261,7 +260,7 @@ function PanelView({ panelId }: { panelId: number }) {
       api<{ invite: ExpertInvite; token?: string }>(`/expert-panels/${panelId}/invites/${id}/${operation}/`, { method: 'POST' }),
     onSuccess: (data) => {
       if (data.token) setShown({ link: expertLink(data.token), label: data.invite.label })
-      else toast.success('Havola bekor qilindi')
+      else toast.success(t('Havola bekor qilindi'))
       refresh()
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -274,11 +273,11 @@ function PanelView({ panelId }: { panelId: number }) {
   return (
     <div className="grid gap-4">
       <div className="text-sm text-muted-foreground">
-        {data.items_count} ta savol · {formatDateTime(data.created_at)} dagi versiya
-        {data.closes_at ? ` · ${formatDateTime(data.closes_at)} gacha` : ''}
+        {t('{items_count} ta savol · {created_at} dagi versiya', { items_count: data.items_count, created_at: formatDateTime(data.created_at) })}
+        {data.closes_at ? t(' · {closes_at} gacha', { closes_at: formatDateTime(data.closes_at) }) : ''}
       </div>
       <div className="grid gap-2">
-        <h3 className="text-sm font-semibold">Ekspertlar</h3>
+        <h3 className="text-sm font-semibold">{t('Ekspertlar')}</h3>
         {data.invites.length ? (
           <ul className="grid gap-1.5">
             {data.invites.map((item) => (
@@ -288,20 +287,20 @@ function PanelView({ panelId }: { panelId: number }) {
                 {item.submitted_at ? null : (
                   <Button variant="ghost" size="sm" disabled={operate.isPending} onClick={() => operate.mutate({ id: item.id, operation: 'renew' })}>
                     <RefreshCw aria-hidden="true" />
-                    Yangi havola
+                    {t('Yangi havola')}
                   </Button>
                 )}
                 {item.revoked ? null : (
                   <Button variant="ghost" size="sm" disabled={operate.isPending} onClick={() => operate.mutate({ id: item.id, operation: 'revoke' })}>
                     <Ban aria-hidden="true" />
-                    Bekor qilish
+                    {t('Bekor qilish')}
                   </Button>
                 )}
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">Hali ekspert qo'shilmagan.</p>
+          <p className="text-sm text-muted-foreground">{t("Hali ekspert qo'shilmagan.")}</p>
         )}
         <form
           className="flex flex-wrap gap-2"
@@ -311,16 +310,16 @@ function PanelView({ panelId }: { panelId: number }) {
           }}
         >
           <Input
-            aria-label="Ekspert belgisi"
+            aria-label={t('Ekspert belgisi')}
             className="h-10 min-w-0 flex-1"
             maxLength={200}
-            placeholder="Masalan: 1-ekspert, TATU, dotsent"
+            placeholder={t('Masalan: 1-ekspert, TATU, dotsent')}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
           />
           <Button type="submit" variant="outline" size="lg" disabled={invite.isPending || !label.trim()}>
             <UserPlus aria-hidden="true" />
-            Havola yaratish
+            {t('Havola yaratish')}
           </Button>
         </form>
       </div>
@@ -350,12 +349,12 @@ export function ExpertPanelsCard({ quiz }: { quiz: Quiz }) {
     content = (
       <EmptyState
         icon={Link2}
-        title="Hali ekspert baholashi yo'q"
-        description="Tajribadan oldin test savollarini 5–10 ta ekspertga baholating: bu testning mazmun validligini isbotlaydi."
+        title={t("Hali ekspert baholashi yo'q")}
+        description={t('Tajribadan oldin test savollarini 5–10 ta ekspertga baholating: bu testning mazmun validligini isbotlaydi.')}
         action={
           <Button size="lg" onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" />
-            Baholashni boshlash
+            {t('Baholashni boshlash')}
           </Button>
         }
       />
@@ -371,7 +370,7 @@ export function ExpertPanelsCard({ quiz }: { quiz: Quiz }) {
           ))}
           <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" />
-            Yangi bosqich
+            {t('Yangi bosqich')}
           </Button>
         </div>
         {current ? <PanelView key={current} panelId={current} /> : null}
@@ -381,10 +380,9 @@ export function ExpertPanelsCard({ quiz }: { quiz: Quiz }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ekspert baholashi (mazmun validligi)</CardTitle>
+        <CardTitle>{t('Ekspert baholashi (mazmun validligi)')}</CardTitle>
         <CardDescription>
-          Ekspertlar har bir savolni zarurligi (Lawshe CVR), mosligi (CVI) va aniqligi bo'yicha baholaydi. Ekspertga akkaunt kerak
-          emas: har biriga shaxsiy havola yuborasiz. Natija tadqiqot eksportida ham bor (ekspert_baholash.csv, ekspertlar ismisiz).
+          {t("Ekspertlar har bir savolni zarurligi (Lawshe CVR), mosligi (CVI) va aniqligi bo'yicha baholaydi. Ekspertga akkaunt kerak emas: har biriga shaxsiy havola yuborasiz. Natija tadqiqot eksportida ham bor (ekspert_baholash.csv, ekspertlar ismisiz).")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>

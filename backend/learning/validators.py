@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from rest_framework import serializers
+from config.i18n import tr
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
@@ -22,15 +23,15 @@ def validate_material_file(uploaded_file):
     extension = Path(uploaded_file.name).suffix.lower()
     if extension not in ALLOWED_FILE_TYPES:
         raise serializers.ValidationError(
-            "Ruxsat etilmagan fayl turi. Mumkin: PDF, DOCX, PPTX, PNG, JPG."
+            tr("Ruxsat etilmagan fayl turi. Mumkin: PDF, DOCX, PPTX, PNG, JPG.")
         )
     if uploaded_file.size > MAX_FILE_SIZE:
-        raise serializers.ValidationError("Fayl hajmi 20 MB dan oshmasligi kerak.")
+        raise serializers.ValidationError(tr("Fayl hajmi 20 MB dan oshmasligi kerak."))
     if uploaded_file.size == 0:
-        raise serializers.ValidationError("Fayl bo'sh.")
+        raise serializers.ValidationError(tr("Fayl bo'sh."))
 
     header = uploaded_file.read(8)
     uploaded_file.seek(0)
     if not any(header.startswith(signature) for signature in ALLOWED_FILE_TYPES[extension]):
-        raise serializers.ValidationError("Fayl tarkibi uning turiga mos emas.")
+        raise serializers.ValidationError(tr("Fayl tarkibi uning turiga mos emas."))
     return uploaded_file

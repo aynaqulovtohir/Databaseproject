@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { api, refreshAccessToken, setAccessToken, setSessionExpiredHandler } from '@/lib/api'
 import type { Me } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 interface AuthContextValue {
   user: Me | null
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth faqat AuthProvider ichida ishlatiladi')
+  if (!context) throw new Error(t('useAuth faqat AuthProvider ichida ishlatiladi'))
   return context
 }
 
@@ -97,12 +98,12 @@ export function useAuth(): AuthContextValue {
 // eslint-disable-next-line react/only-export-components
 export function useUser(): Me {
   const { user } = useAuth()
-  if (!user) throw new Error('Foydalanuvchi tizimga kirmagan')
+  if (!user) throw new Error(t('Foydalanuvchi tizimga kirmagan'))
   return user
 }
 
 // eslint-disable-next-line react/only-export-components
 export function fullName(person: { first_name: string; last_name: string; username?: string }): string {
   const name = `${person.first_name} ${person.last_name}`.trim()
-  return name || person.username || 'Ismsiz'
+  return name || person.username || t('Ismsiz')
 }

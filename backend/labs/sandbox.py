@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 import psycopg
 from django.conf import settings
 from psycopg import pq, sql
+from config.i18n import N_, tr
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,7 @@ def _error_from_result(result, script):
     if position.isdigit():
         line = script[: int(position) - 1].count("\n") + 1
     return SqlError(
-        message=diag(pq.DiagnosticField.MESSAGE_PRIMARY) or "Noma'lum xato",
+        message=diag(pq.DiagnosticField.MESSAGE_PRIMARY) or tr("Noma'lum xato"),
         sqlstate=diag(pq.DiagnosticField.SQLSTATE),
         detail=diag(pq.DiagnosticField.MESSAGE_DETAIL),
         hint=diag(pq.DiagnosticField.MESSAGE_HINT),
@@ -389,27 +390,27 @@ def _execute_script(runner, script, admin=None):
             elif status in (pq.ExecStatus.COPY_IN, pq.ExecStatus.COPY_OUT, pq.ExecStatus.COPY_BOTH):
                 # COPY ... FROM STDIN / TO STDOUT ma'lumot oqimini kutadi; bu yerda ishlatilmaydi
                 error = SqlError(
-                    message="COPY ... FROM STDIN yoki TO STDOUT buyrug'i laboratoriyada ishlamaydi.",
-                    hint="Ma'lumot qo'shish uchun INSERT dan foydalaning.",
+                    message=tr("COPY ... FROM STDIN yoki TO STDOUT buyrug'i laboratoriyada ishlamaydi."),
+                    hint=tr("Ma'lumot qo'shish uchun INSERT dan foydalaning."),
                 )
                 runner.close()
                 break
     except (psycopg.Error, OSError) as exc:
-        error = error or SqlError(message=f"Ulanish uzildi: {exc}")
+        error = error or SqlError(message=tr("Ulanish uzildi: {exc}", exc=exc))
 
     if too_much_data:
         error = SqlError(
-            message=f"Kod juda ko'p ma'lumot yozdi ({MAX_STORAGE_BYTES // (1024 * 1024)} MB dan ortiq) va to'xtatildi.",
-            hint="Laboratoriya uchun kichik ma'lumot yetarli: generate_series va INSERT dagi qatorlar sonini kamaytiring.",
+            message=tr("Kod juda ko'p ma'lumot yozdi ({value} MB dan ortiq) va to'xtatildi.", value=MAX_STORAGE_BYTES // (1024 * 1024)),
+            hint=tr("Laboratoriya uchun kichik ma'lumot yetarli: generate_series va INSERT dagi qatorlar sonini kamaytiring."),
         )
     elif too_many_rows:
         error = SqlError(
-            message=f"So'rov juda ko'p qator qaytardi ({MAX_RECEIVED_ROWS} tadan ortiq), shuning uchun to'xtatildi.",
-            hint="WHERE sharti yoki LIMIT qo'shing; JOIN shartini tekshiring.",
+            message=tr("So'rov juda ko'p qator qaytardi ({MAX_RECEIVED_ROWS} tadan ortiq), shuning uchun to'xtatildi.", MAX_RECEIVED_ROWS=MAX_RECEIVED_ROWS),
+            hint=tr("WHERE sharti yoki LIMIT qo'shing; JOIN shartini tekshiring."),
         )
     elif timed_out:
         error = SqlError(
-            message=f"Kod {SCRIPT_TIMEOUT_SECONDS} soniyadan uzoq ishladi va to'xtatildi.",
+            message=tr("Kod {SCRIPT_TIMEOUT_SECONDS} soniyadan uzoq ishladi va to'xtatildi.", SCRIPT_TIMEOUT_SECONDS=SCRIPT_TIMEOUT_SECONDS),
             sqlstate="57014",
         )
     return error, last_result, status_message
@@ -479,7 +480,7 @@ def _explain(runner, query, outcome):
     sozlamalar bilan rejani "aldamasligi" uchun (ulanish parametrlari, masalan search_path, saqlanib qoladi).
     """
     if runner.closed:
-        outcome.plan_error = SqlError(message="So'rov rejasini olib bo'lmadi: ulanish uzilgan.")
+        outcome.plan_error = SqlError(message=tr("So'rov rejasini olib bo'lmadi: ulanish uzilgan."))
         return
     try:
         runner.execute("RESET ALL")
@@ -567,7 +568,7 @@ def run_sql(script, setup_sql="", explain_sql=""):
 
 # Barcha sinovlar uchun umumiy vaqt: talaba trigger'i har bir sinovni sekinlashtirsa ham tekshiruv cho'zilmaydi
 PROBES_TIME_BUDGET_SECONDS = 20
-PROBE_TIMEOUT_ERROR = SqlError("Sinovlar uchun ajratilgan vaqt tugadi.", sqlstate="57014")
+PROBE_TIMEOUT_ERROR = SqlError(N_("Sinovlar uchun ajratilgan vaqt tugadi."), sqlstate="57014")
 
 
 def run_probes(script, setup_sql, probes):
@@ -741,12 +742,12 @@ class _Session:
                     if len(self.rows) < STEP_SHOWN_ROWS:
                         self.rows.append(tuple(_decode(result.get_value(0, i)) for i in range(result.nfields)))
                     if self.received > MAX_RECEIVED_ROWS:
-                        self.error = SqlError(message=f"So'rov {MAX_RECEIVED_ROWS} tadan ortiq qator qaytardi.")
+                        self.error = SqlError(message=tr("So'rov {MAX_RECEIVED_ROWS} tadan ortiq qator qaytardi.", MAX_RECEIVED_ROWS=MAX_RECEIVED_ROWS))
                         self.pgconn.get_cancel().cancel()
             elif status == pq.ExecStatus.FATAL_ERROR:
                 self.error = self.error or _error_from_result(result, self.statements[self.running])
             elif status in (pq.ExecStatus.COPY_IN, pq.ExecStatus.COPY_OUT, pq.ExecStatus.COPY_BOTH):
-                self.error = SqlError(message="COPY buyrug'i laboratoriyada ishlamaydi.")
+                self.error = SqlError(message=tr("COPY buyrug'i laboratoriyada ishlamaydi."))
                 self.connection.close()
                 return True
         return False
@@ -762,7 +763,7 @@ def run_concurrent(script, setup_sql=""):
     outcome = ConcurrentOutcome()
     statements = split_statements(script)
     if not statements or len(statements) > MAX_CONCURRENT_STATEMENTS:
-        outcome.error = SqlError(message=f"Kodda 1 tadan {MAX_CONCURRENT_STATEMENTS} tagacha buyruq bo'lishi kerak.")
+        outcome.error = SqlError(message=tr("Kodda 1 tadan {MAX_CONCURRENT_STATEMENTS} tagacha buyruq bo'lishi kerak.", MAX_CONCURRENT_STATEMENTS=MAX_CONCURRENT_STATEMENTS))
         return outcome
     body = len(statements) - 1
     order = [("A", i) for i in range(body)] + [("B", i) for i in range(body)] + [("A", body), ("B", body)]
@@ -844,7 +845,7 @@ def _schedule(sessions, order, outcome, admin):
             for session in running:
                 session.pgconn.get_cancel().cancel()
             outcome.error = outcome.error or SqlError(
-                message=f"Kod {CONCURRENT_TIMEOUT_SECONDS} soniyadan uzoq ishladi va to'xtatildi.", sqlstate="57014"
+                message=tr("Kod {CONCURRENT_TIMEOUT_SECONDS} soniyadan uzoq ishladi va to'xtatildi.", CONCURRENT_TIMEOUT_SECONDS=CONCURRENT_TIMEOUT_SECONDS), sqlstate="57014"
             )
             for session in sessions.values():
                 session.failed = True
@@ -855,7 +856,7 @@ def _schedule(sessions, order, outcome, admin):
             if _storage_used(admin) > MAX_STORAGE_BYTES:
                 for session in running:
                     session.pgconn.get_cancel().cancel()
-                outcome.error = SqlError(message=f"Kod juda ko'p ma'lumot yozdi ({MAX_STORAGE_BYTES // (1024 * 1024)} MB dan ortiq).")
+                outcome.error = SqlError(message=tr("Kod juda ko'p ma'lumot yozdi ({value} MB dan ortiq).", value=MAX_STORAGE_BYTES // (1024 * 1024)))
                 for session in sessions.values():
                     session.failed = True
                 return

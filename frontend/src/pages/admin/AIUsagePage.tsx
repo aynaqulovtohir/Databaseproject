@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { AIUsageReport, AIUsageTotals } from '@/lib/types'
+import { intlLocale, t } from '@/lib/i18n'
 
 const PERIODS = [7, 30, 90]
-const numberFormat = new Intl.NumberFormat('uz-UZ')
+const numberFormat = { format: (value: number) => new Intl.NumberFormat(intlLocale()).format(value) }
 
 function formatTokens(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)} mln`
-  if (value >= 10_000) return `${Math.round(value / 1000)} ming`
+  if (value >= 1_000_000) return t('{value} mln', { value: (value / 1_000_000).toFixed(2) })
+  if (value >= 10_000) return t('{value} ming', { value: Math.round(value / 1000) })
   return numberFormat.format(value)
 }
 
@@ -28,9 +29,9 @@ function UsageTile({ label, totals, priced }: { label: string; totals: AIUsageTo
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 font-heading text-2xl font-bold text-heading tabular-nums">{priced ? formatCost(totals.cost) : formatTokens(tokens)}</div>
       <div className="mt-1 text-xs text-muted-foreground tabular-nums">
-        {priced ? `${formatTokens(tokens)} token · ` : 'token · '}
-        {numberFormat.format(totals.requests)} so'rov
-        {totals.failed ? ` · ${numberFormat.format(totals.failed)} xato` : ''}
+        {priced ? t('{tokens} token · ', { tokens: formatTokens(tokens) }) : t('token · ')}
+        {t("{count} so'rov", { count: numberFormat.format(totals.requests) })}
+        {totals.failed ? t(' · {count} xato', { count: numberFormat.format(totals.failed) }) : ''}
       </div>
     </div>
   )
@@ -51,7 +52,7 @@ function DailyChart({ daily, priced }: { daily: AIUsageReport['daily']; priced: 
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Kunlik AI tokenlari" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label={t('Kunlik AI tokenlari')} onMouseLeave={() => setHover(null)}>
         <line x1={0} x2={width} y1={height - bottom} y2={height - bottom} className="stroke-border" />
         {daily.map((day, index) => {
           const barHeight = totals[index] ? Math.max(2, (totals[index] / max) * (height - bottom - 8)) : 0
@@ -90,9 +91,9 @@ function DailyChart({ daily, priced }: { daily: AIUsageReport['daily']; priced: 
           <div className="font-medium">
             {active.date.slice(8, 10)}.{active.date.slice(5, 7)}.{active.date.slice(0, 4)}
           </div>
-          <div className="tabular-nums">{formatTokens(active.input_tokens + active.output_tokens)} token</div>
+          <div className="tabular-nums">{t('{value} token', { value: formatTokens(active.input_tokens + active.output_tokens) })}</div>
           <div className="text-muted-foreground tabular-nums">
-            {active.requests} so'rov{active.failed ? `, ${active.failed} xato` : ''}
+            {t("{requests} so'rov", { requests: active.requests })}{active.failed ? t(', {failed} xato', { failed: active.failed }) : ''}
             {priced ? ` · ${formatCost(active.cost)}` : ''}
           </div>
         </div>
@@ -102,18 +103,18 @@ function DailyChart({ daily, priced }: { daily: AIUsageReport['daily']; priced: 
 }
 
 function BreakdownTable({ rows, label, priced }: { rows: (AIUsageTotals & { name: string })[]; label: string; priced: boolean }) {
-  if (!rows.length) return <p className="text-sm text-muted-foreground">Bu davrda AI so'rovi bo'lmagan.</p>
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{t("Bu davrda AI so'rovi bo'lmagan.")}</p>
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{label}</TableHead>
-          <TableHead className="text-right">So'rovlar</TableHead>
-          <TableHead className="text-right">Xato</TableHead>
-          <TableHead className="text-right">Kirish tokeni</TableHead>
-          <TableHead className="text-right">Keshdan</TableHead>
-          <TableHead className="text-right">Chiqish tokeni</TableHead>
-          {priced ? <TableHead className="text-right">Xarajat</TableHead> : null}
+          <TableHead className="text-right">{t("So'rovlar")}</TableHead>
+          <TableHead className="text-right">{t('Xato')}</TableHead>
+          <TableHead className="text-right">{t('Kirish tokeni')}</TableHead>
+          <TableHead className="text-right">{t('Keshdan')}</TableHead>
+          <TableHead className="text-right">{t('Chiqish tokeni')}</TableHead>
+          {priced ? <TableHead className="text-right">{t('Xarajat')}</TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -150,19 +151,19 @@ export function AIUsagePage() {
     content = (
       <div className="grid gap-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <UsageTile label="Bugun" totals={data.today} priced={priced} />
-          <UsageTile label="Shu oy" totals={data.month} priced={priced} />
-          <UsageTile label="O'tgan oy" totals={data.previous_month} priced={priced} />
+          <UsageTile label={t('Bugun')} totals={data.today} priced={priced} />
+          <UsageTile label={t('Shu oy')} totals={data.month} priced={priced} />
+          <UsageTile label={t("O'tgan oy")} totals={data.previous_month} priced={priced} />
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Kunlik sarf (oxirgi {data.days} kun)</CardTitle>
+            <CardTitle>{t('Kunlik sarf (oxirgi {days} kun)', { days: data.days })}</CardTitle>
             <CardDescription>
-              Jami: {formatTokens(data.period.input_tokens + data.period.output_tokens)} token, {numberFormat.format(data.period.requests)} so'rov
+              {t("Jami: {value} token, {count} so'rov", { value: formatTokens(data.period.input_tokens + data.period.output_tokens), count: numberFormat.format(data.period.requests) })}
               {priced ? `, ${formatCost(data.period.cost)}` : ''}.{' '}
               {priced
-                ? `Narx: 1 mln kirish tokeni $${data.price.input_per_mtok}, chiqish tokeni $${data.price.output_per_mtok}.`
-                : "Narx sozlanmagan (bepul tarif): .env faylidagi AI_PRICE_INPUT_PER_MTOK va AI_PRICE_OUTPUT_PER_MTOK bilan pulli tarif narxini kiriting."}
+                ? t('Narx: 1 mln kirish tokeni ${input_per_mtok}, chiqish tokeni ${output_per_mtok}.', { input_per_mtok: data.price.input_per_mtok, output_per_mtok: data.price.output_per_mtok })
+                : t('Narx sozlanmagan (bepul tarif): .env faylidagi AI_PRICE_INPUT_PER_MTOK va AI_PRICE_OUTPUT_PER_MTOK bilan pulli tarif narxini kiriting.')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -171,24 +172,22 @@ export function AIUsagePage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Maqsad bo'yicha</CardTitle>
-            <CardDescription>Qaysi imkoniyat qancha sarflayapti. Xato — AI javob bermagan yoki javobi yaroqsiz bo'lgan so'rovlar.</CardDescription>
+            <CardTitle>{t("Maqsad bo'yicha")}</CardTitle>
+            <CardDescription>{t("Qaysi imkoniyat qancha sarflayapti. Xato — AI javob bermagan yoki javobi yaroqsiz bo'lgan so'rovlar.")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <BreakdownTable rows={data.by_purpose.map((row) => ({ ...row, name: row.label }))} label="Maqsad" priced={priced} />
+            <BreakdownTable rows={data.by_purpose.map((row) => ({ ...row, name: row.label }))} label={t('Maqsad')} priced={priced} />
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Model bo'yicha</CardTitle>
+            <CardTitle>{t("Model bo'yicha")}</CardTitle>
             <CardDescription>
-              Maslahatlar arzon tez modelda (AI_FAST_MODEL), baholash va tahlil asosiy modelda bajariladi. Asosiy model
-              band bo'lsa, so'rov zaxira modelga o'tadi. «Keshdan» — takrorlanuvchi ko'rsatmalarning keshdan o'qilgan
-              qismi: u oddiy kirish narxining 10 foiziga hisoblanadi.
+              {t("Maslahatlar arzon tez modelda (AI_FAST_MODEL), baholash va tahlil asosiy modelda bajariladi. Asosiy model band bo'lsa, so'rov zaxira modelga o'tadi. «Keshdan» — takrorlanuvchi ko'rsatmalarning keshdan o'qilgan qismi: u oddiy kirish narxining 10 foiziga hisoblanadi.")}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <BreakdownTable rows={data.by_model.map((row) => ({ ...row, name: row.model }))} label="Model" priced={priced} />
+            <BreakdownTable rows={data.by_model.map((row) => ({ ...row, name: row.model }))} label={t('Model')} priced={priced} />
           </CardContent>
         </Card>
       </div>
@@ -198,15 +197,15 @@ export function AIUsagePage() {
   return (
     <>
       <PageHeader
-        title="AI xarajati"
-        description="AI so'rovlari, tokenlar va taxminiy xarajat. Talabalar matni va ismi hisobga yozilmaydi."
+        title={t('AI xarajati')}
+        description={t("AI so'rovlari, tokenlar va taxminiy xarajat. Talabalar matni va ismi hisobga yozilmaydi.")}
         actions={
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Davr</span>
+            <span className="text-muted-foreground">{t('Davr')}</span>
             <select className="h-10 rounded-md border bg-background px-2" value={days} onChange={(event) => setDays(Number(event.target.value))}>
               {PERIODS.map((period) => (
                 <option key={period} value={period}>
-                  {period} kun
+                  {t('{period} kun', { period })}
                 </option>
               ))}
             </select>

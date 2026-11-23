@@ -27,6 +27,7 @@ from .services import (
     survey_summary,
     taking_payload,
 )
+from config.i18n import tr
 
 
 def visible_quizzes(user):
@@ -63,7 +64,7 @@ class QuizViewSet(viewsets.ModelViewSet):
         quiz = self.get_object()
         if quiz.attempts.filter(submitted_at__isnull=False).exists():
             raise ValidationError(
-                {"detail": "Bu testni talabalar topshirgan: tadqiqot natijalari yo'qolmasligi uchun uni o'chirib bo'lmaydi."}
+                {"detail": tr("Bu testni talabalar topshirgan: tadqiqot natijalari yo'qolmasligi uchun uni o'chirib bo'lmaydi.")}
             )
         return super().destroy(request, *args, **kwargs)
 
@@ -73,13 +74,13 @@ class QuizViewSet(viewsets.ModelViewSet):
         masalan, chiqish testidan o'sha savollar bilan kechiktirilgan test. O'qituvchining nusxasiga faqat
         o'zi o'qitadigan guruhlar o'tadi; ochilish/yopilish vaqtlari ko'chirilmaydi (yangidan belgilanadi)."""
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         quiz = self.get_object()
         kind = request.data.get("kind", quiz.kind)
         if kind not in Quiz.Kind.values:
-            raise ValidationError({"kind": "Noma'lum test turi."})
+            raise ValidationError({"kind": tr("Noma'lum test turi.")})
         if (kind == Quiz.Kind.SURVEY) != (quiz.kind == Quiz.Kind.SURVEY):
-            raise ValidationError({"kind": "So'rovnomani oddiy testga (yoki aksincha) aylantirib bo'lmaydi."})
+            raise ValidationError({"kind": tr("So'rovnomani oddiy testga (yoki aksincha) aylantirib bo'lmaydi.")})
         groups = quiz.groups.all()
         if request.user.is_teacher:
             groups = groups.filter(teachers=request.user)
@@ -107,7 +108,7 @@ class QuizViewSet(viewsets.ModelViewSet):
 
     def student_attempt(self, request):
         if not request.user.is_student:
-            raise PermissionDenied("Testni faqat talaba topshiradi.")
+            raise PermissionDenied(tr("Testni faqat talaba topshiradi."))
         quiz = self.get_object()
         attempt = QuizAttempt.objects.filter(quiz=quiz, student=request.user).first()
         return quiz, finalize_if_expired(attempt)
@@ -118,12 +119,12 @@ class QuizViewSet(viewsets.ModelViewSet):
         quiz, attempt = self.student_attempt(request)
         if attempt and attempt.submitted_at:
             return Response(
-                {"detail": "Siz bu testni topshirgansiz.", "result": result_payload(attempt)},
+                {"detail": tr("Siz bu testni topshirgansiz."), "result": result_payload(attempt)},
                 status=status.HTTP_409_CONFLICT,
             )
         if attempt is None:
             if not quiz.is_open():
-                raise ValidationError({"detail": "Test hozir yopiq."})
+                raise ValidationError({"detail": tr("Test hozir yopiq.")})
             attempt, _ = QuizAttempt.objects.get_or_create(quiz=quiz, student=request.user)
         return Response(taking_payload(attempt))
 
@@ -138,10 +139,10 @@ class QuizViewSet(viewsets.ModelViewSet):
         """Javoblarni oraliq saqlash (talaba belgilagan sayin)."""
         quiz, attempt = self.student_attempt(request)
         if attempt is None:
-            raise ValidationError({"detail": "Avval testni boshlang."})
+            raise ValidationError({"detail": tr("Avval testni boshlang.")})
         if attempt.submitted_at:
             return Response(
-                {"detail": "Vaqt tugadi: test yakunlandi.", "result": result_payload(attempt)},
+                {"detail": tr("Vaqt tugadi: test yakunlandi."), "result": result_payload(attempt)},
                 status=status.HTTP_409_CONFLICT,
             )
         attempt.answers = self.cleaned(quiz, request)
@@ -153,7 +154,7 @@ class QuizViewSet(viewsets.ModelViewSet):
         """Testni yakunlaydi. Vaqt tugagan bo'lsa, yangi javoblar qabul qilinmaydi (saqlanganlari baholanadi)."""
         quiz, attempt = self.student_attempt(request)
         if attempt is None:
-            raise ValidationError({"detail": "Avval testni boshlang."})
+            raise ValidationError({"detail": tr("Avval testni boshlang.")})
         if not attempt.submitted_at and "answers" in request.data:
             attempt.answers = self.cleaned(quiz, request)
             attempt.save(update_fields=["answers"])
@@ -163,7 +164,7 @@ class QuizViewSet(viewsets.ModelViewSet):
     def result(self, request, pk=None):
         quiz, attempt = self.student_attempt(request)
         if attempt is None or not attempt.submitted_at:
-            raise ValidationError({"detail": "Test hali topshirilmagan."})
+            raise ValidationError({"detail": tr("Test hali topshirilmagan.")})
         return Response(result_payload(attempt))
 
     @staticmethod
@@ -179,10 +180,10 @@ class QuizViewSet(viewsets.ModelViewSet):
     def survey(self, request, pk=None):
         """So'rovnoma bo'yicha umumlashgan natija (alohida talabalar javobisiz)."""
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         quiz = self.get_object()
         if quiz.kind != Quiz.Kind.SURVEY:
-            raise ValidationError({"detail": "Bu test so'rovnoma emas."})
+            raise ValidationError({"detail": tr("Bu test so'rovnoma emas.")})
         return Response(survey_summary(quiz))
 
     @action(detail=True, methods=["get"])
@@ -191,14 +192,14 @@ class QuizViewSet(viewsets.ModelViewSet):
         from .psychometrics import analyse_quiz
 
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         return Response(analyse_quiz(self.get_object()))
 
     @action(detail=True, methods=["get"])
     def results(self, request, pk=None):
         """Test berilgan guruhlardagi har bir talabaning natijasi."""
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         quiz = self.get_object()
         attempts = {
             attempt.student_id: finalize_if_expired(attempt)
@@ -241,7 +242,7 @@ class ExperimentView(APIView):
         from .experiment import analyse
 
         if request.user.is_student:
-            raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Tahlil faqat admin va o'qituvchi uchun."))
         quizzes = Quiz.objects.all() if request.user.is_admin else Quiz.objects.filter(author=request.user)
         return Response(analyse(quizzes, research_groups(request.user)))
 
@@ -255,7 +256,7 @@ class ExpertPanelViewSet(viewsets.ModelViewSet):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if request.user.is_student:
-            raise PermissionDenied("Ekspert baholashi faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Ekspert baholashi faqat admin va o'qituvchi uchun."))
 
     def get_queryset(self):
         from .expert import visible_panels
@@ -264,7 +265,7 @@ class ExpertPanelViewSet(viewsets.ModelViewSet):
         quiz_id = self.request.query_params.get("quiz")
         if quiz_id:
             if not quiz_id.isdigit():
-                raise ValidationError({"quiz": "Test raqami butun son bo'lishi kerak."})
+                raise ValidationError({"quiz": tr("Test raqami butun son bo'lishi kerak.")})
             queryset = queryset.filter(quiz_id=quiz_id)
         return queryset
 
@@ -284,9 +285,9 @@ class ExpertPanelViewSet(viewsets.ModelViewSet):
         panel = self.get_object()
         label = request.data.get("label")
         if not isinstance(label, str) or not label.strip() or len(label) > 200:
-            raise ValidationError({"label": "Ekspert uchun belgi kiriting (200 belgigacha)."})
+            raise ValidationError({"label": tr("Ekspert uchun belgi kiriting (200 belgigacha).")})
         if panel.invites.count() >= 50:
-            raise ValidationError({"detail": "Bitta baholashga 50 tadan ortiq ekspert qo'shib bo'lmaydi."})
+            raise ValidationError({"detail": tr("Bitta baholashga 50 tadan ortiq ekspert qo'shib bo'lmaydi.")})
         invite, token = create_invite(panel, label.strip())
         return Response({"invite": invite_payload(invite), "token": token}, status=status.HTTP_201_CREATED)
 
@@ -302,7 +303,7 @@ class ExpertPanelViewSet(viewsets.ModelViewSet):
             invite.save(update_fields=["revoked", "updated_at"])
             return Response({"invite": invite_payload(invite)})
         if invite.submitted_at:
-            raise ValidationError({"detail": "Ekspert baholarini yuborgan: havolani yangilash shart emas."})
+            raise ValidationError({"detail": tr("Ekspert baholarini yuborgan: havolani yangilash shart emas.")})
         invite.revoked = False
         token = renew_token(invite)
         invite.save(update_fields=["revoked"])
@@ -338,7 +339,7 @@ class ExpertRatingView(APIView):
 
         invite = find_invite(token)
         if invite is None:
-            raise NotFound("Havola noto'g'ri yoki bekor qilingan.")
+            raise NotFound(tr("Havola noto'g'ri yoki bekor qilingan."))
         return invite
 
     def payload(self, invite):
@@ -368,10 +369,10 @@ class ExpertRatingView(APIView):
 
         invite = self.invite(token)
         if not invite.panel.is_open():
-            raise ValidationError({"detail": "Baholash muddati tugagan."})
+            raise ValidationError({"detail": tr("Baholash muddati tugagan.")})
         submit = request.data.get("submit", False)
         if not isinstance(submit, bool):
-            raise ValidationError({"submit": "Qiymat true yoki false bo'lishi kerak."})
+            raise ValidationError({"submit": tr("Qiymat true yoki false bo'lishi kerak.")})
         try:
             invite = save_ratings(invite, request.data.get("expert", {}), request.data.get("ratings", {}), submit)
         except RatingsError as exc:

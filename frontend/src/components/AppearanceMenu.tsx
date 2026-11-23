@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { setTextSize, setTheme, TEXT_SIZES, THEMES, useTextSize, useTheme, type TextSize, type Theme } from '@/lib/appearance'
+import { t } from '@/lib/i18n'
 
 /** Mavzu va yozuv o'lchami. Tanlaganda menyu yopilmaydi: natija darhol ko'rinadi. */
 export function AppearanceMenu() {
@@ -19,12 +20,12 @@ export function AppearanceMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-lg" aria-label="Ko'rinish: mavzu va yozuv o'lchami" title="Ko'rinish">
+        <Button variant="ghost" size="icon-lg" aria-label={t("Ko'rinish: mavzu va yozuv o'lchami")} title={t("Ko'rinish")}>
           <Palette className="size-5" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[80svh] w-52 overflow-y-auto">
-        <DropdownMenuLabel>Mavzu</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('Mavzu')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>
           {THEMES.map((item) => (
             <DropdownMenuRadioItem key={item.value} value={item.value} onSelect={(event) => event.preventDefault()}>
@@ -33,7 +34,7 @@ export function AppearanceMenu() {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Yozuv o'lchami</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("Yozuv o'lchami")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={textSize} onValueChange={(value) => setTextSize(value as TextSize)}>
           {TEXT_SIZES.map((item) => (
             <DropdownMenuRadioItem key={item.value} value={item.value} onSelect={(event) => event.preventDefault()}>

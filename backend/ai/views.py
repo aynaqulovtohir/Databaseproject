@@ -26,6 +26,7 @@ from .serializers import (
     StudentAnalysisSerializer,
 )
 from .services import chat_reply
+from config.i18n import N_, tr
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 CHAT_HISTORY_LIMIT = 20
 
 
-AI_DISABLED_MESSAGE = "Guruhingizda AI yordamchisi o'chirilgan."
+AI_DISABLED_MESSAGE = N_("Guruhingizda AI yordamchisi o'chirilgan.")
 
 def get_visible_analysis(user, submission_pk):
     submission = get_object_or_404(visible_submissions(user), pk=submission_pk)
@@ -61,13 +62,13 @@ class SubmissionAnalysisRetryView(APIView):
 
     def post(self, request, submission_pk):
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         analysis = get_visible_analysis(request.user, submission_pk)
         updated = AIAnalysis.objects.filter(pk=analysis.pk, status=AIAnalysis.Status.FAILED).update(
             status=AIAnalysis.Status.PENDING, attempts=0, error_message="", completed_at=None
         )
         if not updated:
-            raise ValidationError({"detail": "Faqat xato bilan tugagan tahlilni qayta ishga tushirish mumkin."})
+            raise ValidationError({"detail": tr("Faqat xato bilan tugagan tahlilni qayta ishga tushirish mumkin.")})
         analysis.refresh_from_db()
         return Response(StaffAnalysisSerializer(analysis).data)
 
@@ -80,7 +81,7 @@ class AssignmentChatView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
-            raise PermissionDenied("Chat-yordamchi faqat talaba uchun.")
+            raise PermissionDenied(tr("Chat-yordamchi faqat talaba uchun."))
         if not request.user.ai_allowed:
             raise PermissionDenied(AI_DISABLED_MESSAGE)
         self.assignment = get_object_or_404(visible_assignments(request.user), pk=kwargs["assignment_pk"])
@@ -110,7 +111,7 @@ class AssignmentChatView(APIView):
 
         if self.messages_sent_today() >= settings.AI_CHAT_DAILY_LIMIT:
             return Response(
-                {"detail": f"Bugungi xabarlar limiti ({settings.AI_CHAT_DAILY_LIMIT} ta) tugadi. Ertaga davom eting."},
+                {"detail": tr("Bugungi xabarlar limiti ({AI_CHAT_DAILY_LIMIT} ta) tugadi. Ertaga davom eting.", AI_CHAT_DAILY_LIMIT=settings.AI_CHAT_DAILY_LIMIT)},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -126,18 +127,18 @@ class AssignmentChatView(APIView):
             )
         except AINotConfigured:
             return Response(
-                {"detail": "AI yordamchi hali sozlanmagan. Administratorga murojaat qiling."},
+                {"detail": tr("AI yordamchi hali sozlanmagan. Administratorga murojaat qiling.")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except AITransientError:
             return Response(
-                {"detail": "AI yordamchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
+                {"detail": tr("AI yordamchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except AIError as exc:
             logger.error("Chat xatosi: %s", exc)
             return Response(
-                {"detail": "AI bu xabarga javob bera olmadi. Savolni boshqacha yozib ko'ring."},
+                {"detail": tr("AI bu xabarga javob bera olmadi. Savolni boshqacha yozib ko'ring.")},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -172,7 +173,7 @@ class AIUsageView(APIView):
 
         days = request.query_params.get("days", "30")
         if not days.isdigit() or not 1 <= int(days) <= 365:
-            raise ValidationError({"days": "Kunlar soni 1 dan 365 gacha butun son bo'lsin."})
+            raise ValidationError({"days": tr("Kunlar soni 1 dan 365 gacha butun son bo'lsin.")})
         return Response(usage_report(int(days)))
 
 
@@ -220,7 +221,7 @@ class SubmissionVivaView(APIView):
         from .viva import MAX_ANSWER_LENGTH, evaluate_answers, generate_questions
 
         if not request.user.is_student:
-            raise PermissionDenied("Himoyadan faqat yechim egasi o'tadi.")
+            raise PermissionDenied(tr("Himoyadan faqat yechim egasi o'tadi."))
         submission = self.submission(request, submission_pk)
         refused = refuse_ai(request.user)
         if refused:
@@ -229,7 +230,7 @@ class SubmissionVivaView(APIView):
 
         if step is None:
             if viva:
-                raise ValidationError({"detail": "Bu yechim bo'yicha himoya savollari allaqachon berilgan."})
+                raise ValidationError({"detail": tr("Bu yechim bo'yicha himoya savollari allaqachon berilgan.")})
             try:
                 questions = generate_questions(submission)
             except AIError as exc:
@@ -239,7 +240,7 @@ class SubmissionVivaView(APIView):
             return Response({"viva": viva_payload(viva, False)}, status=status.HTTP_201_CREATED)
 
         if viva is None or viva.status != VivaSession.Status.ASKED:
-            raise ValidationError({"detail": "Javob beriladigan himoya savollari yo'q."})
+            raise ValidationError({"detail": tr("Javob beriladigan himoya savollari yo'q.")})
         answers = request.data.get("answers")
         if (
             not isinstance(answers, list)
@@ -247,11 +248,11 @@ class SubmissionVivaView(APIView):
             or not all(isinstance(answer, str) and len(answer) <= MAX_ANSWER_LENGTH for answer in answers)
         ):
             raise ValidationError(
-                {"answers": f"Har bir savolga javob yozing (har biri {MAX_ANSWER_LENGTH} belgidan oshmasin)."}
+                {"answers": tr("Har bir savolga javob yozing (har biri {MAX_ANSWER_LENGTH} belgidan oshmasin).", MAX_ANSWER_LENGTH=MAX_ANSWER_LENGTH)}
             )
         answers = [answer.strip() for answer in answers]
         if not any(answers):
-            raise ValidationError({"answers": "Kamida bitta savolga javob yozing."})
+            raise ValidationError({"answers": tr("Kamida bitta savolga javob yozing.")})
         try:
             feedback, understanding, summary = evaluate_answers(submission, viva.questions, answers)
         except AIError as exc:

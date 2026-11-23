@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from config.i18n import N_
 
 
 def material_file_path(instance, filename):
@@ -98,8 +99,8 @@ class AssignmentStage(models.Model):
         Assignment, verbose_name="topshiriq", on_delete=models.CASCADE, related_name="stages"
     )
     class Kind(models.TextChoices):
-        SQL = "sql", "SQL kod"
-        ER = "er", "ER-diagramma"
+        SQL = "sql", N_("SQL kod")
+        ER = "er", N_("ER-diagramma")
 
     # 0 dan boshlab, ketma-ket
     order = models.PositiveSmallIntegerField("tartib raqami")

@@ -2,6 +2,7 @@
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.db import models
 from django.utils import timezone
+from config.i18n import N_
 
 
 class UserManager(DjangoUserManager):
@@ -13,9 +14,9 @@ class UserManager(DjangoUserManager):
 
 class User(AbstractUser):
     class Role(models.TextChoices):
-        ADMIN = "admin", "Admin"
-        TEACHER = "teacher", "O'qituvchi"
-        STUDENT = "student", "Talaba"
+        ADMIN = "admin", N_("Admin")
+        TEACHER = "teacher", N_("O'qituvchi")
+        STUDENT = "student", N_("Talaba")
 
     role = models.CharField("rol", max_length=10, choices=Role.choices, default=Role.STUDENT)
     # Faqat talabalar uchun: talaba bitta guruhda bo'ladi

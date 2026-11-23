@@ -24,6 +24,7 @@ import { formatDateTime } from '@/lib/format'
 import { MAX_SCORE, type Assignment, type RubricCriterion, type Submission } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { t } from '@/lib/i18n'
 
 function useReviewMutation(submission: Submission, request: () => Promise<Submission>, successText: string) {
   const queryClient = useQueryClient()
@@ -77,7 +78,7 @@ function GradeForm({
           ? { rubric_scores: criterionScores.map((value) => Number(value)), comment }
           : { score: Number(score), comment },
       }),
-    submission.grade ? 'Baho yangilandi' : "Baho qo'yildi",
+    submission.grade ? t('Baho yangilandi') : t("Baho qo'yildi"),
   )
 
   const isValid = (value: string, max: number) => {
@@ -98,7 +99,7 @@ function GradeForm({
     <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
       {useRubric ? (
         <fieldset className="grid gap-2">
-          <legend className="mb-1 text-sm font-medium">Rubrika bo'yicha ballar</legend>
+          <legend className="mb-1 text-sm font-medium">{t("Rubrika bo'yicha ballar")}</legend>
           {criteria.map((item, index) => (
             <div key={index} className="flex items-center justify-between gap-3">
               <label htmlFor={`criterion_${index}`} className="min-w-0 text-sm">
@@ -127,11 +128,11 @@ function GradeForm({
           ))}
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-t pt-2 text-sm">
             <span className="font-medium tabular-nums">
-              Jami: {rubricSum} / {maxScore}
+              {t('Jami: {rubricSum} / {maxScore}', { rubricSum, maxScore })}
             </span>
             {suggested != null ? (
               <span className="text-xs text-muted-foreground">
-                AI taklifi: {Math.round((suggested * maxScore) / MAX_SCORE)} / {maxScore}
+                {t('AI taklifi: {value} / {maxScore}', { value: Math.round((suggested * maxScore) / MAX_SCORE), maxScore })}
               </span>
             ) : null}
           </div>
@@ -142,7 +143,7 @@ function GradeForm({
           ) : null}
         </fieldset>
       ) : (
-      <FormField id="score" label={`Ball (0–${MAX_SCORE})`} error={errors.score}>
+      <FormField id="score" label={t('Ball (0–{MAX_SCORE})', { MAX_SCORE })} error={errors.score}>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             id="score"
@@ -159,13 +160,13 @@ function GradeForm({
           />
           {suggested != null && !disabled ? (
             <Button type="button" variant="outline" size="lg" onClick={() => setScore(String(suggested))}>
-              AI taklifi: {suggested}
+              {t('AI taklifi: {suggested}', { suggested })}
             </Button>
           ) : null}
         </div>
       </FormField>
       )}
-      <FormField id="grade_comment" label="Izoh" error={errors.comment} hint="Ixtiyoriy. Talabaga ko'rinadi.">
+      <FormField id="grade_comment" label={t('Izoh')} error={errors.comment} hint={t("Ixtiyoriy. Talabaga ko'rinadi.")}>
         <Textarea
           id="grade_comment"
           className="max-h-48 min-h-20"
@@ -177,7 +178,7 @@ function GradeForm({
       </FormField>
       <Button type="submit" size="lg" className="justify-self-start" disabled={disabled || mutation.isPending || !scoreValid}>
         {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-        {submission.grade ? 'Bahoni yangilash' : "Baho qo'yish"}
+        {submission.grade ? t('Bahoni yangilash') : t("Baho qo'yish")}
       </Button>
     </form>
   )
@@ -188,7 +189,7 @@ function ReturnForm({ submission, disabled }: { submission: Submission; disabled
   const { mutation, errors } = useReviewMutation(
     submission,
     () => api<Submission>(`/submissions/${submission.id}/return/`, { method: 'POST', body: { comment } }),
-    'Yechim qayta ishlashga qaytarildi',
+    t('Yechim qayta ishlashga qaytarildi'),
   )
 
   function handleSubmit(event: FormEvent) {
@@ -198,7 +199,7 @@ function ReturnForm({ submission, disabled }: { submission: Submission; disabled
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-      <FormField id="return_comment" label="Qaytarish sababi" error={errors.comment} hint="Talabaga ko'rinadi.">
+      <FormField id="return_comment" label={t('Qaytarish sababi')} error={errors.comment} hint={t("Talabaga ko'rinadi.")}>
         <Textarea
           id="return_comment"
           className="max-h-48 min-h-20"
@@ -216,7 +217,7 @@ function ReturnForm({ submission, disabled }: { submission: Submission; disabled
         disabled={disabled || mutation.isPending || !comment.trim()}
       >
         {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Undo2 aria-hidden="true" />}
-        Qayta ishlashga qaytarish
+        {t('Qayta ishlashga qaytarish')}
       </Button>
     </form>
   )
@@ -251,16 +252,16 @@ function Review({ submission }: { submission: Submission }) {
         className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        {assignment.data?.title ?? 'Topshiriq'}
+        {assignment.data?.title ?? t('Topshiriq')}
       </Link>
       <PageHeader
         title={fullName(submission.student)}
-        description={`${stage ? `${stage.order + 1}-bosqich: ${stage.title} · ` : ''}${submission.attempt_number}-urinish · ${formatDateTime(submission.submitted_at)}`}
+        description={`${stage ? `${t('{number}-bosqich: {title}', { number: stage.order + 1, title: stage.title })} · ` : ''}${t('{number}-urinish', { number: submission.attempt_number })} · ${formatDateTime(submission.submitted_at)}`}
         actions={<SubmissionStatusBadge submission={submission} />}
       />
 
       {stageAttempts && stageAttempts.length > 1 ? (
-        <nav className="mb-4 flex flex-wrap gap-2" aria-label="Urinishlar">
+        <nav className="mb-4 flex flex-wrap gap-2" aria-label={t('Urinishlar')}>
           {[...stageAttempts].reverse().map((attempt) => (
             <Link
               key={attempt.id}
@@ -273,7 +274,7 @@ function Review({ submission }: { submission: Submission }) {
                   : 'bg-background text-muted-foreground hover:bg-muted',
               )}
             >
-              {attempt.attempt_number}-urinish
+              {t('{attempt_number}-urinish', { attempt_number: attempt.attempt_number })}
             </Link>
           ))}
         </nav>
@@ -283,7 +284,7 @@ function Review({ submission }: { submission: Submission }) {
         <div className="grid gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>{submission.diagram ? 'ER-diagramma' : 'SQL kod'}</CardTitle>
+              <CardTitle>{submission.diagram ? t('ER-diagramma') : t('SQL kod')}</CardTitle>
             </CardHeader>
             <CardContent>
               {submission.diagram ? <ErEditor value={submission.diagram} /> : <SqlCode code={submission.sql_code} />}
@@ -291,7 +292,7 @@ function Review({ submission }: { submission: Submission }) {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>AI tahlili</CardTitle>
+              <CardTitle>{t('AI tahlili')}</CardTitle>
             </CardHeader>
             <CardContent>
               <AnalysisPanel submissionId={submission.id} staff />
@@ -299,8 +300,8 @@ function Review({ submission }: { submission: Submission }) {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Loyiha himoyasi</CardTitle>
-              <CardDescription>AI talabaga uning o'z yechimi bo'yicha savollar beradi va javoblarini baholaydi.</CardDescription>
+              <CardTitle>{t('Loyiha himoyasi')}</CardTitle>
+              <CardDescription>{t("AI talabaga uning o'z yechimi bo'yicha savollar beradi va javoblarini baholaydi.")}</CardDescription>
             </CardHeader>
             <CardContent>
               <VivaPanel submissionId={submission.id} staff />
@@ -311,23 +312,23 @@ function Review({ submission }: { submission: Submission }) {
         <div className="grid gap-4">
           {!isLatest ? (
             <Alert>
-              <AlertTitle>Bu eski urinish</AlertTitle>
-              <AlertDescription>Faqat talabaning oxirgi urinishini baholash yoki qaytarish mumkin.</AlertDescription>
+              <AlertTitle>{t('Bu eski urinish')}</AlertTitle>
+              <AlertDescription>{t('Faqat talabaning oxirgi urinishini baholash yoki qaytarish mumkin.')}</AlertDescription>
             </Alert>
           ) : null}
           {returned ? (
             <Alert>
-              <AlertTitle>Qayta ishlashga qaytarilgan</AlertTitle>
+              <AlertTitle>{t('Qayta ishlashga qaytarilgan')}</AlertTitle>
               <AlertDescription className="whitespace-pre-wrap">{submission.return_comment}</AlertDescription>
             </Alert>
           ) : null}
           <Card>
             <CardHeader>
-              <CardTitle>Baho</CardTitle>
+              <CardTitle>{t('Baho')}</CardTitle>
               <CardDescription>
                 {submission.grade
-                  ? `${submission.grade.graded_by ? fullName(submission.grade.graded_by) : 'Noma\'lum'} · ${formatDateTime(submission.grade.updated_at)}`
-                  : 'Yakuniy bahoni siz qo\'yasiz; AI bahosi faqat taklif.'}
+                  ? `${submission.grade.graded_by ? fullName(submission.grade.graded_by) : t("Noma'lum")} · ${formatDateTime(submission.grade.updated_at)}`
+                  : t("Yakuniy bahoni siz qo'yasiz; AI bahosi faqat taklif.")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -341,8 +342,8 @@ function Review({ submission }: { submission: Submission }) {
           {returned ? null : (
             <Card>
               <CardHeader>
-                <CardTitle>Qayta ishlashga qaytarish</CardTitle>
-                <CardDescription>Talaba izohingizni ko'rib, yangi urinish topshira oladi.</CardDescription>
+                <CardTitle>{t('Qayta ishlashga qaytarish')}</CardTitle>
+                <CardDescription>{t("Talaba izohingizni ko'rib, yangi urinish topshira oladi.")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReturnForm submission={submission} disabled={!isLatest} />

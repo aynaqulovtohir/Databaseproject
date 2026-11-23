@@ -6,11 +6,13 @@ import { NavLink, Outlet, useNavigation } from 'react-router-dom'
 
 import { AppearanceMenu } from '@/components/AppearanceMenu'
 import { ConsentPrompt } from '@/components/Consent'
+import { LanguageMenu } from '@/components/LanguageMenu'
 import { HeaderSearch, Logo, NotificationsMenu, ProfileMenu } from '@/components/layout/HeaderParts'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useUser } from '@/lib/auth'
 import { navSectionsFor } from '@/lib/nav'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 const SIDEBAR_KEY = 'mb-sidebar-hidden'
 const YEAR = new Date().getFullYear()
@@ -26,7 +28,7 @@ function readHidden() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const user = useUser()
   return (
-    <nav aria-label="Asosiy menyu">
+    <nav aria-label={t('Asosiy menyu')}>
       <ul className="flex flex-col">
         {navSectionsFor(user.role).map((section, index) => (
           <li key={section.heading ?? index}>
@@ -79,7 +81,7 @@ function NavigationProgress() {
   const navigation = useNavigation()
   if (navigation.state === 'idle') return null
   return (
-    <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden" role="progressbar" aria-label="Sahifa yuklanmoqda">
+    <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden" role="progressbar" aria-label={t('Sahifa yuklanmoqda')}>
       <div className="h-full w-1/3 animate-pulse bg-primary" />
     </div>
   )
@@ -89,21 +91,21 @@ function Footer() {
   return (
     <footer className="border-t border-[#cddfff] px-5 py-6 text-center text-[0.8125rem] text-heading transition-[margin] dark:border-border">
       <div>
-        © {YEAR} <strong className="font-semibold">MB loyihalash</strong> — ma'lumotlar bazasini
-        loyihalash ta'lim platformasi
+        © {YEAR} <strong className="font-semibold">{t('MB loyihalash')}</strong> —{' '}
+        {t("ma'lumotlar bazasini loyihalash ta'lim platformasi")}
       </div>
       {/* NiceAdmin bepul litsenziyasi muallif havolasini saqlashni talab qiladi */}
       <div className="mt-1 text-xs text-muted-foreground">
-        Dizayn:{' '}
+        {t('Dizayn:')}{' '}
         <a
           href="https://bootstrapmade.com/"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          BootstrapMade
+          {t('BootstrapMade')}
         </a>{' '}
-        (NiceAdmin)
+        {t('(NiceAdmin)')}
       </div>
     </footer>
   )
@@ -136,7 +138,7 @@ export function AppShell() {
         <button
           type="button"
           onClick={toggleSidebar}
-          aria-label={hidden ? "Yon menyuni ko'rsatish" : 'Yon menyuni yashirish'}
+          aria-label={hidden ? t("Yon menyuni ko'rsatish") : t('Yon menyuni yashirish')}
           aria-expanded={menuOpen || undefined}
           className="ml-1 flex size-10 shrink-0 items-center justify-center rounded-md text-heading outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 sm:ml-2.5"
         >
@@ -145,6 +147,7 @@ export function AppShell() {
         <HeaderSearch className="ml-4 hidden w-[min(360px,28vw)] lg:block" />
 
         <div className="ml-auto flex items-center gap-0.5 sm:gap-1.5">
+          <LanguageMenu />
           <AppearanceMenu />
           <NotificationsMenu />
           <ProfileMenu />
@@ -168,8 +171,8 @@ export function AppShell() {
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="left" className="w-[300px] gap-0 overflow-y-auto border-none bg-sidebar p-5 text-sidebar-foreground">
           <SheetHeader className="mb-4 p-0">
-            <SheetTitle className="sr-only">Menyu</SheetTitle>
-            <SheetDescription className="sr-only">Sahifalar ro'yxati</SheetDescription>
+            <SheetTitle className="sr-only">{t('Menyu')}</SheetTitle>
+            <SheetDescription className="sr-only">{t("Sahifalar ro'yxati")}</SheetDescription>
             <Logo compact />
           </SheetHeader>
           <HeaderSearch className="mb-4 lg:hidden" />

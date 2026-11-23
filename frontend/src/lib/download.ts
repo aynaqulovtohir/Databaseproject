@@ -1,4 +1,5 @@
 import { ApiError, apiFetch } from '@/lib/api'
+import { t } from '@/lib/i18n'
 
 /**
  * Faylni token bilan yuklab oladi. Oddiy havola ishlamaydi,
@@ -7,7 +8,7 @@ import { ApiError, apiFetch } from '@/lib/api'
 export async function downloadFile(path: string, filename: string) {
   const response = await apiFetch(path)
   if (!response.ok) {
-    throw new ApiError(response.status, null, "Faylni yuklab bo'lmadi.")
+    throw new ApiError(response.status, null, t("Faylni yuklab bo'lmadi."))
   }
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')

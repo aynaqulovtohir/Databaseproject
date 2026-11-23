@@ -10,6 +10,7 @@ natijani buzib yubormaydi. Hisobotda talabalar ismi yo'q, faqat sonlar.
 import re
 
 from .checker import ERROR_TIPS
+from config.i18n import tr
 
 MAX_ITEMS = 10
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
@@ -99,9 +100,8 @@ Javob qisqa (10-15 qator), oddiy matn va "- " bandlar bilan. O'zbek tilida (loti
 
 def report_text(report):
     lines = [
-        f"Talabalar: {report['students']}, urinib ko'rgan: {report['attempted']}, yechgan: {report['solved']}, "
-        f"hali yechmagan: {report['stuck']}, noto'g'ri urinishlar: {report['wrong_attempts']}.",
-        "Eng ko'p xatolar (talabalar ulushi — urinib ko'rganlar ichida):",
+        tr("Talabalar: {students}, urinib ko'rgan: {attempted}, yechgan: {solved}, hali yechmagan: {stuck}, noto'g'ri urinishlar: {wrong_attempts}.", students=report['students'], attempted=report['attempted'], solved=report['solved'], stuck=report['stuck'], wrong_attempts=report['wrong_attempts']),
+        tr("Eng ko'p xatolar (talabalar ulushi — urinib ko'rganlar ichida):"),
     ]
     for item in report["items"]:
         kind = "SQL xatosi" if item["kind"] == "error" else "natija farqi"

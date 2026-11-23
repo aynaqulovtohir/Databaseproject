@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import type { AIQualityItem, AIQualityState, AIRating } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function ItemCard({ item, state }: { item: AIQualityItem; state: AIQualityState }) {
   const queryClient = useQueryClient()
@@ -34,19 +35,21 @@ function ItemCard({ item, state }: { item: AIQualityItem; state: AIQualityState 
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           {item.kind_label}
-          {item.kind === 'hint' ? <Badge variant="outline">{item.level}-daraja</Badge> : null}
+          {item.kind === 'hint' ? <Badge variant="outline">{t('{level}-daraja', { level: item.level })}</Badge> : null}
         </CardTitle>
         <CardDescription>
-          {item.lab.title} · talaba ishi {item.is_correct ? "to'g'ri" : "noto'g'ri"} edi. Talaba ismi ko'rsatilmaydi.
+          {item.is_correct
+            ? t("{title} · talaba ishi to'g'ri edi. Talaba ismi ko'rsatilmaydi.", { title: item.lab.title })
+            : t("{title} · talaba ishi noto'g'ri edi. Talaba ismi ko'rsatilmaydi.", { title: item.lab.title })}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <details className="rounded-lg border p-3">
-          <summary className="cursor-pointer text-sm font-medium select-none">Laboratoriya sharti</summary>
+          <summary className="cursor-pointer text-sm font-medium select-none">{t('Laboratoriya sharti')}</summary>
           <p className="mt-2 text-sm whitespace-pre-wrap">{item.lab.description}</p>
         </details>
         <div className="grid min-w-0 gap-1.5">
-          <h3 className="text-sm font-medium">Talaba ishi</h3>
+          <h3 className="text-sm font-medium">{t('Talaba ishi')}</h3>
           <SqlCode code={item.work || '—'} />
           {item.differences.length ? (
             <ul className="grid list-disc gap-0.5 pl-5 text-xs text-muted-foreground">
@@ -58,17 +61,17 @@ function ItemCard({ item, state }: { item: AIQualityItem; state: AIQualityState 
         </div>
         {item.explanation ? (
           <div className="grid gap-1.5">
-            <h3 className="text-sm font-medium">Talabaning tushuntirishi (AI bahosi: {item.verdict})</h3>
+            <h3 className="text-sm font-medium">{t('Talabaning tushuntirishi (AI bahosi: {verdict})', { verdict: item.verdict })}</h3>
             <p className="rounded-lg border p-3 text-sm whitespace-pre-wrap">{item.explanation}</p>
           </div>
         ) : null}
         <div className="grid gap-1.5">
-          <h3 className="text-sm font-medium">AI yozgan matn</h3>
+          <h3 className="text-sm font-medium">{t('AI yozgan matn')}</h3>
           <p className="rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap">{item.text}</p>
         </div>
         <Textarea
-          aria-label="Izoh (ixtiyoriy)"
-          placeholder="Izoh (ixtiyoriy): nimasi noto'g'ri yoki ortiqcha?"
+          aria-label={t('Izoh (ixtiyoriy)')}
+          placeholder={t("Izoh (ixtiyoriy): nimasi noto'g'ri yoki ortiqcha?")}
           maxLength={1000}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
@@ -96,21 +99,23 @@ function SummaryCard({ state }: { state: AIQualityState }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Xulosa</CardTitle>
+        <CardTitle>{t('Xulosa')}</CardTitle>
         <CardDescription>
-          Barcha o'qituvchilarning baholari (guruhlaringiz bo'yicha): ulush va 95% ishonch oralig'i (Wilson). Siz{' '}
-          {state.rated_by_me} ta matnni baholadingiz.
+          {t(
+            "Barcha o'qituvchilarning baholari (guruhlaringiz bo'yicha): ulush va 95% ishonch oralig'i (Wilson). Siz {rated_by_me} ta matnni baholadingiz.",
+            { rated_by_me: state.rated_by_me },
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Turi</TableHead>
+              <TableHead>{t('Turi')}</TableHead>
               {state.ratings.map((rating) => (
                 <TableHead key={rating.value}>{rating.label}</TableHead>
               ))}
-              <TableHead>Jami</TableHead>
+              <TableHead>{t('Jami')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -128,7 +133,7 @@ function SummaryCard({ state }: { state: AIQualityState }) {
                         </span>
                         {item.ci95 ? (
                           <span className="text-xs text-muted-foreground">
-                            95% oraliq: {item.ci95[0]}–{item.ci95[1]}%
+                            {t('95% oraliq: {value}–{value2}%', { value: item.ci95[0], value2: item.ci95[1] })}
                           </span>
                         ) : null}
                       </div>
@@ -161,8 +166,8 @@ export function AIQualityPage() {
         ) : (
           <EmptyState
             icon={BotMessageSquare}
-            title="Baholanadigan AI matni qolmadi"
-            description="Talabalar yangi AI maslahatlari olganda yoki yechimini tushuntirganda bu yerda yana paydo bo'ladi."
+            title={t('Baholanadigan AI matni qolmadi')}
+            description={t("Talabalar yangi AI maslahatlari olganda yoki yechimini tushuntirganda bu yerda yana paydo bo'ladi.")}
           />
         )}
         <SummaryCard state={state.data} />
@@ -173,8 +178,8 @@ export function AIQualityPage() {
   return (
     <>
       <PageHeader
-        title="AI sifati"
-        description="AI yozgan maslahatlar va izohlarni baholang: foydali, tushunarsiz, noto'g'ri yoki javobni aytib qo'ygan. Natija AI qanchalik ishonchli ekanini ko'rsatadi (ilmiy eksportda — ai_sifati.csv). Murabbiy va buyurtmachi suhbatlari bu yerga kirmaydi: ular talabaga shaxsiy deb va'da qilingan."
+        title={t('AI sifati')}
+        description={t("AI yozgan maslahatlar va izohlarni baholang: foydali, tushunarsiz, noto'g'ri yoki javobni aytib qo'ygan. Natija AI qanchalik ishonchli ekanini ko'rsatadi (ilmiy eksportda — ai_sifati.csv). Murabbiy va buyurtmachi suhbatlari bu yerga kirmaydi: ular talabaga shaxsiy deb va'da qilingan.")}
       />
       {content}
     </>

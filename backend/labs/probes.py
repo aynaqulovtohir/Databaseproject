@@ -15,6 +15,7 @@ import re
 
 from .checker import LabSetupError, _error_payload, _plan_payload, _result_payload
 from .sandbox import SqlError, run_probes, split_statements
+from config.i18n import tr
 
 KINDS = ("attack", "valid")
 MAX_PROBES = 20
@@ -46,27 +47,27 @@ def passed(probe, error):
 def validate_probes(value):
     """Tuzilishini tekshiradi va toza nusxasini qaytaradi (sandboxsiz)."""
     if not isinstance(value, list):
-        raise ProbesError("Sinovlar ro'yxat ko'rinishida bo'lishi kerak.")
+        raise ProbesError(tr("Sinovlar ro'yxat ko'rinishida bo'lishi kerak."))
     if len(value) > MAX_PROBES:
-        raise ProbesError(f"Sinovlar {MAX_PROBES} tadan oshmasligi kerak.")
+        raise ProbesError(tr("Sinovlar {MAX_PROBES} tadan oshmasligi kerak.", MAX_PROBES=MAX_PROBES))
     clean, ids = [], set()
     for item in value:
         if not isinstance(item, dict):
-            raise ProbesError("Sinov noto'g'ri formatda.")
+            raise ProbesError(tr("Sinov noto'g'ri formatda."))
         probe_id = item.get("id")
         if not isinstance(probe_id, str) or not ID_PATTERN.match(probe_id) or probe_id in ids:
-            raise ProbesError("Sinov identifikatori (harf, raqam, _ yoki -; 20 belgigacha) takrorlanmasligi kerak.")
+            raise ProbesError(tr("Sinov identifikatori (harf, raqam, _ yoki -; 20 belgigacha) takrorlanmasligi kerak."))
         ids.add(probe_id)
         title = item.get("title")
         if not isinstance(title, str) or not title.strip() or len(title) > MAX_TITLE:
-            raise ProbesError(f"«{probe_id}» sinovining nomi bo'sh bo'lmasligi va {MAX_TITLE} belgidan oshmasligi kerak.")
+            raise ProbesError(tr("«{probe_id}» sinovining nomi bo'sh bo'lmasligi va {MAX_TITLE} belgidan oshmasligi kerak.", probe_id=probe_id, MAX_TITLE=MAX_TITLE))
         if item.get("kind") not in KINDS:
-            raise ProbesError(f"«{probe_id}» sinovining turi «attack» yoki «valid» bo'lishi kerak.")
+            raise ProbesError(tr("«{probe_id}» sinovining turi «attack» yoki «valid» bo'lishi kerak.", probe_id=probe_id))
         sql = item.get("sql")
         if not isinstance(sql, str) or not sql.strip() or len(sql) > MAX_PROBE_SQL:
-            raise ProbesError(f"«{probe_id}» sinovining SQL'i bo'sh bo'lmasligi va {MAX_PROBE_SQL} belgidan oshmasligi kerak.")
+            raise ProbesError(tr("«{probe_id}» sinovining SQL'i bo'sh bo'lmasligi va {MAX_PROBE_SQL} belgidan oshmasligi kerak.", probe_id=probe_id, MAX_PROBE_SQL=MAX_PROBE_SQL))
         if any(TRANSACTION_CONTROL.match(statement) for statement in split_statements(sql)):
-            raise ProbesError(f"«{probe_id}» sinovida tranzaksiya buyruqlari (BEGIN, COMMIT, ROLLBACK...) bo'lmasligi kerak.")
+            raise ProbesError(tr("«{probe_id}» sinovida tranzaksiya buyruqlari (BEGIN, COMMIT, ROLLBACK...) bo'lmasligi kerak.", probe_id=probe_id))
         clean.append(
             {
                 "id": probe_id,
@@ -77,14 +78,14 @@ def validate_probes(value):
             }
         )
     if clean and not any(probe["kind"] == "attack" for probe in clean):
-        raise ProbesError("Kamida bitta hujum (attack) sinovi bo'lishi kerak.")
+        raise ProbesError(tr("Kamida bitta hujum (attack) sinovi bo'lishi kerak."))
     return clean
 
 
 def validate_lab_probes(setup_sql, solution_sql, probes):
     """Laboratoriyani saqlashdan oldin: har bir hujum cheklovsiz o'tadi, namunaviy yechim esa barcha sinovlardan o'tadi."""
     if not solution_sql.strip():
-        raise LabSetupError("solution_sql", SqlError("Cheklovlar laboratoriyasida namunaviy yechim (cheklovlar) bo'lishi kerak."))
+        raise LabSetupError("solution_sql", SqlError(tr("Cheklovlar laboratoriyasida namunaviy yechim (cheklovlar) bo'lishi kerak.")))
     sqls = [probe["sql"] for probe in probes]
     outcome, errors = run_probes("SELECT 1", setup_sql, sqls)
     if outcome.error:
@@ -93,25 +94,25 @@ def validate_lab_probes(setup_sql, solution_sql, probes):
         if probe["kind"] == "attack" and error is not None:
             raise LabSetupError(
                 "probes",
-                SqlError(f"«{probe['title']}» hujumi cheklovsiz ham bajarilmadi — u sinov bo'la olmaydi: {message(error)}"),
+                SqlError(tr("«{title}» hujumi cheklovsiz ham bajarilmadi — u sinov bo'la olmaydi: {error}", title=probe['title'], error=message(error))),
             )
         if probe["kind"] == "valid" and error is not None:
-            raise LabSetupError("probes", SqlError(f"«{probe['title']}» to'g'ri ma'lumoti boshlang'ich jadvallarda xato berdi: {message(error)}"))
+            raise LabSetupError("probes", SqlError(tr("«{title}» to'g'ri ma'lumoti boshlang'ich jadvallarda xato berdi: {error}", title=probe['title'], error=message(error))))
     outcome, errors = run_probes(solution_sql, setup_sql, sqls)
     if outcome.error:
         raise LabSetupError("solution_sql", outcome.error)
     for probe, error in zip(probes, errors):
         if not passed(probe, error):
-            what = "to'xtatmadi" if probe["kind"] == "attack" else "rad etdi"
+            what = "to'xtatmadi" if probe["kind"] == "attack" else tr("rad etdi")
             detail = f": {message(error)}" if error else ""
-            raise LabSetupError("probes", SqlError(f"Namunaviy yechim «{probe['title']}» sinovini {what}{detail}"))
+            raise LabSetupError("probes", SqlError(tr("Namunaviy yechim «{title}» sinovini {what}{detail}", title=probe['title'], what=what, detail=detail)))
 
 
 def _item(probe, error):
     ok = passed(probe, error)
     if probe["kind"] == "attack":
         # To'xtatilmagan hujumda boshqa xato (jadval yo'q, vaqt tugadi) bo'lsa — o'sha, aks holda ma'lumot qabul qilingan
-        text = message(error) if error else "Ma'lumot qabul qilindi — cheklov uni to'xtatmadi."
+        text = message(error) if error else tr("Ma'lumot qabul qilindi — cheklov uni to'xtatmadi.")
     else:
         text = "" if ok else message(error)
     return {"id": probe["id"], "title": probe["title"], "kind": probe["kind"], "passed": ok, "message": text}
@@ -130,12 +131,11 @@ def check_probes(lab, sql_code):
     differences = []
     for item in visible:
         if not item["passed"]:
-            what = "o'tib ketdi" if item["kind"] == "attack" else "rad etildi, lekin u to'g'ri ma'lumot"
+            what = tr("o'tib ketdi") if item["kind"] == "attack" else tr("rad etildi, lekin u to'g'ri ma'lumot")
             differences.append(f"«{item['title']}» — {what}.")
     if hidden and not all(hidden):
         differences.append(
-            f"Yashirin sinovlardan {len(hidden) - sum(hidden)} tasi o'tmadi: cheklov faqat ko'rinadigan misollarga emas, "
-            "qoidaning o'ziga mos bo'lsin."
+            tr("Yashirin sinovlardan {value} tasi o'tmadi: cheklov faqat ko'rinadigan misollarga emas, qoidaning o'ziga mos bo'lsin.", value=len(hidden) - sum(hidden))
         )
     total = len(results)
     ratio = round(sum(ok for _, _, ok in results) / total, 3) if total and outcome.error is None else 0.0

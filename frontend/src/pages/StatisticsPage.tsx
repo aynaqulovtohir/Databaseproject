@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { AiEffectBucket, LearningCurvePoint, Statistics, StatisticsGroup } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
 // Diagramma ranglari index.css dagi --series-* tokenlaridan (yorug' va qorong'i mavzu uchun alohida)
 const SERIES_1 = 'var(--series-1)'
@@ -51,26 +52,26 @@ function ErrorsCard({ errors }: { errors: Statistics['top_errors'] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Eng ko'p uchragan xatolar</CardTitle>
+        <CardTitle>{t("Eng ko'p uchragan xatolar")}</CardTitle>
         <CardDescription>
-          Noto'g'ri urinishlardagi xato turlari: har bir urinishda har bir tur bir marta sanaladi.
+          {t("Noto'g'ri urinishlardagi xato turlari: har bir urinishda har bir tur bir marta sanaladi.")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {errors.length ? (
-          <ol className="grid gap-2" aria-label="Xato turlari va soni">
+          <ol className="grid gap-2" aria-label={t('Xato turlari va soni')}>
             {errors.map((item) => (
               <li key={item.category} className="grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_3rem] items-center gap-3 text-sm">
                 <span className="truncate" title={item.label}>
                   {item.label}
                 </span>
-                <HorizontalBar value={item.count} max={max} color={SERIES_1} label={`${item.label}: ${item.count} ta`} />
+                <HorizontalBar value={item.count} max={max} color={SERIES_1} label={t('{label}: {count} ta', { label: item.label, count: item.count })} />
                 <span className="text-right tabular-nums">{item.count}</span>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-sm text-muted-foreground">Hali xato urinishlar yo'q.</p>
+          <p className="text-sm text-muted-foreground">{t("Hali xato urinishlar yo'q.")}</p>
         )}
       </CardContent>
     </Card>
@@ -81,10 +82,9 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Laboratoriyalar qiyinligi</CardTitle>
+        <CardTitle>{t('Laboratoriyalar qiyinligi')}</CardTitle>
         <CardDescription>
-          Yechganlar ulushi qancha past va yechish uchun urinishlar qancha ko'p bo'lsa, laboratoriya shuncha qiyin.
-          Laboratoriyalar talabalar bajargan tartibda.
+          {t("Yechganlar ulushi qancha past va yechish uchun urinishlar qancha ko'p bo'lsa, laboratoriya shuncha qiyin. Laboratoriyalar talabalar bajargan tartibda.")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -92,10 +92,10 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Laboratoriya</TableHead>
-                <TableHead className="w-[30%]">Yechganlar</TableHead>
-                <TableHead className="text-right">Yechish uchun o'rtacha urinish</TableHead>
-                <TableHead className="text-right">O'rtacha baho</TableHead>
+                <TableHead>{t('Laboratoriya')}</TableHead>
+                <TableHead className="w-[30%]">{t('Yechganlar')}</TableHead>
+                <TableHead className="text-right">{t("Yechish uchun o'rtacha urinish")}</TableHead>
+                <TableHead className="text-right">{t("O'rtacha baho")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,7 +105,7 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
                     {lab.title}
                     {lab.kind !== 'sql' ? (
                       <Badge variant="outline" className="ml-2">
-                        {lab.kind === 'er' ? 'ER' : 'NF'}
+                        {lab.kind === 'er' ? t('ER') : t('NF')}
                       </Badge>
                     ) : null}
                   </TableCell>
@@ -115,7 +115,7 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
                         value={lab.solved_rate ?? 0}
                         max={100}
                         color={SERIES_1}
-                        label={`${lab.solved} / ${lab.students} talaba yechgan`}
+                        label={t('{solved} / {students} talaba yechgan', { solved: lab.solved, students: lab.students })}
                       />
                       <span className="w-24 shrink-0 text-right text-xs tabular-nums">
                         {formatPercent(lab.solved_rate)} ({lab.solved}/{lab.students})
@@ -129,17 +129,17 @@ function LabsCard({ labs }: { labs: Statistics['labs'] }) {
             </TableBody>
           </Table>
         ) : (
-          <p className="text-sm text-muted-foreground">Bu guruhlarga hali laboratoriya berilmagan.</p>
+          <p className="text-sm text-muted-foreground">{t('Bu guruhlarga hali laboratoriya berilmagan.')}</p>
         )}
       </CardContent>
     </Card>
   )
 }
 
-const CURVE_SERIES = [
+const CURVE_SERIES = localized([
   { key: 'ai', label: 'AI yoqilgan', color: SERIES_1 },
   { key: 'control', label: 'Nazorat', color: SERIES_2 },
-] as const
+] as const)
 const CURVE = { width: 640, height: 240, left: 36, right: 84, top: 12, bottom: 28 }
 
 /** O'rganish egri chizig'i: har bir laboratoriyani yechish uchun o'rtacha urinishlar (kamaysa — o'rganish tezlashgan) */
@@ -182,11 +182,11 @@ function LearningCurveChart({ points }: { points: LearningCurvePoint[] }) {
 
   return (
     <div className="grid gap-3">
-      <ul className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label="Belgilar">
+      <ul className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label={t('Belgilar')}>
         {series.map((item) => (
           <li key={item.key} className="flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded-full" style={{ background: item.color }} aria-hidden="true" />
-            {item.label} guruhlar
+            {t('{label} guruhlar', { label: item.label })}
           </li>
         ))}
       </ul>
@@ -197,7 +197,7 @@ function LearningCurveChart({ points }: { points: LearningCurvePoint[] }) {
             viewBox={`0 0 ${CURVE.width} ${CURVE.height}`}
             className="w-full"
             role="img"
-            aria-label="Laboratoriyalar bo'yicha yechish uchun o'rtacha urinishlar"
+            aria-label={t("Laboratoriyalar bo'yicha yechish uchun o'rtacha urinishlar")}
             onMouseLeave={() => setHover(null)}
           >
             {ticks.map((tick) => (
@@ -273,9 +273,9 @@ function LearningCurveChart({ points }: { points: LearningCurvePoint[] }) {
                   <div key={item.key} className="flex items-start gap-1.5">
                     <span className="mt-1 size-2 shrink-0 rounded-full" style={{ background: item.color }} aria-hidden="true" />
                     <span>
-                      {item.label}: {segment.attempts_to_solve ?? '—'} urinish
+                      {item.label}: {segment.attempts_to_solve ?? '—'}{' '}{t('urinish')}
                       <span className="block text-muted-foreground">
-                        {segment.solved}/{segment.students} yechgan · birinchi urinishda {formatPercent(segment.first_try_rate)}
+                        {t('{solved}/{students} yechgan · birinchi urinishda {first_try_rate}', { solved: segment.solved, students: segment.students, first_try_rate: formatPercent(segment.first_try_rate) })}
                       </span>
                     </span>
                   </div>
@@ -294,25 +294,24 @@ function LearningCurveCard({ points }: { points: LearningCurvePoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>O'rganish egri chizig'i</CardTitle>
+        <CardTitle>{t("O'rganish egri chizig'i")}</CardTitle>
         <CardDescription>
-          Laboratoriyalar talabalar bajargan tartibda (gorizontal o'qda tartib raqami). Vertikal o'q — yechgan talabalarning
-          birinchi to'g'ri yechimgacha o'rtacha urinishlari. Egri chiziq pasaysa, talabalar tezroq o'rganmoqda.
+          {t("Laboratoriyalar talabalar bajargan tartibda (gorizontal o'qda tartib raqami). Vertikal o'q — yechgan talabalarning birinchi to'g'ri yechimgacha o'rtacha urinishlari. Egri chiziq pasaysa, talabalar tezroq o'rganmoqda.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {hasData ? <LearningCurveChart points={points} /> : <p className="text-sm text-muted-foreground">Hali yechilgan laboratoriya yo'q.</p>}
+        {hasData ? <LearningCurveChart points={points} /> : <p className="text-sm text-muted-foreground">{t("Hali yechilgan laboratoriya yo'q.")}</p>}
         {points.length ? (
           <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground">Jadval ko'rinishida</summary>
+            <summary className="cursor-pointer text-muted-foreground">{t("Jadval ko'rinishida")}</summary>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>№</TableHead>
-                  <TableHead>Laboratoriya</TableHead>
+                  <TableHead>{t('Laboratoriya')}</TableHead>
                   {CURVE_SERIES.map((item) => (
                     <TableHead key={item.key} className="text-right">
-                      {item.label}: urinish (yechgan)
+                      {t('{label}: urinish (yechgan)', { label: item.label })}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -349,7 +348,7 @@ function AiBucket({ title, bucket, color }: { title: string; bucket: AiEffectBuc
       </div>
       <HorizontalBar value={bucket.rate ?? 0} max={100} color={color} label={`${bucket.solved} / ${bucket.pairs}`} />
       <span className="text-xs text-muted-foreground tabular-nums">
-        {bucket.solved} / {bucket.pairs} holatda keyin to'g'ri yechilgan
+        {t("{solved} / {pairs} holatda keyin to'g'ri yechilgan", { solved: bucket.solved, pairs: bucket.pairs })}
       </span>
     </div>
   )
@@ -359,15 +358,14 @@ function AiEffectCard({ effect }: { effect: Statistics['ai_effect'] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI maslahatining ta'siri</CardTitle>
+        <CardTitle>{t("AI maslahatining ta'siri")}</CardTitle>
         <CardDescription>
-          Xato qilgan talaba laboratoriyani keyinroq to'g'ri yechdimi: AI maslahatini olganlar va olmaganlar
-          (nazorat guruhi ham shu yerda) taqqoslanadi.
+          {t("Xato qilgan talaba laboratoriyani keyinroq to'g'ri yechdimi: AI maslahatini olganlar va olmaganlar (nazorat guruhi ham shu yerda) taqqoslanadi.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 sm:grid-cols-2">
-        <AiBucket title="AI maslahatini olgan" bucket={effect.with_advice} color={SERIES_1} />
-        <AiBucket title="Maslahatsiz" bucket={effect.without_advice} color={SERIES_2} />
+        <AiBucket title={t('AI maslahatini olgan')} bucket={effect.with_advice} color={SERIES_1} />
+        <AiBucket title={t('Maslahatsiz')} bucket={effect.without_advice} color={SERIES_2} />
       </CardContent>
     </Card>
   )
@@ -375,11 +373,11 @@ function AiEffectCard({ effect }: { effect: Statistics['ai_effect'] }) {
 
 function TestBars({ group, max }: { group: StatisticsGroup; max: number }) {
   const bars = [
-    { key: 'pre', label: 'Kirish', value: group.pre_test, count: group.pre_count, color: SERIES_1 },
-    { key: 'post', label: 'Chiqish', value: group.post_test, count: group.post_count, color: SERIES_2 },
+    { key: 'pre', label: t('Kirish'), value: group.pre_test, count: group.pre_count, color: SERIES_1 },
+    { key: 'post', label: t('Chiqish'), value: group.post_test, count: group.post_count, color: SERIES_2 },
     // Kechiktirilgan test o'tkazilgan bo'lsagina ko'rsatiladi
     ...(group.delayed_count
-      ? [{ key: 'delayed', label: 'Keyin', value: group.delayed_test, count: group.delayed_count, color: SERIES_3 }]
+      ? [{ key: 'delayed', label: t('Keyin'), value: group.delayed_test, count: group.delayed_count, color: SERIES_3 }]
       : []),
   ]
   return (
@@ -388,10 +386,10 @@ function TestBars({ group, max }: { group: StatisticsGroup; max: number }) {
         <div key={bar.key} className="flex items-center gap-2">
           <span className="w-14 shrink-0 text-xs text-muted-foreground">{bar.label}</span>
           {bar.value === null ? (
-            <span className="text-xs text-muted-foreground">hali topshirilmagan</span>
+            <span className="text-xs text-muted-foreground">{t('hali topshirilmagan')}</span>
           ) : (
             <>
-              <HorizontalBar value={bar.value} max={max} color={bar.color} label={`${bar.label} testi: ${bar.value}% (${bar.count} ta talaba)`} />
+              <HorizontalBar value={bar.value} max={max} color={bar.color} label={t('{label} testi: {value}% ({count} ta talaba)', { label: bar.label, value: bar.value, count: bar.count })} />
               <span className="w-12 shrink-0 text-right text-xs tabular-nums">{bar.value}%</span>
             </>
           )}
@@ -405,21 +403,20 @@ function GroupsCard({ groups }: { groups: StatisticsGroup[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Guruhlar taqqoslashi</CardTitle>
+        <CardTitle>{t('Guruhlar taqqoslashi')}</CardTitle>
         <CardDescription>
-          Kirish, chiqish va kechiktirilgan (kurs tugagandan keyin) testlarning o'rtacha natijasi (%) va o'sish. Tajriba
-          guruhida AI yoqilgan, nazorat guruhida o'chirilgan.
+          {t("Kirish, chiqish va kechiktirilgan (kurs tugagandan keyin) testlarning o'rtacha natijasi (%) va o'sish. Tajriba guruhida AI yoqilgan, nazorat guruhida o'chirilgan.")}
         </CardDescription>
-        <ul className="flex flex-wrap gap-4 pt-1 text-xs text-muted-foreground" aria-label="Belgilar">
+        <ul className="flex flex-wrap gap-4 pt-1 text-xs text-muted-foreground" aria-label={t('Belgilar')}>
           <li className="flex items-center gap-1.5">
-            <span className="size-3 rounded-sm" style={{ background: SERIES_1 }} aria-hidden="true" /> Kirish testi
+            <span className="size-3 rounded-sm" style={{ background: SERIES_1 }} aria-hidden="true" />{' '}{t('Kirish testi')}
           </li>
           <li className="flex items-center gap-1.5">
-            <span className="size-3 rounded-sm" style={{ background: SERIES_2 }} aria-hidden="true" /> Chiqish testi
+            <span className="size-3 rounded-sm" style={{ background: SERIES_2 }} aria-hidden="true" />{' '}{t('Chiqish testi')}
           </li>
           {groups.some((group) => group.delayed_count) ? (
             <li className="flex items-center gap-1.5">
-              <span className="size-3 rounded-sm" style={{ background: SERIES_3 }} aria-hidden="true" /> Kechiktirilgan test
+              <span className="size-3 rounded-sm" style={{ background: SERIES_3 }} aria-hidden="true" />{' '}{t('Kechiktirilgan test')}
             </li>
           ) : null}
         </ul>
@@ -428,11 +425,11 @@ function GroupsCard({ groups }: { groups: StatisticsGroup[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Guruh</TableHead>
-              <TableHead className="w-[34%]">Testlar (o'rtacha %)</TableHead>
-              <TableHead className="text-right">O'sish</TableHead>
-              <TableHead className="text-right">Laboratoriyalarni yechgan</TableHead>
-              <TableHead className="text-right">O'rtacha baho</TableHead>
+              <TableHead>{t('Guruh')}</TableHead>
+              <TableHead className="w-[34%]">{t("Testlar (o'rtacha %)")}</TableHead>
+              <TableHead className="text-right">{t("O'sish")}</TableHead>
+              <TableHead className="text-right">{t('Laboratoriyalarni yechgan')}</TableHead>
+              <TableHead className="text-right">{t("O'rtacha baho")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -442,11 +439,11 @@ function GroupsCard({ groups }: { groups: StatisticsGroup[] }) {
                   <div className="font-medium">{group.name}</div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                     {group.ai_enabled ? (
-                      <Badge variant="outline">AI yoqilgan</Badge>
+                      <Badge variant="outline">{t('AI yoqilgan')}</Badge>
                     ) : (
-                      <Badge className="bg-amber-100 text-amber-800">AI o'chirilgan</Badge>
+                      <Badge className="bg-amber-100 text-amber-800">{t("AI o'chirilgan")}</Badge>
                     )}
-                    {group.students} talaba
+                    {t('{students} talaba', { students: group.students })}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -481,17 +478,17 @@ export function StatisticsPage() {
     content = <ErrorState error={statistics.error} onRetry={() => void statistics.refetch()} />
   } else if (!statistics.data.groups.length) {
     content = (
-      <EmptyState icon={BarChart3} title="Hali guruh yo'q" description="Statistika guruhlaringiz talabalari bo'yicha hisoblanadi." />
+      <EmptyState icon={BarChart3} title={t("Hali guruh yo'q")} description={t("Statistika guruhlaringiz talabalari bo'yicha hisoblanadi.")} />
     )
   } else {
     const data = statistics.data
     content = (
       <div className="grid gap-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatTile label="Talabalar" value={String(data.overview.students)} />
-          <StatTile label="Laboratoriya urinishlari" value={String(data.overview.attempts)} hint={`${data.overview.labs} ta laboratoriya`} />
-          <StatTile label="Yechilgan laboratoriyalar" value={formatPercent(data.overview.solved_rate)} hint="talaba va laboratoriya juftliklaridan" />
-          <StatTile label="O'rtacha baho" value={data.overview.average_grade === null ? '—' : String(data.overview.average_grade)} hint="100 ballik" />
+          <StatTile label={t('Talabalar')} value={String(data.overview.students)} />
+          <StatTile label={t('Laboratoriya urinishlari')} value={String(data.overview.attempts)} hint={t('{labs} ta laboratoriya', { labs: data.overview.labs })} />
+          <StatTile label={t('Yechilgan laboratoriyalar')} value={formatPercent(data.overview.solved_rate)} hint={t('talaba va laboratoriya juftliklaridan')} />
+          <StatTile label={t("O'rtacha baho")} value={data.overview.average_grade === null ? '—' : String(data.overview.average_grade)} hint={t('100 ballik')} />
         </div>
         <GroupsCard groups={data.groups} />
         <ExperimentCard />
@@ -511,18 +508,18 @@ export function StatisticsPage() {
   return (
     <>
       <PageHeader
-        title="Statistika"
-        description="Tajriba natijalari: guruhlar, xatolar, laboratoriyalar qiyinligi va AI ta'siri. To'liq ma'lumot — Virtual laboratoriya sahifasidagi «Tadqiqot ma'lumotlari»."
+        title={t('Statistika')}
+        description={t("Tajriba natijalari: guruhlar, xatolar, laboratoriyalar qiyinligi va AI ta'siri. To'liq ma'lumot — Virtual laboratoriya sahifasidagi «Tadqiqot ma'lumotlari».")}
         actions={
           statistics.data?.groups_available.length ? (
             <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Guruh</span>
+              <span className="text-muted-foreground">{t('Guruh')}</span>
               <select
                 className="h-10 rounded-md border bg-background px-2"
                 value={groupId}
                 onChange={(event) => setGroupId(event.target.value)}
               >
-                <option value="">Barcha guruhlar</option>
+                <option value="">{t('Barcha guruhlar')}</option>
                 {statistics.data.groups_available.map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}

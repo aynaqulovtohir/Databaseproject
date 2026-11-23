@@ -18,6 +18,7 @@ import logging
 from ai.client import AIError, AINotConfigured, AITransientError, is_configured
 
 from .models import AIAction, AIFailure, LabAttempt
+from config.i18n import N_, tr
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +55,12 @@ def refuse_ai(user):
     Admin va o'qituvchi uchun kunlik limit yo'q (ular talaba emas), lekin AI sozlangan bo'lishi kerak.
     """
     if not user.ai_allowed:
-        return Response({"detail": "Guruhingizda AI yordamchisi o'chirilgan."}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"detail": tr("Guruhingizda AI yordamchisi o'chirilgan.")}, status=status.HTTP_403_FORBIDDEN)
     if not is_configured():
-        return Response({"detail": "AI yordamchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"detail": tr("AI yordamchi hali sozlanmagan.")}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     if user.is_student and ai_advice_left(user) <= 0:
         return Response(
-            {"detail": "Bugungi AI yordami limiti tugadi. Ertaga yana urinib ko'ring."},
+            {"detail": tr("Bugungi AI yordami limiti tugadi. Ertaga yana urinib ko'ring.")},
             status=status.HTTP_429_TOO_MANY_REQUESTS,
         )
     return None
@@ -80,17 +81,17 @@ def record_ai_failure(user, lab, kind, exc):
 def ai_error_response(exc, what="so'rov"):
     """AI xatosini talabaga tushunarli javobga aylantiradi."""
     if isinstance(exc, AINotConfigured):
-        return Response({"detail": "AI yordamchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"detail": tr("AI yordamchi hali sozlanmagan.")}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     if isinstance(exc, AITransientError):
         return Response(
-            {"detail": "AI vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
+            {"detail": tr("AI vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     logger.error("AI xatosi (%s): %s", what, exc)
-    return Response({"detail": f"AI bu {what}ga javob bera olmadi."}, status=status.HTTP_502_BAD_GATEWAY)
+    return Response({"detail": tr("AI bu {what}ga javob bera olmadi.", what=what)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
-SANDBOX_DOWN = "Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."
+SANDBOX_DOWN = N_("Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")
 
 
 def sandbox_down_response():

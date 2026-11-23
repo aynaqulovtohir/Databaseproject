@@ -4,12 +4,13 @@ import { useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Dashboard } from '@/lib/types'
+import { localized, t } from '@/lib/i18n'
 
-const SERIES = [
+const SERIES = localized([
   { key: 'submissions', label: 'Topshiriq yechimlari', color: 'var(--series-1)' },
   { key: 'lab_attempts', label: 'Laboratoriya urinishlari', color: 'var(--series-2)' },
   { key: 'quiz_attempts', label: 'Test topshirishlari', color: 'var(--series-3)' },
-] as const
+] as const)
 
 const HEIGHT = 260
 const PAD = { top: 12, right: 12, bottom: 28, left: 32 }
@@ -57,7 +58,7 @@ export function ActivityChart({ chart, showTable }: { chart: Dashboard['chart'];
 
   return (
     <div>
-      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Izoh">
+      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={t('Izoh')}>
         {SERIES.map((s) => (
           <li key={s.key} className="flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded-full" style={{ background: s.color }} aria-hidden="true" />
@@ -71,7 +72,7 @@ export function ActivityChart({ chart, showTable }: { chart: Dashboard['chart'];
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Kun</TableHead>
+                <TableHead>{t('Kun')}</TableHead>
                 {SERIES.map((s) => (
                   <TableHead key={s.key} className="text-right">
                     {s.label}
@@ -99,7 +100,7 @@ export function ActivityChart({ chart, showTable }: { chart: Dashboard['chart'];
             width={width}
             height={HEIGHT}
             role="img"
-            aria-label={`So'nggi ${days.length} kunlik faollik grafigi, jami ${total} ta harakat. Aniq sonlar jadval ko'rinishida.`}
+            aria-label={t("So'nggi {days} kunlik faollik grafigi, jami {total} ta harakat. Aniq sonlar jadval ko'rinishida.", { days: days.length, total })}
             className="block max-w-full"
           >
             {ticks.map((tick) => (

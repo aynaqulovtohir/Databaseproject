@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from .consent import needs_decision
 from .models import StudentGroup, User
+from config.i18n import tr
 
 
 def check_password_strength(password, user=None):
@@ -56,7 +57,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         # Yangi foydalanuvchi yaratishda parol majburiy
         if instance is None and not attrs.get("password"):
-            raise serializers.ValidationError({"password": "Parol kiritilishi shart."})
+            raise serializers.ValidationError({"password": tr("Parol kiritilishi shart.")})
 
         if attrs.get("password"):
             candidate = instance or User(
@@ -73,7 +74,7 @@ class UserSerializer(serializers.ModelSerializer):
         # createsuperuser buyrug'i bilan yaratiladi
         if attrs.get("role") == User.Role.ADMIN and not (instance and instance.is_admin):
             raise serializers.ValidationError(
-                {"role": "Admin rolini berib bo'lmaydi. Faqat o'qituvchi yoki talaba rolini tanlang."}
+                {"role": tr("Admin rolini berib bo'lmaydi. Faqat o'qituvchi yoki talaba rolini tanlang.")}
             )
 
         # Guruh faqat talabaga biriktiriladi
@@ -81,16 +82,16 @@ class UserSerializer(serializers.ModelSerializer):
         group = attrs.get("group", instance.group if instance else None)
         if group is not None and role != User.Role.STUDENT:
             if "group" in attrs:
-                raise serializers.ValidationError({"group": "Guruh faqat talabaga biriktiriladi."})
+                raise serializers.ValidationError({"group": tr("Guruh faqat talabaga biriktiriladi.")})
             # Rol o'zgarganda eski guruh avtomatik olib tashlanadi
             attrs["group"] = None
 
         # Admin o'zini bloklab yoki rolini o'zgartirib, tizimdan uzilib qolmasin
         if instance is not None and instance.pk == request_user.pk:
             if attrs.get("is_active") is False:
-                raise serializers.ValidationError({"is_active": "O'zingizni bloklay olmaysiz."})
+                raise serializers.ValidationError({"is_active": tr("O'zingizni bloklay olmaysiz.")})
             if "role" in attrs and attrs["role"] != User.Role.ADMIN:
-                raise serializers.ValidationError({"role": "O'z rolingizni o'zgartira olmaysiz."})
+                raise serializers.ValidationError({"role": tr("O'z rolingizni o'zgartira olmaysiz.")})
 
         return attrs
 
@@ -145,7 +146,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate_old_password(self, value):
         if not self.context["request"].user.check_password(value):
-            raise serializers.ValidationError("Eski parol noto'g'ri.")
+            raise serializers.ValidationError(tr("Eski parol noto'g'ri."))
         return value
 
     def validate_new_password(self, value):

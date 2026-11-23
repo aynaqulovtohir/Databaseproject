@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { api, errorMessage } from '@/lib/api'
 import type { BuggyCode, Lab } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 /** O'qituvchi: AI bilan yangi variant va "AI yozgan xatoli kod — xatoni toping" boshlang'ich kodi. */
 export function LabGenerateCard({ lab }: { lab: Lab }) {
@@ -21,7 +22,7 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
     mutationFn: () => api<Lab>(`/labs/${lab.id}/generate-variant/`, { method: 'POST', body: { domain } }),
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: ['labs'] })
-      toast.success("Variant yaratildi va qum qutida tekshirildi. Ko'rib chiqib, guruhlarga bering.")
+      toast.success(t("Variant yaratildi va qum qutida tekshirildi. Ko'rib chiqib, guruhlarga bering."))
       navigate(`/labs/${created.id}`)
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -34,7 +35,7 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
     mutationFn: (starter: string) => api<Lab>(`/labs/${lab.id}/`, { method: 'PATCH', body: { starter_sql: starter } }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['lab', lab.id], updated)
-      toast.success(updated.starter_sql ? "Boshlang'ich kod saqlandi" : "Boshlang'ich kod olib tashlandi")
+      toast.success(updated.starter_sql ? t("Boshlang'ich kod saqlandi") : t("Boshlang'ich kod olib tashlandi"))
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -42,45 +43,41 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI yordamida yaratish</CardTitle>
+        <CardTitle>{t('AI yordamida yaratish')}</CardTitle>
         <CardDescription>
-          AI yozgan hamma narsa qum qutida haqiqatan ishga tushirib tekshiriladi. Natijani baribir o'zingiz ko'rib
-          chiqing.
+          {t("AI yozgan hamma narsa qum qutida haqiqatan ishga tushirib tekshiriladi. Natijani baribir o'zingiz ko'rib chiqing.")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="grid gap-2">
-          <div className="text-sm font-medium">Yangi variant</div>
+          <div className="text-sm font-medium">{t('Yangi variant')}</div>
           <p className="text-xs text-muted-foreground">
-            Shu ko'nikmani boshqa sohada tekshiradigan laboratoriya: talabalar eski yechimni ko'chira olmaydi. Guruhlarsiz
-            qoralama sifatida saqlanadi.
+            {t("Shu ko'nikmani boshqa sohada tekshiradigan laboratoriya: talabalar eski yechimni ko'chira olmaydi. Guruhlarsiz qoralama sifatida saqlanadi.")}
           </p>
           <div className="flex flex-wrap gap-2">
             <Input
-              aria-label="Soha"
+              aria-label={t('Soha')}
               className="max-w-64"
-              placeholder="Soha (ixtiyoriy): kasalxona"
+              placeholder={t('Soha (ixtiyoriy): kasalxona')}
               maxLength={100}
               value={domain}
               onChange={(event) => setDomain(event.target.value)}
             />
             <Button type="button" variant="outline" disabled={variant.isPending} onClick={() => variant.mutate()}>
               {variant.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Shuffle aria-hidden="true" />}
-              {variant.isPending ? 'Yozilmoqda va tekshirilmoqda…' : 'Variant yaratish'}
+              {variant.isPending ? t('Yozilmoqda va tekshirilmoqda…') : t('Variant yaratish')}
             </Button>
           </div>
         </div>
 
         <div className="grid gap-2 border-t pt-4">
-          <div className="text-sm font-medium">«Xatoni toping»: AI yozgan kodni tekshirish</div>
+          <div className="text-sm font-medium">{t('«Xatoni toping»: AI yozgan kodni tekshirish')}</div>
           <p className="text-xs text-muted-foreground">
-            Ishonarli ko'rinadigan, xatosiz bajariladigan, lekin noto'g'ri natija beradigan kod. Talaba uni muharrirda
-            boshlang'ich kod sifatida oladi va tuzatadi. Shartga «Bu kodni AI yozgan, xatolarini toping» deb qo'shib
-            qo'ying.
+            {t("Ishonarli ko'rinadigan, xatosiz bajariladigan, lekin noto'g'ri natija beradigan kod. Talaba uni muharrirda boshlang'ich kod sifatida oladi va tuzatadi. Shartga «Bu kodni AI yozgan, xatolarini toping» deb qo'shib qo'ying.")}
           </p>
           {lab.starter_sql?.trim() ? (
             <div className="grid gap-2 rounded-lg border p-3">
-              <div className="text-xs font-medium">Hozirgi boshlang'ich kod (talabaga ko'rinadi)</div>
+              <div className="text-xs font-medium">{t("Hozirgi boshlang'ich kod (talabaga ko'rinadi)")}</div>
               <SqlCode code={lab.starter_sql.trim()} />
               <Button
                 type="button"
@@ -90,7 +87,7 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
                 onClick={() => saveStarter.mutate('')}
               >
                 <Trash2 aria-hidden="true" />
-                Olib tashlash
+                {t('Olib tashlash')}
               </Button>
             </div>
           ) : null}
@@ -102,18 +99,18 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
             onClick={() => buggy.mutate()}
           >
             {buggy.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Bug aria-hidden="true" />}
-            {buggy.isPending ? 'Yozilmoqda va tekshirilmoqda…' : 'Xatoli kod yaratish'}
+            {buggy.isPending ? t('Yozilmoqda va tekshirilmoqda…') : t('Xatoli kod yaratish')}
           </Button>
           {buggy.data ? (
             <div className="grid gap-2 rounded-lg border p-3" aria-live="polite">
               <SqlCode code={buggy.data.buggy_sql} />
-              <div className="text-xs font-medium">Xatolar (faqat sizga):</div>
+              <div className="text-xs font-medium">{t('Xatolar (faqat sizga):')}</div>
               <ul className="list-disc space-y-1 pl-5 text-sm">
                 {buggy.data.bugs.map((bug, index) => (
                   <li key={index}>{bug}</li>
                 ))}
               </ul>
-              <div className="text-xs font-medium">Tekshiruv natijasi (talaba ham shuni ko'radi):</div>
+              <div className="text-xs font-medium">{t("Tekshiruv natijasi (talaba ham shuni ko'radi):")}</div>
               <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
                 {buggy.data.differences.map((difference, index) => (
                   <li key={index}>{difference}</li>
@@ -125,7 +122,7 @@ export function LabGenerateCard({ lab }: { lab: Lab }) {
                 disabled={saveStarter.isPending}
                 onClick={() => saveStarter.mutate(buggy.data.buggy_sql)}
               >
-                Boshlang'ich kod sifatida saqlash
+                {t("Boshlang'ich kod sifatida saqlash")}
               </Button>
             </div>
           ) : null}

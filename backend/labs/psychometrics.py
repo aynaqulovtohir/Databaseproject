@@ -25,6 +25,7 @@ from users.consent import consent_required, research_participants
 from users.models import User
 
 from .models import Lab, LabAttempt, LabGrade
+from config.i18n import N_, tr
 
 # Laboratoriya tahlil qilinishi uchun uni boshlagan talabalar soni (kam bo'lsa ko'rsatkichlar tasodifiy)
 MIN_STUDENTS = 5
@@ -36,11 +37,11 @@ RELIABLE_STUDENTS = 30
 
 LEVELS = [
     # (raqam, kalit, nomi, p shu qiymatdan katta bo'lsa)
-    (1, "very_easy", "Juda oson", 0.80),
+    (1, "very_easy", N_("Juda oson"), 0.80),
     (2, "easy", "Oson", 0.60),
     (3, "medium", "O'rtacha", 0.40),
     (4, "hard", "Qiyin", 0.20),
-    (5, "very_hard", "Juda qiyin", -math.inf),
+    (5, "very_hard", N_("Juda qiyin"), -math.inf),
 ]
 
 DISCRIMINATION = [
@@ -57,10 +58,10 @@ ALPHA_LEVELS = [
     ("acceptable", "Maqbul", 0.7),
     ("questionable", "Shubhali", 0.6),
     ("poor", "Past", 0.5),
-    ("unacceptable", "Qabul qilinmaydi", -math.inf),
+    ("unacceptable", N_("Qabul qilinmaydi"), -math.inf),
 ]
 
-VERDICTS = {"good": "Yaxshi", "review": "Qayta ko'rib chiqing", "replace": "Tekshiring yoki almashtiring"}
+VERDICTS = {"good": "Yaxshi", "review": N_("Qayta ko'rib chiqing"), "replace": N_("Tekshiring yoki almashtiring")}
 
 # α shu qiymatdan ko'proq oshsa, laboratoriya to'plamni "buzyapti" deb hisoblanadi
 ALPHA_GAIN = 0.02
@@ -241,18 +242,17 @@ def analyse(labs, groups):
         without = alpha_without.get(lab.pk)
         advice = []
         if number == 5:
-            advice.append("Juda qiyin: shartni aniqlashtiring, nazariyaga namuna qo'shing yoki oldingi mavzuni takrorlating.")
+            advice.append(tr("Juda qiyin: shartni aniqlashtiring, nazariyaga namuna qo'shing yoki oldingi mavzuni takrorlating."))
         elif number == 1:
-            advice.append("Juda oson: talabalarni bilim darajasi bo'yicha ajratmaydi; qo'shimcha talab qo'shing.")
+            advice.append(tr("Juda oson: talabalarni bilim darajasi bo'yicha ajratmaydi; qo'shimcha talab qo'shing."))
         if r is not None and r < 0:
             advice.append(
-                "Kuchli talabalar bu laboratoriyani kuchsizlardan yomonroq bajargan: namunaviy yechim, yashirin test "
-                "ma'lumotlari va baholashni tekshiring."
+                tr("Kuchli talabalar bu laboratoriyani kuchsizlardan yomonroq bajargan: namunaviy yechim, yashirin test ma'lumotlari va baholashni tekshiring.")
             )
         elif r is not None and r < 0.20:
-            advice.append("Kuchli va kuchsiz talabalarni yaxshi ajratmaydi: shart boshqa ko'nikmani o'lchayotgan bo'lishi mumkin.")
+            advice.append(tr("Kuchli va kuchsiz talabalarni yaxshi ajratmaydi: shart boshqa ko'nikmani o'lchayotgan bo'lishi mumkin."))
         if without is not None and without > alpha + ALPHA_GAIN:
-            advice.append("Olib tashlansa, laboratoriyalar to'plamining ishonchliligi (α) oshadi.")
+            advice.append(tr("Olib tashlansa, laboratoriyalar to'plamining ishonchliligi (α) oshadi."))
         if r is not None and r < 0:
             verdict = "replace"
         elif advice:

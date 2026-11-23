@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { t } from '@/lib/i18n'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -40,7 +41,7 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel size="lg" disabled={pending}>
-            Bekor qilish
+            {t('Bekor qilish')}
           </AlertDialogCancel>
           {/* Oddiy tugma: so'rov tugaguncha oyna ochiq turadi */}
           <Button variant="destructive" size="lg" disabled={pending} onClick={onConfirm}>

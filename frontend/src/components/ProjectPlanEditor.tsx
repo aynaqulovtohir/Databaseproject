@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RUBRIC_TOTAL, rubricTotal, type CriterionDraft, type StageDraft } from '@/lib/rubric'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 const MAX_STAGES = 8
 const MAX_CRITERIA = 20
@@ -55,11 +56,10 @@ export function ProjectPlanEditor({
       <section className="grid gap-2" aria-labelledby="stages_heading">
         <div>
           <h3 id="stages_heading" className="text-sm font-medium">
-            Bosqichlar (ixtiyoriy)
+            {t('Bosqichlar (ixtiyoriy)')}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Loyihani bosqichlarga bo'ling: har bir bosqich alohida topshiriladi va o'z mezonlari bo'yicha baholanadi.
-            Loyiha muddati — oxirgi bosqich muddati.
+            {t("Loyihani bosqichlarga bo'ling: har bir bosqich alohida topshiriladi va o'z mezonlari bo'yicha baholanadi. Loyiha muddati — oxirgi bosqich muddati.")}
           </p>
         </div>
         {stages.map((stage, index) => (
@@ -67,9 +67,9 @@ export function ProjectPlanEditor({
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-sm font-medium">{index + 1}.</span>
               <Input
-                aria-label={`${index + 1}-bosqich sarlavhasi`}
+                aria-label={t('{value}-bosqich sarlavhasi', { value: index + 1 })}
                 className="h-9"
-                placeholder="Masalan: ER-model"
+                placeholder={t('Masalan: ER-model')}
                 maxLength={200}
                 value={stage.title}
                 onChange={(event) => updateStage(index, { title: event.target.value })}
@@ -79,7 +79,7 @@ export function ProjectPlanEditor({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`${index + 1}-bosqichni o'chirish`}
+                  aria-label={t("{value}-bosqichni o'chirish", { value: index + 1 })}
                   onClick={() => removeStage(index)}
                 >
                   <Trash2 aria-hidden="true" />
@@ -87,27 +87,27 @@ export function ProjectPlanEditor({
               ) : null}
             </div>
             <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              Talaba topshiradi
+              {t('Talaba topshiradi')}
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
                 disabled={locked}
                 value={stage.kind}
                 onChange={(event) => updateStage(index, { kind: event.target.value as StageDraft['kind'] })}
               >
-                <option value="sql">SQL kod</option>
-                <option value="er">ER-diagramma</option>
+                <option value="sql">{t('SQL kod')}</option>
+                <option value="er">{t('ER-diagramma')}</option>
               </select>
             </label>
             <Textarea
-              aria-label={`${index + 1}-bosqich sharti`}
+              aria-label={t('{value}-bosqich sharti', { value: index + 1 })}
               className="max-h-40 min-h-14"
-              placeholder="Bu bosqichda nima topshiriladi"
+              placeholder={t('Bu bosqichda nima topshiriladi')}
               maxLength={5000}
               value={stage.description}
               onChange={(event) => updateStage(index, { description: event.target.value })}
             />
             <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              Muddat
+              {t('Muddat')}
               <Input
                 type="datetime-local"
                 className="h-9 w-full sm:w-64"
@@ -125,7 +125,7 @@ export function ProjectPlanEditor({
             onClick={() => onStagesChange([...stages, { kind: 'sql', title: '', description: '', deadline: '' }])}
           >
             <Plus aria-hidden="true" />
-            Bosqich qo'shish
+            {t("Bosqich qo'shish")}
           </Button>
         ) : null}
         {stagesError ? (
@@ -138,27 +138,27 @@ export function ProjectPlanEditor({
       <section className="grid gap-2" aria-labelledby="rubric_heading">
         <div>
           <h3 id="rubric_heading" className="text-sm font-medium">
-            Baholash rubrikasi {stages.length ? '' : '(ixtiyoriy)'}
+            {t('Baholash rubrikasi')}{' '}{stages.length ? '' : t('(ixtiyoriy)')}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Talabaga oldindan ko'rinadi. Har bir mezonga ball alohida qo'yiladi, ballar yig'indisi {RUBRIC_TOTAL}.
-            {stages.length ? " Har bir mezonni bosqichga biriktiring." : ''}
-            {locked ? " Yechimlar kelgan: ball va bosqichni o'zgartirib bo'lmaydi, nomi va izohini — mumkin." : ''}
+            {t("Talabaga oldindan ko'rinadi. Har bir mezonga ball alohida qo'yiladi, ballar yig'indisi {RUBRIC_TOTAL}.", { RUBRIC_TOTAL })}
+            {stages.length ? t(' Har bir mezonni bosqichga biriktiring.') : ''}
+            {locked ? t(" Yechimlar kelgan: ball va bosqichni o'zgartirib bo'lmaydi, nomi va izohini — mumkin.") : ''}
           </p>
         </div>
         {rubric.map((item, index) => (
           <div key={index} className="grid gap-2 rounded-lg border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Input
-                aria-label={`${index + 1}-mezon nomi`}
+                aria-label={t('{value}-mezon nomi', { value: index + 1 })}
                 className="h-9 min-w-0 flex-1 basis-48"
-                placeholder="Masalan: Normallashtirish"
+                placeholder={t('Masalan: Normallashtirish')}
                 maxLength={100}
                 value={item.name}
                 onChange={(event) => updateCriterion(index, { name: event.target.value })}
               />
               <Input
-                aria-label={`${index + 1}-mezon bali`}
+                aria-label={t('{value}-mezon bali', { value: index + 1 })}
                 type="number"
                 min={1}
                 max={RUBRIC_TOTAL}
@@ -167,10 +167,10 @@ export function ProjectPlanEditor({
                 value={item.points}
                 onChange={(event) => updateCriterion(index, { points: event.target.value })}
               />
-              <span className="text-xs text-muted-foreground">ball</span>
+              <span className="text-xs text-muted-foreground">{t('ball')}</span>
               {stages.length ? (
                 <select
-                  aria-label={`${index + 1}-mezon bosqichi`}
+                  aria-label={t('{value}-mezon bosqichi', { value: index + 1 })}
                   className="h-9 rounded-md border bg-background px-2 text-sm"
                   disabled={locked}
                   value={item.stage ?? ''}
@@ -178,10 +178,10 @@ export function ProjectPlanEditor({
                     updateCriterion(index, { stage: event.target.value === '' ? null : Number(event.target.value) })
                   }
                 >
-                  <option value="">Bosqichni tanlang</option>
+                  <option value="">{t('Bosqichni tanlang')}</option>
                   {stages.map((stage, stageIndex) => (
                     <option key={stageIndex} value={stageIndex}>
-                      {stageIndex + 1}. {stage.title || 'bosqich'}
+                      {stageIndex + 1}. {stage.title || t('bosqich')}
                     </option>
                   ))}
                 </select>
@@ -191,7 +191,7 @@ export function ProjectPlanEditor({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`${index + 1}-mezonni o'chirish`}
+                  aria-label={t("{value}-mezonni o'chirish", { value: index + 1 })}
                   onClick={() => onRubricChange(rubric.filter((_, i) => i !== index))}
                 >
                   <Trash2 aria-hidden="true" />
@@ -199,9 +199,9 @@ export function ProjectPlanEditor({
               ) : null}
             </div>
             <Input
-              aria-label={`${index + 1}-mezon izohi`}
+              aria-label={t('{value}-mezon izohi', { value: index + 1 })}
               className="h-9"
-              placeholder="Nima tekshiriladi (ixtiyoriy)"
+              placeholder={t('Nima tekshiriladi (ixtiyoriy)')}
               maxLength={1000}
               value={item.description}
               onChange={(event) => updateCriterion(index, { description: event.target.value })}
@@ -218,14 +218,14 @@ export function ProjectPlanEditor({
               }
             >
               <Plus aria-hidden="true" />
-              Mezon qo'shish
+              {t("Mezon qo'shish")}
             </Button>
           ) : null}
           {rubric.length ? (
             <span
               className={cn('text-sm tabular-nums', total === RUBRIC_TOTAL ? 'text-muted-foreground' : 'text-destructive')}
             >
-              Jami: {total} / {RUBRIC_TOTAL}
+              {t('Jami: {total} / {RUBRIC_TOTAL}', { total, RUBRIC_TOTAL })}
             </span>
           ) : null}
         </div>

@@ -31,19 +31,20 @@ import {
   type SurveySummary,
 } from '@/lib/types'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { localized, t } from '@/lib/i18n'
 
 const SAVE_DELAY_MS = 800
-const STATUS_LABELS: Record<QuizAttemptStatus, string> = {
+const STATUS_LABELS: Record<QuizAttemptStatus, string> = localized({
   not_started: 'Boshlamagan',
   in_progress: 'Boshlagan',
   submitted: 'Topshirgan',
-}
+})
 
 function BackLink() {
   return (
     <Link to="/quizzes" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
       <ArrowLeft className="size-4" aria-hidden="true" />
-      Testlar
+      {t('Testlar')}
     </Link>
   )
 }
@@ -70,10 +71,9 @@ function ResultView({ result, survey = false }: { result: QuizResult; survey?: b
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Rahmat!</CardTitle>
+          <CardTitle>{t('Rahmat!')}</CardTitle>
           <CardDescription>
-            Javoblaringiz qabul qilindi ({formatDateTime(result.submitted_at)}). O'qituvchi alohida javoblaringizni
-            ko'rmaydi, faqat guruh bo'yicha umumiy natijani ko'radi.
+            {t("Javoblaringiz qabul qilindi ({submitted_at}). O'qituvchi alohida javoblaringizni ko'rmaydi, faqat guruh bo'yicha umumiy natijani ko'radi.", { submitted_at: formatDateTime(result.submitted_at) })}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -83,20 +83,20 @@ function ResultView({ result, survey = false }: { result: QuizResult; survey?: b
     <div className="grid gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Natijangiz</CardTitle>
-          <CardDescription>Topshirilgan: {formatDateTime(result.submitted_at)}</CardDescription>
+          <CardTitle>{t('Natijangiz')}</CardTitle>
+          <CardDescription>{t('Topshirilgan: {submitted_at}', { submitted_at: formatDateTime(result.submitted_at) })}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <span className="text-3xl font-semibold tabular-nums">{result.percent}%</span>
           <span className="text-sm text-muted-foreground tabular-nums">
-            {result.score} / {result.max_score} ball
+            {t('{score} / {max_score} ball', { score: result.score, max_score: result.max_score })}
           </span>
         </CardContent>
       </Card>
       {result.questions ? (
         <Card>
           <CardHeader>
-            <CardTitle>Javoblar</CardTitle>
+            <CardTitle>{t('Javoblar')}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             {result.questions.map((question, index) => (
@@ -120,14 +120,14 @@ function ResultView({ result, survey = false }: { result: QuizResult; survey?: b
                       )}
                     >
                       {choice.is_correct ? (
-                        <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" />
+                        <CircleCheck className="size-4 shrink-0" aria-label={t("to'g'ri javob")} />
                       ) : choice.selected ? (
-                        <CircleX className="size-4 shrink-0" aria-label="noto'g'ri tanlangan" />
+                        <CircleX className="size-4 shrink-0" aria-label={t("noto'g'ri tanlangan")} />
                       ) : (
                         <span className="size-4 shrink-0" aria-hidden="true" />
                       )}
                       <span>{choice.text}</span>
-                      {choice.selected ? <span className="ml-auto text-xs">sizning javobingiz</span> : null}
+                      {choice.selected ? <span className="ml-auto text-xs">{t('sizning javobingiz')}</span> : null}
                     </li>
                   ))}
                 </ul>
@@ -136,7 +136,7 @@ function ResultView({ result, survey = false }: { result: QuizResult; survey?: b
           </CardContent>
         </Card>
       ) : (
-        <p className="text-sm text-muted-foreground">To'g'ri javoblar ko'rsatilmaydi: o'qituvchi bu test uchun ularni yopgan.</p>
+        <p className="text-sm text-muted-foreground">{t("To'g'ri javoblar ko'rsatilmaydi: o'qituvchi bu test uchun ularni yopgan.")}</p>
       )}
     </div>
   )
@@ -235,14 +235,14 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
           </span>
         ) : null}
         <span className="text-sm text-muted-foreground">
-          {answered} / {taking.questions.length} savolga javob berildi
+          {t('{answered} / {length} savolga javob berildi', { answered, length: taking.questions.length })}
         </span>
         <span className="text-xs text-muted-foreground" aria-live="polite">
-          {saveState === 'saving' ? 'Saqlanmoqda…' : saveState === 'error' ? "Saqlanmadi: internetni tekshiring" : 'Saqlandi'}
+          {saveState === 'saving' ? t('Saqlanmoqda…') : saveState === 'error' ? t('Saqlanmadi: internetni tekshiring') : t('Saqlandi')}
         </span>
         <Button className="ml-auto" disabled={submit.isPending} onClick={() => setConfirming(true)}>
           {submit.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-          {survey ? 'Yuborish' : 'Topshirish'}
+          {survey ? t('Yuborish') : t('Topshirish@@tugma')}
         </Button>
       </div>
 
@@ -258,13 +258,13 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
               </CardTitle>
               <CardDescription>
                 {likert
-                  ? 'Bu fikrga qanchalik qo\'shilasiz?'
-                  : `${single ? 'Bitta javobni tanlang' : 'Barcha to\'g\'ri javoblarni belgilang'} · ${question.points} ball`}
+                  ? t("Bu fikrga qanchalik qo'shilasiz?")
+                  : `${single ? t('Bitta javobni tanlang') : t("Barcha to'g'ri javoblarni belgilang")} · ${t('{points} ball', { points: question.points })}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <fieldset className={cn('grid gap-2', likert && 'sm:grid-cols-5')}>
-                <legend className="sr-only">{index + 1}-savol javoblari</legend>
+                <legend className="sr-only">{t('{value}-savol javoblari', { value: index + 1 })}</legend>
                 {question.choices.map((choice, position) => (
                   <label
                     key={choice.id}
@@ -294,13 +294,13 @@ function Taker({ quiz, taking, onFinished }: { quiz: Quiz; taking: QuizTaking; o
 
       <ConfirmDialog
         open={confirming}
-        title={survey ? "So'rovnomani yuborish" : 'Testni topshirish'}
+        title={survey ? t("So'rovnomani yuborish") : t('Testni topshirish')}
         description={
           unanswered
-            ? `${unanswered} ta savolga javob bermagansiz. Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi.`
-            : "Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi."
+            ? t("{unanswered} ta savolga javob bermagansiz. Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi.", { unanswered })
+            : t("Yuborgandan keyin javoblarni o'zgartirib bo'lmaydi.")
         }
-        confirmLabel={survey ? 'Yuborish' : 'Topshirish'}
+        confirmLabel={survey ? t('Yuborish') : t('Topshirish@@tugma')}
         pending={submit.isPending}
         onConfirm={() => {
           setConfirming(false)
@@ -347,23 +347,23 @@ function StudentView({ quiz }: { quiz: Quiz }) {
     content = (
       <Card>
         <CardHeader>
-          <CardTitle>{survey ? "So'rovnomani boshlash" : 'Testni boshlash'}</CardTitle>
+          <CardTitle>{survey ? t("So'rovnomani boshlash") : t('Testni boshlash')}</CardTitle>
           <CardDescription>
             {quiz.time_limit_minutes
-              ? `Boshlaganingizdan keyin ${quiz.time_limit_minutes} daqiqa vaqtingiz bo'ladi; vaqt tugasa, test avtomatik topshiriladi.`
-              : 'Vaqt cheklanmagan.'}{' '}
-            {survey ? "So'rovnoma" : 'Test'} faqat bir marta topshiriladi. Javoblaringiz avtomatik saqlanadi.
+              ? t("Boshlaganingizdan keyin {time_limit_minutes} daqiqa vaqtingiz bo'ladi; vaqt tugasa, test avtomatik topshiriladi.", { time_limit_minutes: quiz.time_limit_minutes })
+              : t('Vaqt cheklanmagan.')}{' '}
+            {survey ? t("So'rovnoma") : t('Test')}{' '}{t('faqat bir marta topshiriladi. Javoblaringiz avtomatik saqlanadi.')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {quiz.is_open ? (
             <Button size="lg" onClick={() => setStarted(true)}>
               <Play aria-hidden="true" />
-              Boshlash
+              {t('Boshlash')}
             </Button>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Test hozir yopiq.{quiz.opens_at ? ` Ochilish vaqti: ${formatDateTime(quiz.opens_at)}.` : ''}
+              {t('Test hozir yopiq.')}{quiz.opens_at ? t(' Ochilish vaqti: {opens_at}.', { opens_at: formatDateTime(quiz.opens_at) }) : ''}
             </p>
           )}
         </CardContent>
@@ -402,22 +402,22 @@ function ResultsCard({ quiz }: { quiz: Quiz }) {
   let content
   if (results.isPending) content = <ListSkeleton rows={2} />
   else if (results.isError) content = <ErrorState error={results.error} onRetry={() => void results.refetch()} />
-  else if (!results.data.length) content = <EmptyState icon={Users} title="Bu guruhlarda hali talaba yo'q" />
+  else if (!results.data.length) content = <EmptyState icon={Users} title={t("Bu guruhlarda hali talaba yo'q")} />
   else
     content = (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Talaba</TableHead>
-            <TableHead>Guruh</TableHead>
-            <TableHead>Holat</TableHead>
+            <TableHead>{t('Talaba')}</TableHead>
+            <TableHead>{t('Guruh')}</TableHead>
+            <TableHead>{t('Holat')}</TableHead>
             {survey ? null : (
               <>
-                <TableHead className="text-right">Ball</TableHead>
-                <TableHead className="text-right">Foiz</TableHead>
+                <TableHead className="text-right">{t('Ball')}</TableHead>
+                <TableHead className="text-right">{t('Foiz')}</TableHead>
               </>
             )}
-            <TableHead>Topshirilgan</TableHead>
+            <TableHead>{t('Topshirilgan')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -450,15 +450,15 @@ function ResultsCard({ quiz }: { quiz: Quiz }) {
     <Card>
       <CardHeader>
         <CardTitle>
-          Natijalar
-          {results.data?.length ? ` (${submitted.length} / ${results.data.length} topshirgan)` : ''}
+          {t('Natijalar')}
+          {results.data?.length ? t(' ({submitted} / {length} topshirgan)', { submitted: submitted.length, length: results.data.length }) : ''}
         </CardTitle>
         <CardDescription>
           {survey
-            ? "Kim javob berganini ko'rasiz, javoblarning o'zini emas."
+            ? t("Kim javob berganini ko'rasiz, javoblarning o'zini emas.")
             : average === null
-              ? 'Hali hech kim topshirmagan.'
-              : `O'rtacha natija: ${average}%`}
+              ? t('Hali hech kim topshirmagan.')
+              : t("O'rtacha natija: {average}%", { average })}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
@@ -470,23 +470,23 @@ function SegmentCell({ segment }: { segment: SurveySegment }) {
   if (!segment.count) return <TableCell className="text-right text-muted-foreground">—</TableCell>
   if (segment.hidden) {
     return (
-      <TableCell className="text-right text-xs text-muted-foreground" title="Javoblar kam: natija maxfiylik uchun yashirilgan">
-        yashirin
+      <TableCell className="text-right text-xs text-muted-foreground" title={t('Javoblar kam: natija maxfiylik uchun yashirilgan')}>
+        {t('yashirin')}
       </TableCell>
     )
   }
   return (
     <TableCell className="text-right tabular-nums">
       {segment.mean?.toFixed(2)}
-      <span className="block text-xs text-muted-foreground">{segment.count} ta javob</span>
+      <span className="block text-xs text-muted-foreground">{t('{count} ta javob', { count: segment.count })}</span>
     </TableCell>
   )
 }
 
 /** Javoblar taqsimoti: 1 dan 5 gacha har bir qiymat ulushi bitta chiziqda */
 function DistributionBar({ segment, scale }: { segment: SurveySegment; scale: string[] }) {
-  if (!segment.count) return <span className="text-xs text-muted-foreground">Javob yo'q</span>
-  if (!segment.distribution) return <span className="text-xs text-muted-foreground">Javoblar kam</span>
+  if (!segment.count) return <span className="text-xs text-muted-foreground">{t("Javob yo'q")}</span>
+  if (!segment.distribution) return <span className="text-xs text-muted-foreground">{t('Javoblar kam')}</span>
   const { distribution } = segment
   const shades = ['bg-red-400', 'bg-orange-300', 'bg-zinc-300', 'bg-emerald-300', 'bg-emerald-500']
   const label = distribution.map((count, index) => `${index + 1} (${scale[index]}): ${count}`).join(', ')
@@ -508,17 +508,17 @@ function SurveyCard({ quiz }: { quiz: Quiz }) {
   let content
   if (summary.isPending) content = <ListSkeleton rows={2} />
   else if (summary.isError) content = <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />
-  else if (!summary.data.respondents) content = <EmptyState icon={Users} title="Hali hech kim javob bermagan" />
+  else if (!summary.data.respondents) content = <EmptyState icon={Users} title={t('Hali hech kim javob bermagan')} />
   else
     content = (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Fikr</TableHead>
-            <TableHead className="w-40">Taqsimot (1 → 5)</TableHead>
-            <TableHead className="text-right">Hammasi</TableHead>
-            <TableHead className="text-right">AI yoqilgan</TableHead>
-            <TableHead className="text-right">Nazorat</TableHead>
+            <TableHead>{t('Fikr')}</TableHead>
+            <TableHead className="w-40">{t('Taqsimot (1 → 5)')}</TableHead>
+            <TableHead className="text-right">{t('Hammasi')}</TableHead>
+            <TableHead className="text-right">{t('AI yoqilgan')}</TableHead>
+            <TableHead className="text-right">{t('Nazorat')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -542,11 +542,9 @@ function SurveyCard({ quiz }: { quiz: Quiz }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>So'rovnoma natijasi{summary.data?.respondents ? ` (${summary.data.respondents} ta javob)` : ''}</CardTitle>
+        <CardTitle>{t("So'rovnoma natijasi")}{summary.data?.respondents ? t(' ({respondents} ta javob)', { respondents: summary.data.respondents }) : ''}</CardTitle>
         <CardDescription>
-          O'rtacha qiymat 1 dan 5 gacha: 1 — mutlaqo qo'shilmayman, 5 — to'liq qo'shilaman. Talabalar ochiq javob berishi
-          uchun {summary.data?.min_responses ?? 3} tadan kam javobli natija yashiriladi. Alohida javoblar anonim eksportda
-          (Statistika → tadqiqot eksporti) taxallus bilan beriladi.
+          {t("O'rtacha qiymat 1 dan 5 gacha: 1 — mutlaqo qo'shilmayman, 5 — to'liq qo'shilaman. Talabalar ochiq javob berishi uchun {min} tadan kam javobli natija yashiriladi. Alohida javoblar anonim eksportda (Statistika → tadqiqot eksporti) taxallus bilan beriladi.", { min: summary.data?.min_responses ?? 3 })}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
@@ -568,8 +566,8 @@ function StaffView({ quiz }: { quiz: Quiz }) {
     onSuccess: (copy) => {
       toast.success(
         copy.kind === 'delayed'
-          ? "Kechiktirilgan test yaratildi. Uning ochilish vaqtini kurs tugagandan 4–6 hafta keyinga qo'ying."
-          : 'Nusxa yaratildi',
+          ? t("Kechiktirilgan test yaratildi. Uning ochilish vaqtini kurs tugagandan 4–6 hafta keyinga qo'ying.")
+          : t('Nusxa yaratildi'),
       )
       void queryClient.invalidateQueries({ queryKey: ['quizzes'] })
       void navigate(`/quizzes/${copy.id}`)
@@ -580,7 +578,7 @@ function StaffView({ quiz }: { quiz: Quiz }) {
   const remove = useMutation({
     mutationFn: () => api(`/quizzes/${quiz.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Test o'chirildi")
+      toast.success(t("Test o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['quizzes'] })
       void navigate('/quizzes', { replace: true })
     },
@@ -595,26 +593,26 @@ function StaffView({ quiz }: { quiz: Quiz }) {
       <BackLink />
       <PageHeader
         title={quiz.title}
-        description={`${QUIZ_KIND_LABELS[quiz.kind]} · ${quizTiming(quiz)} · Guruhlar: ${groupNames(quiz.groups, groups)}`}
+        description={`${QUIZ_KIND_LABELS[quiz.kind]} · ${quizTiming(quiz)} · ${t('Guruhlar: {groups}', { groups: groupNames(quiz.groups, groups) })}`}
         actions={
           <>
             <Button variant="outline" size="lg" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
-              Tahrirlash
+              {t('Tahrirlash')}
             </Button>
             {quiz.kind === 'post' ? (
               <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate('delayed')}>
                 <History aria-hidden="true" />
-                Kechiktirilgan test yaratish
+                {t('Kechiktirilgan test yaratish')}
               </Button>
             ) : null}
             <Button variant="outline" size="lg" disabled={duplicate.isPending} onClick={() => duplicate.mutate(quiz.kind)}>
               <Copy aria-hidden="true" />
-              Nusxa olish
+              {t('Nusxa olish')}
             </Button>
             <Button variant="destructive" size="lg" onClick={() => setConfirmingDelete(true)}>
               <Trash2 aria-hidden="true" />
-              O'chirish
+              {t("O'chirish")}
             </Button>
           </>
         }
@@ -627,10 +625,10 @@ function StaffView({ quiz }: { quiz: Quiz }) {
         {survey ? null : (
           <Card>
             <CardHeader>
-              <CardTitle>Savollar</CardTitle>
+              <CardTitle>{t('Savollar')}</CardTitle>
               <CardDescription>
-                To'g'ri javoblar yashil bilan belgilangan.{' '}
-                {quiz.show_answers ? "Talabaga topshirgandan keyin ko'rsatiladi." : "Talabaga ko'rsatilmaydi."}
+                {t("To'g'ri javoblar yashil bilan belgilangan.")}{' '}
+                {quiz.show_answers ? t("Talabaga topshirgandan keyin ko'rsatiladi.") : t("Talabaga ko'rsatilmaydi.")}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -639,7 +637,7 @@ function StaffView({ quiz }: { quiz: Quiz }) {
                   <p className="text-sm font-medium whitespace-pre-wrap">
                     {index + 1}. {question.text}{' '}
                     <span className="font-normal text-muted-foreground">
-                      ({question.kind === 'single' ? 'bitta javob' : 'bir nechta javob'}, {question.points} ball)
+                      ({question.kind === 'single' ? t('bitta javob') : t('bir nechta javob')}{t(', {points} ball)', { points: question.points })}
                     </span>
                   </p>
                   <ul className="grid gap-1">
@@ -649,7 +647,7 @@ function StaffView({ quiz }: { quiz: Quiz }) {
                         className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-sm', choice.is_correct && 'bg-emerald-50 text-emerald-900')}
                       >
                         {choice.is_correct ? (
-                          <CircleCheck className="size-4 shrink-0" aria-label="to'g'ri javob" />
+                          <CircleCheck className="size-4 shrink-0" aria-label={t("to'g'ri javob")} />
                         ) : (
                           <span className="size-4 shrink-0" aria-hidden="true" />
                         )}
@@ -667,9 +665,9 @@ function StaffView({ quiz }: { quiz: Quiz }) {
       {editing ? <QuizDialog quiz={quiz} onClose={() => setEditing(false)} /> : null}
       <ConfirmDialog
         open={confirmingDelete}
-        title="Testni o'chirish"
-        description={`«${quiz.title}» o'chiriladi. Talabalar topshirgan test o'chirilmaydi.`}
-        confirmLabel="O'chirish"
+        title={t("Testni o'chirish")}
+        description={t("«{title}» o'chiriladi. Talabalar topshirgan test o'chirilmaydi.", { title: quiz.title })}
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmingDelete(false)}

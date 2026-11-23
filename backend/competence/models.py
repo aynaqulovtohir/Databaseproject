@@ -10,6 +10,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from labs.models import Lab
+from config.i18n import N_
 
 
 class Component(models.Model):
@@ -51,18 +52,18 @@ class Indicator(models.Model):
     """Komponent ko'rsatkichi: qiymati (0-100) qaysi ma'lumotdan va qaysi kesimda hisoblanishi."""
 
     class Source(models.TextChoices):
-        QUIZ = "quiz", "Test natijasi"
-        SURVEY = "survey", "So'rovnoma (Likert)"
-        LABS = "labs", "Laboratoriyalar: yechilgan ulushi"
-        MASTERY = "mastery", "Laboratoriyalar: o'zlashtirish (BKT)"
-        EXPLANATION = "explanation", "Yechimni o'z so'zlari bilan tushuntirish"
-        GRADES = "grades", "O'qituvchi baholari (topshiriqlar)"
-        INTERVIEW = "interview", "Talablarni aniqlash (buyurtmachi bilan suhbat)"
-        CALIBRATION = "calibration", "O'z bilimini baholash aniqligi (ishonch va natija)"
-        PEER_ACCURACY = "peer_accuracy", "Hamkasb ishini baholash aniqligi (o'zaro baholash)"
-        PEER_HELPFUL = "peer_helpful", "Izohlar foydaliligi (o'zaro baholash)"
-        FIND_ERROR = "find_error", "«Xatoni top» mashqlari: yechilgan ulushi"
-        INDEPENDENCE = "independence", "Yordamsiz yechish (AI maslahati so'ramasdan)"
+        QUIZ = "quiz", N_("Test natijasi")
+        SURVEY = "survey", N_("So'rovnoma (Likert)")
+        LABS = "labs", N_("Laboratoriyalar: yechilgan ulushi")
+        MASTERY = "mastery", N_("Laboratoriyalar: o'zlashtirish (BKT)")
+        EXPLANATION = "explanation", N_("Yechimni o'z so'zlari bilan tushuntirish")
+        GRADES = "grades", N_("O'qituvchi baholari (topshiriqlar)")
+        INTERVIEW = "interview", N_("Talablarni aniqlash (buyurtmachi bilan suhbat)")
+        CALIBRATION = "calibration", N_("O'z bilimini baholash aniqligi (ishonch va natija)")
+        PEER_ACCURACY = "peer_accuracy", N_("Hamkasb ishini baholash aniqligi (o'zaro baholash)")
+        PEER_HELPFUL = "peer_helpful", N_("Izohlar foydaliligi (o'zaro baholash)")
+        FIND_ERROR = "find_error", N_("«Xatoni top» mashqlari: yechilgan ulushi")
+        INDEPENDENCE = "independence", N_("Yordamsiz yechish (AI maslahati so'ramasdan)")
 
     # Test va so'rovnoma har bir kesimda o'lchanadi (har biriga o'z testi), qolganlari — o'quv jarayoni
     # ma'lumotlari, ular faqat tajriba oxirida bor

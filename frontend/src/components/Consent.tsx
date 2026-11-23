@@ -19,6 +19,7 @@ import { api, errorMessage } from '@/lib/api'
 import { useAuth, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import type { ConsentStatus } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function useConsent(enabled = true) {
   return useQuery({ queryKey: ['consent'], queryFn: () => api<ConsentStatus>('/auth/consent/'), enabled })
@@ -31,7 +32,7 @@ function useDecide(onDone?: () => void) {
     mutationFn: (agreed: boolean) => api<ConsentStatus>('/auth/consent/', { method: 'POST', body: { agreed } }),
     onSuccess: async (status) => {
       queryClient.setQueryData(['consent'], status)
-      toast.success(status.agreed ? 'Rahmat! Roziligingiz saqlandi' : 'Qaroringiz saqlandi')
+      toast.success(status.agreed ? t('Rahmat! Roziligingiz saqlandi') : t('Qaroringiz saqlandi'))
       await refreshUser()
       onDone?.()
     },
@@ -45,7 +46,7 @@ function ConsentText({ status }: { status: ConsentStatus }) {
       {status.text.map((paragraph, index) => (
         <p key={index}>{paragraph}</p>
       ))}
-      {status.contact ? <p className="text-muted-foreground">Savollar uchun: {status.contact}</p> : null}
+      {status.contact ? <p className="text-muted-foreground">{t('Savollar uchun: {contact}', { contact: status.contact })}</p> : null}
     </div>
   )
 }
@@ -62,8 +63,8 @@ export function ConsentPrompt() {
     <Dialog open={open} onOpenChange={(next) => (!next && !decide.isPending ? setPostponed(true) : undefined)}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{status.data?.title ?? 'Ilmiy tadqiqotda ishtirok etishga rozilik'}</DialogTitle>
-          <DialogDescription>Iltimos, o'qib chiqing va qaroringizni belgilang.</DialogDescription>
+          <DialogTitle>{status.data?.title ?? t('Ilmiy tadqiqotda ishtirok etishga rozilik')}</DialogTitle>
+          <DialogDescription>{t("Iltimos, o'qib chiqing va qaroringizni belgilang.")}</DialogDescription>
         </DialogHeader>
         {status.isPending ? (
           <Skeleton className="h-40 w-full" />
@@ -74,15 +75,15 @@ export function ConsentPrompt() {
         )}
         <DialogFooter className="gap-2 sm:justify-between">
           <Button variant="ghost" size="lg" disabled={decide.isPending} onClick={() => setPostponed(true)}>
-            Keyinroq
+            {t('Keyinroq')}
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button variant="outline" size="lg" disabled={decide.isPending || !status.data} onClick={() => decide.mutate(false)}>
-              Rozi emasman
+              {t('Rozi emasman')}
             </Button>
             <Button size="lg" disabled={decide.isPending || !status.data} onClick={() => decide.mutate(true)}>
               {decide.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Roziman
+              {t('Roziman')}
             </Button>
           </div>
         </DialogFooter>
@@ -114,18 +115,18 @@ export function ConsentCard() {
               <CircleSlash className="size-4 text-muted-foreground" aria-hidden="true" />
             )}
             <span>
-              {agreed === null ? 'Hali qaror bermagansiz' : agreed ? 'Rozisiz' : 'Rozi emassiz'}
+              {agreed === null ? t('Hali qaror bermagansiz') : agreed ? t('Rozisiz') : t('Rozi emassiz')}
               {decidedAt ? <span className="text-muted-foreground"> ({formatDateTime(decidedAt)})</span> : null}
             </span>
           </div>
           {agreed === true ? (
             <Button variant="outline" size="lg" disabled={decide.isPending} onClick={() => decide.mutate(false)}>
-              Roziligimni qaytarib olaman
+              {t('Roziligimni qaytarib olaman')}
             </Button>
           ) : (
             <Button size="lg" disabled={decide.isPending} onClick={() => decide.mutate(true)}>
               {decide.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Roziman
+              {t('Roziman')}
             </Button>
           )}
         </div>
@@ -136,8 +137,8 @@ export function ConsentCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ilmiy tadqiqot</CardTitle>
-        <CardDescription>Ishtirok ixtiyoriy va bahoyingizga ta'sir qilmaydi.</CardDescription>
+        <CardTitle>{t('Ilmiy tadqiqot')}</CardTitle>
+        <CardDescription>{t("Ishtirok ixtiyoriy va bahoyingizga ta'sir qilmaydi.")}</CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>
     </Card>

@@ -20,6 +20,7 @@ import { applyFormError } from '@/lib/forms'
 import { formatDateTime, formatFileSize } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
 import type { GroupShort, Material, MaterialFile } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 // Backend ham xuddi shu cheklovlarni tekshiradi (learning/validators.py)
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.png', '.jpg', '.jpeg']
@@ -28,9 +29,9 @@ const MATERIAL_FIELDS = ['title', 'text', 'groups'] as const
 
 function checkFile(file: File): string | null {
   const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
-  if (!ALLOWED_EXTENSIONS.includes(extension)) return `${file.name}: ruxsat etilmagan fayl turi.`
-  if (file.size > MAX_FILE_SIZE) return `${file.name}: hajmi 20 MB dan oshmasligi kerak.`
-  if (file.size === 0) return `${file.name}: fayl bo'sh.`
+  if (!ALLOWED_EXTENSIONS.includes(extension)) return t('{name}: ruxsat etilmagan fayl turi.', { name: file.name })
+  if (file.size > MAX_FILE_SIZE) return t('{name}: hajmi 20 MB dan oshmasligi kerak.', { name: file.name })
+  if (file.size === 0) return t("{name}: fayl bo'sh.", { name: file.name })
   return null
 }
 
@@ -57,7 +58,7 @@ function FileRow({ file, onRemove, removing }: { file: MaterialFile; onRemove?: 
         type="button"
         variant="ghost"
         size="icon-lg"
-        aria-label={`${file.original_name}: yuklab olish`}
+        aria-label={t('{original_name}: yuklab olish', { original_name: file.original_name })}
         disabled={downloading}
         onClick={() => void handleDownload()}
       >
@@ -68,7 +69,7 @@ function FileRow({ file, onRemove, removing }: { file: MaterialFile; onRemove?: 
           type="button"
           variant="ghost"
           size="icon-lg"
-          aria-label={`${file.original_name}: o'chirish`}
+          aria-label={t("{original_name}: o'chirish", { original_name: file.original_name })}
           disabled={removing}
           onClick={onRemove}
         >
@@ -125,9 +126,9 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
     onSuccess: (failed) => {
       void queryClient.invalidateQueries({ queryKey: ['materials'] })
       if (failed.length) {
-        toast.warning(`Material saqlandi, lekin ba'zi fayllar yuklanmadi. ${failed.join(' ')}`)
+        toast.warning(t("Material saqlandi, lekin ba'zi fayllar yuklanmadi. {failed}", { failed: failed.join(' ') }))
       } else {
-        toast.success(material ? 'Material saqlandi' : "Material qo'shildi")
+        toast.success(material ? t('Material saqlandi') : t("Material qo'shildi"))
       }
       onClose()
     },
@@ -149,7 +150,7 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!groupIds.length) {
-      setErrors({ groups: 'Kamida bitta guruh tanlang.' })
+      setErrors({ groups: t('Kamida bitta guruh tanlang.') })
       return
     }
     setErrors({})
@@ -160,11 +161,11 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
     <Dialog open onOpenChange={(open) => (!open && !save.isPending ? onClose() : undefined)}>
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{material ? 'Materialni tahrirlash' : 'Yangi material'}</DialogTitle>
-          <DialogDescription>Materialni faqat tanlangan guruhlar talabalari ko'radi.</DialogDescription>
+          <DialogTitle>{material ? t('Materialni tahrirlash') : t('Yangi material')}</DialogTitle>
+          <DialogDescription>{t("Materialni faqat tanlangan guruhlar talabalari ko'radi.")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <FormField id="material_title" label="Sarlavha" error={errors.title}>
+          <FormField id="material_title" label={t('Sarlavha')} error={errors.title}>
             <Input
               id="material_title"
               className="h-10"
@@ -173,7 +174,7 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
               onChange={(event) => setTitle(event.target.value)}
             />
           </FormField>
-          <FormField id="material_text" label="Matn" error={errors.text} hint="Ixtiyoriy.">
+          <FormField id="material_text" label={t('Matn')} error={errors.text} hint={t('Ixtiyoriy.')}>
             <Textarea
               id="material_text"
               className="max-h-64 min-h-28"
@@ -182,17 +183,17 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
               onChange={(event) => setText(event.target.value)}
             />
           </FormField>
-          <FormField id="material_groups" label="Guruhlar" error={errors.groups}>
+          <FormField id="material_groups" label={t('Guruhlar')} error={errors.groups}>
             <CheckList
               idPrefix="material-group"
               options={groups.map((group) => ({ id: group.id, label: group.name }))}
               selected={groupIds}
               onChange={setGroupIds}
-              emptyText="Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling."
+              emptyText={t('Sizga hali guruh biriktirilmagan. Administratorga murojaat qiling.')}
               invalid={Boolean(errors.groups)}
             />
           </FormField>
-          <FormField id="material_files" label="Fayllar" hint="PDF, DOCX, PPTX, PNG yoki JPG; har biri 20 MB gacha.">
+          <FormField id="material_files" label={t('Fayllar')} hint={t('PDF, DOCX, PPTX, PNG yoki JPG; har biri 20 MB gacha.')}>
             <div className="grid gap-2">
               {existingFiles.length ? (
                 <ul className="grid gap-2">
@@ -217,7 +218,7 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
                         type="button"
                         variant="ghost"
                         size="icon-lg"
-                        aria-label={`${file.name}: ro'yxatdan olib tashlash`}
+                        aria-label={t("{name}: ro'yxatdan olib tashlash", { name: file.name })}
                         onClick={() => setNewFiles((files) => files.filter((_, itemIndex) => itemIndex !== index))}
                       >
                         <X />
@@ -238,11 +239,11 @@ function MaterialDialog({ material, groups, onClose }: MaterialDialogProps) {
           </FormField>
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={save.isPending} onClick={onClose}>
-              Bekor qilish
+              {t('Bekor qilish')}
             </Button>
             <Button type="submit" size="lg" disabled={save.isPending || !title.trim()}>
               {save.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Saqlash
+              {t('Saqlash')}
             </Button>
           </DialogFooter>
         </form>
@@ -264,7 +265,7 @@ export function MaterialsPage() {
   const remove = useMutation({
     mutationFn: (material: Material) => api(`/materials/${material.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Material o'chirildi")
+      toast.success(t("Material o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['materials'] })
       setDeleting(null)
     },
@@ -277,7 +278,7 @@ export function MaterialsPage() {
   const addButton = isStaff ? (
     <Button size="lg" onClick={() => setEditing('new')}>
       <Plus aria-hidden="true" />
-      Material qo'shish
+      {t("Material qo'shish")}
     </Button>
   ) : null
 
@@ -290,13 +291,13 @@ export function MaterialsPage() {
     content = (
       <EmptyState
         icon={BookOpen}
-        title="Hali material yo'q"
+        title={t("Hali material yo'q")}
         description={
           isStaff
-            ? "Talabalar uchun birinchi o'quv materialini qo'shing."
+            ? t("Talabalar uchun birinchi o'quv materialini qo'shing.")
             : user.group
-              ? "O'qituvchi material qo'shganda shu yerda ko'rinadi."
-              : 'Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.'
+              ? t("O'qituvchi material qo'shganda shu yerda ko'rinadi.")
+              : t('Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.')
         }
         action={addButton}
       />
@@ -312,7 +313,7 @@ export function MaterialsPage() {
                   <CardTitle>{material.title}</CardTitle>
                   <CardDescription className="mt-1">
                     {fullName(material.author)} · {formatDateTime(material.created_at)}
-                    {isStaff ? ` · Guruhlar: ${groupNames(material.groups, groups)}` : null}
+                    {isStaff ? ` · ${t('Guruhlar: {groups}', { groups: groupNames(material.groups, groups) })}` : null}
                   </CardDescription>
                 </div>
                 {isStaff ? (
@@ -320,7 +321,7 @@ export function MaterialsPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${material.title}: tahrirlash`}
+                      aria-label={t('{title}: tahrirlash', { title: material.title })}
                       onClick={() => setEditing(material)}
                     >
                       <Pencil />
@@ -328,7 +329,7 @@ export function MaterialsPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${material.title}: o'chirish`}
+                      aria-label={t("{title}: o'chirish", { title: material.title })}
                       onClick={() => setDeleting(material)}
                     >
                       <Trash2 />
@@ -358,8 +359,8 @@ export function MaterialsPage() {
   return (
     <>
       <PageHeader
-        title="Materiallar"
-        description={isStaff ? "Guruhlar uchun o'quv materiallari." : "Guruhingizga berilgan o'quv materiallari."}
+        title={t('Materiallar')}
+        description={isStaff ? t("Guruhlar uchun o'quv materiallari.") : t("Guruhingizga berilgan o'quv materiallari.")}
         actions={materials.data?.length ? addButton : null}
       />
       {content}
@@ -374,9 +375,9 @@ export function MaterialsPage() {
       ) : null}
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="Materialni o'chirish"
-        description={deleting ? `«${deleting.title}» va unga biriktirilgan barcha fayllar o'chiriladi. Bu amalni qaytarib bo'lmaydi.` : ''}
-        confirmLabel="O'chirish"
+        title={t("Materialni o'chirish")}
+        description={deleting ? t("«{title}» va unga biriktirilgan barcha fayllar o'chiriladi. Bu amalni qaytarib bo'lmaydi.", { title: deleting.title }) : ''}
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(null)}

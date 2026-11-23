@@ -21,6 +21,7 @@ import { fullName, useUser } from '@/lib/auth'
 import { applyFormError } from '@/lib/forms'
 import { groupNames } from '@/lib/groups'
 import { ROLE_LABELS, type AdminUser, type Group, type Role } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const NO_GROUP = 'none'
 const USER_FIELDS = ['username', 'first_name', 'last_name', 'role', 'group', 'password', 'is_active'] as const
@@ -65,7 +66,7 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
         : api<AdminUser>('/users/', { method: 'POST', body })
     },
     onSuccess: () => {
-      toast.success(user ? "Foydalanuvchi ma'lumotlari saqlandi" : 'Foydalanuvchi yaratildi')
+      toast.success(user ? t("Foydalanuvchi ma'lumotlari saqlandi") : t('Foydalanuvchi yaratildi'))
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       void queryClient.invalidateQueries({ queryKey: ['groups'] })
       onClose()
@@ -83,16 +84,16 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
     <Dialog open onOpenChange={(open) => (!open && !mutation.isPending ? onClose() : undefined)}>
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{user ? 'Foydalanuvchini tahrirlash' : 'Yangi foydalanuvchi'}</DialogTitle>
+          <DialogTitle>{user ? t('Foydalanuvchini tahrirlash') : t('Yangi foydalanuvchi')}</DialogTitle>
           <DialogDescription>
             {user
-              ? "Parolni o'zgartirmoqchi bo'lmasangiz, parol maydonini bo'sh qoldiring."
-              : "Login va parolni foydalanuvchiga o'zingiz yetkazasiz."}
+              ? t("Parolni o'zgartirmoqchi bo'lmasangiz, parol maydonini bo'sh qoldiring.")
+              : t("Login va parolni foydalanuvchiga o'zingiz yetkazasiz.")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField id="first_name" label="Ism" error={errors.first_name}>
+            <FormField id="first_name" label={t('Ism')} error={errors.first_name}>
               <Input
                 id="first_name"
                 className="h-10"
@@ -101,7 +102,7 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
                 onChange={(event) => setFirstName(event.target.value)}
               />
             </FormField>
-            <FormField id="last_name" label="Familiya" error={errors.last_name}>
+            <FormField id="last_name" label={t('Familiya')} error={errors.last_name}>
               <Input
                 id="last_name"
                 className="h-10"
@@ -111,7 +112,7 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
               />
             </FormField>
           </div>
-          <FormField id="username" label="Login" error={errors.username}>
+          <FormField id="username" label={t('Login')} error={errors.username}>
             <Input
               id="username"
               className="h-10"
@@ -124,7 +125,7 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
           </FormField>
           {isAdminAccount ? null : (
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField id="role" label="Rol" error={errors.role}>
+              <FormField id="role" label={t('Rol')} error={errors.role}>
                 <Select value={role} onValueChange={(value) => setRole(value as Role)}>
                   <SelectTrigger id="role" className="h-10 w-full" aria-invalid={Boolean(errors.role)}>
                     <SelectValue />
@@ -136,13 +137,13 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
                 </Select>
               </FormField>
               {role === 'student' ? (
-                <FormField id="group" label="Guruh" error={errors.group}>
+                <FormField id="group" label={t('Guruh')} error={errors.group}>
                   <Select value={group} onValueChange={setGroup}>
                     <SelectTrigger id="group" className="h-10 w-full" aria-invalid={Boolean(errors.group)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NO_GROUP}>Biriktirilmagan</SelectItem>
+                      <SelectItem value={NO_GROUP}>{t('Biriktirilmagan')}</SelectItem>
                       {groups.map((item) => (
                         <SelectItem key={item.id} value={String(item.id)}>
                           {item.name}
@@ -153,16 +154,16 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
                 </FormField>
               ) : (
                 <p className="self-end pb-2 text-xs text-muted-foreground">
-                  O'qituvchiga guruhlar «Guruhlar» sahifasida biriktiriladi.
+                  {t("O'qituvchiga guruhlar «Guruhlar» sahifasida biriktiriladi.")}
                 </p>
               )}
             </div>
           )}
           <FormField
             id="password"
-            label={user ? 'Yangi parol' : 'Parol'}
+            label={user ? t('Yangi parol') : t('Parol')}
             error={errors.password}
-            hint="Kamida 8 belgi; faqat raqamlardan iborat bo'lmasin."
+            hint={t("Kamida 8 belgi; faqat raqamlardan iborat bo'lmasin.")}
           >
             <PasswordInput
               id="password"
@@ -181,18 +182,18 @@ function UserDialog({ user, groups, onClose }: UserDialogProps) {
                   checked={isActive}
                   onCheckedChange={(checked) => setIsActive(checked === true)}
                 />
-                Faol (belgi olib tashlansa, foydalanuvchi tizimga kira olmaydi)
+                {t('Faol (belgi olib tashlansa, foydalanuvchi tizimga kira olmaydi)')}
               </label>
               {errors.is_active ? <p className="text-xs text-destructive">{errors.is_active}</p> : null}
             </div>
           ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" size="lg" disabled={mutation.isPending} onClick={onClose}>
-              Bekor qilish
+              {t('Bekor qilish')}
             </Button>
             <Button type="submit" size="lg" disabled={mutation.isPending || !username.trim() || (!user && !password)}>
               {mutation.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-              Saqlash
+              {t('Saqlash')}
             </Button>
           </DialogFooter>
         </form>
@@ -218,7 +219,7 @@ export function UsersPage() {
   const remove = useMutation({
     mutationFn: (user: AdminUser) => api(`/users/${user.id}/`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("Foydalanuvchi o'chirildi")
+      toast.success(t("Foydalanuvchi o'chirildi"))
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       void queryClient.invalidateQueries({ queryKey: ['groups'] })
       setDeleting(null)
@@ -244,19 +245,19 @@ export function UsersPage() {
   } else if (users.isError) {
     content = <ErrorState error={users.error} onRetry={() => void users.refetch()} />
   } else if (!filtered.length) {
-    content = <EmptyState icon={Users} title="Foydalanuvchi topilmadi" description="Qidiruv shartini o'zgartirib ko'ring." />
+    content = <EmptyState icon={Users} title={t('Foydalanuvchi topilmadi')} description={t("Qidiruv shartini o'zgartirib ko'ring.")} />
   } else {
     content = (
       <Card className="py-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ism familiya</TableHead>
-              <TableHead>Login</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Guruh</TableHead>
-              <TableHead>Holat</TableHead>
-              <TableHead className="text-right">Amallar</TableHead>
+              <TableHead>{t('Ism familiya')}</TableHead>
+              <TableHead>{t('Login')}</TableHead>
+              <TableHead>{t('Rol')}</TableHead>
+              <TableHead>{t('Guruh')}</TableHead>
+              <TableHead>{t('Holat')}</TableHead>
+              <TableHead className="text-right">{t('Amallar')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -272,9 +273,9 @@ export function UsersPage() {
                 </TableCell>
                 <TableCell>
                   {user.is_active ? (
-                    <Badge variant="secondary">Faol</Badge>
+                    <Badge variant="secondary">{t('Faol')}</Badge>
                   ) : (
-                    <Badge variant="destructive">Bloklangan</Badge>
+                    <Badge variant="destructive">{t('Bloklangan')}</Badge>
                   )}
                 </TableCell>
                 <TableCell>
@@ -282,7 +283,7 @@ export function UsersPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${fullName(user)}: tahrirlash`}
+                      aria-label={t('{user}: tahrirlash', { user: fullName(user) })}
                       onClick={() => setEditing(user)}
                     >
                       <Pencil />
@@ -290,7 +291,7 @@ export function UsersPage() {
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label={`${fullName(user)}: o'chirish`}
+                      aria-label={t("{user}: o'chirish", { user: fullName(user) })}
                       disabled={user.id === me.id}
                       onClick={() => setDeleting(user)}
                     >
@@ -309,12 +310,12 @@ export function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Foydalanuvchilar"
-        description="O'qituvchi va talabalar hisoblarini boshqarish."
+        title={t('Foydalanuvchilar')}
+        description={t("O'qituvchi va talabalar hisoblarini boshqarish.")}
         actions={
           <Button size="lg" onClick={() => setEditing('new')}>
             <Plus aria-hidden="true" />
-            Foydalanuvchi qo'shish
+            {t("Foydalanuvchi qo'shish")}
           </Button>
         }
       />
@@ -322,17 +323,17 @@ export function UsersPage() {
         <Input
           type="search"
           className="h-10 max-w-xs"
-          placeholder="Ism yoki login bo'yicha qidirish"
-          aria-label="Qidirish"
+          placeholder={t("Ism yoki login bo'yicha qidirish")}
+          aria-label={t('Qidirish')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
         <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as RoleFilter)}>
-          <SelectTrigger className="h-10 w-44" aria-label="Rol bo'yicha saralash">
+          <SelectTrigger className="h-10 w-44" aria-label={t("Rol bo'yicha saralash")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Barcha rollar</SelectItem>
+            <SelectItem value="all">{t('Barcha rollar')}</SelectItem>
             <SelectItem value="student">{ROLE_LABELS.student}</SelectItem>
             <SelectItem value="teacher">{ROLE_LABELS.teacher}</SelectItem>
             <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
@@ -351,13 +352,13 @@ export function UsersPage() {
       ) : null}
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="Foydalanuvchini o'chirish"
+        title={t("Foydalanuvchini o'chirish")}
         description={
           deleting
-            ? `${fullName(deleting)} butunlay o'chiriladi. Talaba bo'lsa, uning barcha yechimlari va baholari ham o'chadi. Bu amalni qaytarib bo'lmaydi.`
+            ? t("{deleting} butunlay o'chiriladi. Talaba bo'lsa, uning barcha yechimlari va baholari ham o'chadi. Bu amalni qaytarib bo'lmaydi.", { deleting: fullName(deleting) })
             : ''
         }
-        confirmLabel="O'chirish"
+        confirmLabel={t("O'chirish")}
         pending={remove.isPending}
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(null)}

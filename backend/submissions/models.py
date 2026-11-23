@@ -1,15 +1,16 @@
 """Talaba yechimi: har bir topshirish alohida urinish sifatida saqlanadi."""
 from django.conf import settings
 from django.db import models
+from config.i18n import N_
 
 MAX_SQL_CODE_LENGTH = 50_000
 
 
 class Submission(models.Model):
     class Status(models.TextChoices):
-        SUBMITTED = "submitted", "Topshirilgan"
-        GRADED = "graded", "Baholangan"
-        RETURNED = "returned", "Qayta ishlashga qaytarilgan"
+        SUBMITTED = "submitted", N_("Topshirilgan")
+        GRADED = "graded", N_("Baholangan")
+        RETURNED = "returned", N_("Qayta ishlashga qaytarilgan")
 
     # Yechim kelgan topshiriqni o'chirib bo'lmaydi
     assignment = models.ForeignKey(

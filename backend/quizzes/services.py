@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import LIKERT_SCALE, Question, QuizAttempt
+from config.i18n import tr
 
 # So'rovnoma natijasi bundan kam javob bo'lsa ko'rsatilmaydi: aks holda o'qituvchi kim topshirganini
 # bilgani uchun alohida talabaning javobini aniqlay oladi
@@ -18,21 +19,21 @@ class AnswersError(ValueError):
 def clean_answers(quiz, raw):
     """{"savol_id": [variant id'lari]} ni tekshiradi; faqat shu testning savol va variantlari qabul qilinadi."""
     if not isinstance(raw, dict):
-        raise AnswersError("Javoblar noto'g'ri formatda.")
+        raise AnswersError(tr("Javoblar noto'g'ri formatda."))
     questions = {str(question.pk): question for question in quiz.questions.all()}
     cleaned = {}
     for key, selected in raw.items():
         question = questions.get(str(key))
         if question is None:
-            raise AnswersError("Bu testda bunday savol yo'q.")
+            raise AnswersError(tr("Bu testda bunday savol yo'q."))
         if not isinstance(selected, list) or not all(isinstance(item, int) and not isinstance(item, bool) for item in selected):
-            raise AnswersError("Javoblar noto'g'ri formatda.")
+            raise AnswersError(tr("Javoblar noto'g'ri formatda."))
         allowed = {choice.pk for choice in question.choices.all()}
         selected = sorted(set(selected))
         if any(item not in allowed for item in selected):
-            raise AnswersError("Savolda bunday javob varianti yo'q.")
+            raise AnswersError(tr("Savolda bunday javob varianti yo'q."))
         if question.kind in (Question.Kind.SINGLE, Question.Kind.LIKERT) and len(selected) > 1:
-            raise AnswersError("Bu savolda faqat bitta javob tanlanadi.")
+            raise AnswersError(tr("Bu savolda faqat bitta javob tanlanadi."))
         cleaned[str(question.pk)] = selected
     return cleaned
 

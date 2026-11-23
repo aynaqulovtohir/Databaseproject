@@ -8,6 +8,7 @@ from users.models import StudentGroup, User
 from .models import Assignment, AssignmentStage, Material, MaterialFile
 from .rubric import MAX_STAGES, RubricError, clean_rubric, structure
 from .validators import validate_material_file
+from config.i18n import tr
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -31,13 +32,13 @@ class GroupsValidationMixin:
 
     def validate_groups(self, groups):
         if not groups:
-            raise serializers.ValidationError("Kamida bitta guruh tanlang.")
+            raise serializers.ValidationError(tr("Kamida bitta guruh tanlang."))
         user = self.context["request"].user
         if user.is_teacher:
             own_group_ids = set(user.teaching_groups.values_list("id", flat=True))
             if any(group.id not in own_group_ids for group in groups):
                 raise serializers.ValidationError(
-                    "Faqat o'zingizga biriktirilgan guruhlarni tanlashingiz mumkin."
+                    tr("Faqat o'zingizga biriktirilgan guruhlarni tanlashingiz mumkin.")
                 )
         return groups
 
@@ -112,7 +113,7 @@ class AssignmentSerializer(GroupsValidationMixin, serializers.ModelSerializer):
     def check_future(self, deadline, previous):
         # Muddat o'zgartirilmagan bo'lsa (tahrirlashda), qayta tekshirilmaydi
         if previous != deadline and deadline <= timezone.now():
-            raise serializers.ValidationError("Muddat kelajakdagi vaqt bo'lishi kerak.")
+            raise serializers.ValidationError(tr("Muddat kelajakdagi vaqt bo'lishi kerak."))
 
     def validate_deadline(self, deadline):
         self.check_future(deadline, self.instance.deadline if self.instance else None)
@@ -125,19 +126,19 @@ class AssignmentSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         stages = attrs.get("stages")
         stage_count = len(stages) if stages is not None else len(old_stages)
         if stage_count > MAX_STAGES:
-            raise serializers.ValidationError({"stages": f"Bosqichlar {MAX_STAGES} tadan oshmasin."})
+            raise serializers.ValidationError({"stages": tr("Bosqichlar {MAX_STAGES} tadan oshmasin.", MAX_STAGES=MAX_STAGES)})
 
         if stages is not None:
             if locked and len(stages) != len(old_stages):
                 raise serializers.ValidationError(
-                    {"stages": "Yechimlar kelgan: bosqichlar sonini o'zgartirib bo'lmaydi."}
+                    {"stages": tr("Yechimlar kelgan: bosqichlar sonini o'zgartirib bo'lmaydi.")}
                 )
             # kind yuborilmasa, mavjud bosqich turi saqlanadi
             if locked and any(
                 stage.get("kind", old.kind) != old.kind for stage, old in zip(stages, old_stages)
             ):
                 raise serializers.ValidationError(
-                    {"stages": "Yechimlar kelgan: bosqich turini (SQL yoki ER-diagramma) o'zgartirib bo'lmaydi."}
+                    {"stages": tr("Yechimlar kelgan: bosqich turini (SQL yoki ER-diagramma) o'zgartirib bo'lmaydi.")}
                 )
             previous_deadline = None
             for order, stage in enumerate(stages):
@@ -145,17 +146,17 @@ class AssignmentSerializer(GroupsValidationMixin, serializers.ModelSerializer):
                 try:
                     self.check_future(stage["deadline"], old)
                 except serializers.ValidationError:
-                    raise serializers.ValidationError({"stages": f"{order + 1}-bosqich muddati kelajakda bo'lsin."})
+                    raise serializers.ValidationError({"stages": tr("{value}-bosqich muddati kelajakda bo'lsin.", value=order + 1)})
                 if previous_deadline and stage["deadline"] < previous_deadline:
                     raise serializers.ValidationError(
-                        {"stages": f"{order + 1}-bosqich muddati oldingi bosqichnikidan keyin bo'lsin."}
+                        {"stages": tr("{value}-bosqich muddati oldingi bosqichnikidan keyin bo'lsin.", value=order + 1)}
                     )
                 previous_deadline = stage["deadline"]
             if stages:
                 # Loyiha muddati — oxirgi bosqich muddati
                 attrs["deadline"] = stages[-1]["deadline"]
         if "deadline" not in attrs and current is None:
-            raise serializers.ValidationError({"deadline": "Muddat kiritilishi shart."})
+            raise serializers.ValidationError({"deadline": tr("Muddat kiritilishi shart.")})
 
         rubric = attrs.get("rubric", current.rubric if current else [])
         try:
@@ -164,8 +165,7 @@ class AssignmentSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"rubric": str(exc)})
         if locked and structure(cleaned) != structure(current.rubric):
             raise serializers.ValidationError(
-                {"rubric": "Yechimlar kelgan: mezonlar ballari va bosqichlarini o'zgartirib bo'lmaydi "
-                 "(nomi va izohini o'zgartirish mumkin)."}
+                {"rubric": tr("Yechimlar kelgan: mezonlar ballari va bosqichlarini o'zgartirib bo'lmaydi (nomi va izohini o'zgartirish mumkin).")}
             )
         attrs["rubric"] = cleaned
         return attrs

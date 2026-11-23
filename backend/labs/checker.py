@@ -4,50 +4,41 @@ from collections import Counter
 from types import SimpleNamespace
 
 from .sandbox import SqlError, run_concurrent, run_sql, split_statements
+from config.i18n import N_, tr
 
 MAX_DISPLAY_ROWS = 100
 MAX_DIFFERENCES = 8
 
 # Eng ko'p uchraydigan PostgreSQL xatolari uchun o'zbekcha tushuntirish (SQLSTATE bo'yicha)
 ERROR_TIPS = {
-    "42601": "Sintaksis xatosi. Ko'rsatilgan so'z atrofini tekshiring: kalit so'z noto'g'ri yozilgan, "
-    "vergul, qavs yoki nuqtali vergul tushib qolgan bo'lishi mumkin.",
-    "42P01": "Bunday jadval topilmadi. Jadval nomi to'g'ri yozilganini va u shu koddan oldin "
-    "yaratilganini tekshiring.",
-    "42703": "Bunday ustun topilmadi. Ustun nomini va u qaysi jadvalga tegishli ekanini tekshiring. "
-    "Matn qiymatlari qo'shtirnoqda emas, bitta tirnoqda ('...') yoziladi.",
-    "42P07": "Bunday nomli jadval allaqachon mavjud. Boshqa nom tanlang yoki jadvalni ikki marta yaratmang.",
-    "42701": "Bitta jadvalda bir xil nomli ustun ikki marta yozilgan.",
-    "42702": "Bu ustun nomi bir nechta jadvalda bor. Qaysi jadvalniki ekanini ko'rsating: jadval.ustun.",
+    "42601": N_("Sintaksis xatosi. Ko'rsatilgan so'z atrofini tekshiring: kalit so'z noto'g'ri yozilgan, vergul, qavs yoki nuqtali vergul tushib qolgan bo'lishi mumkin."),
+    "42P01": N_("Bunday jadval topilmadi. Jadval nomi to'g'ri yozilganini va u shu koddan oldin yaratilganini tekshiring."),
+    "42703": N_("Bunday ustun topilmadi. Ustun nomini va u qaysi jadvalga tegishli ekanini tekshiring. Matn qiymatlari qo'shtirnoqda emas, bitta tirnoqda ('...') yoziladi."),
+    "42P07": N_("Bunday nomli jadval allaqachon mavjud. Boshqa nom tanlang yoki jadvalni ikki marta yaratmang."),
+    "42701": N_("Bitta jadvalda bir xil nomli ustun ikki marta yozilgan."),
+    "42702": N_("Bu ustun nomi bir nechta jadvalda bor. Qaysi jadvalniki ekanini ko'rsating: jadval.ustun."),
     "42803": "SELECT dagi agregat funksiya (COUNT, SUM, ...) ichida bo'lmagan har bir ustun "
     "GROUP BY da ham yozilishi kerak.",
-    "42883": "Bunday funksiya yoki operator yo'q. Funksiya nomini va argumentlar turini tekshiring "
-    "(masalan, matn bilan sonni to'g'ridan-to'g'ri solishtirib bo'lmaydi).",
-    "42804": "Ma'lumot turlari mos emas. Ustun turi va unga berilayotgan qiymat turini tekshiring.",
-    "42704": "Bunday ma'lumot turi yoki obyekt yo'q. Tur nomi to'g'ri yozilganini tekshiring.",
-    "42830": "Tashqi kalit bog'lanayotgan ustun PRIMARY KEY yoki UNIQUE bo'lishi kerak.",
-    "42P16": "Jadval ta'rifi noto'g'ri: masalan, bitta jadvalda ikkita PRIMARY KEY bo'lishi mumkin emas.",
-    "42501": "Bu amalga ruxsat yo'q. Laboratoriyada faqat o'z jadvallaringiz bilan ishlashingiz mumkin; "
-    "jadval nomi oldiga sxema nomi (masalan, public.) yozmang.",
-    "22P02": "Qiymat ustun turiga to'g'ri kelmaydi (masalan, son ustuniga matn yozilgan).",
-    "22001": "Matn ustun uchun belgilangan uzunlikdan (VARCHAR(n)) oshib ketdi.",
-    "22003": "Son ustun turi sig'dira oladigan chegaradan chiqib ketdi.",
-    "22012": "Nolga bo'lish. Bo'luvchi nol bo'lmasligini tekshiring (NULLIF yordam beradi).",
-    "21000": "Ichki so'rov bitta qiymat o'rniga bir nechta qator qaytardi. "
-    "= o'rniga IN ishlating yoki ichki so'rovni toraytiring.",
-    "23502": "NOT NULL ustunga qiymat berilmagan. INSERT da shu ustunni ham to'ldiring.",
-    "23503": "Tashqi kalit buzildi: bog'langan jadvalda bunday qiymat yo'q "
-    "(yoki o'chirilayotgan qatorga boshqa jadval bog'langan).",
-    "23505": "UNIQUE yoki PRIMARY KEY buzildi: bunday qiymat jadvalda allaqachon bor.",
-    "23514": "CHECK cheklovi buzildi: qiymat ustunga qo'yilgan shartga to'g'ri kelmaydi.",
-    "40001": "Serializatsiya xatosi: tranzaksiya parallel tranzaksiya bilan to'qnashdi va bekor qilindi. Haqiqiy "
-    "dasturda bunday tranzaksiya qayta uriniladi; bu laboratoriyada esa qatorni qulflang yoki o'zgarishni bitta "
-    "atomar buyruq bilan qiling.",
-    "40P01": "O'zaro qulflanish (deadlock): ikki tranzaksiya bir-birining qulfini kutib qoldi va biri bekor qilindi. "
-    "Qatorlarni har doim bir xil tartibda qulflang.",
-    "55P03": "Qulfni kutish vaqti tugadi: boshqa tranzaksiya qatorni uzoq vaqt qulflab turdi.",
-    "25P02": "Tranzaksiya avvalgi xato tufayli bekor qilingan: undagi keyingi buyruqlar bajarilmaydi.",
-    "57014": "Kod juda uzoq ishladi. Cheksiz sikl yoki shartsiz JOIN (juda ko'p qator) yo'qligini tekshiring.",
+    "42883": N_("Bunday funksiya yoki operator yo'q. Funksiya nomini va argumentlar turini tekshiring (masalan, matn bilan sonni to'g'ridan-to'g'ri solishtirib bo'lmaydi)."),
+    "42804": N_("Ma'lumot turlari mos emas. Ustun turi va unga berilayotgan qiymat turini tekshiring."),
+    "42704": N_("Bunday ma'lumot turi yoki obyekt yo'q. Tur nomi to'g'ri yozilganini tekshiring."),
+    "42830": N_("Tashqi kalit bog'lanayotgan ustun PRIMARY KEY yoki UNIQUE bo'lishi kerak."),
+    "42P16": N_("Jadval ta'rifi noto'g'ri: masalan, bitta jadvalda ikkita PRIMARY KEY bo'lishi mumkin emas."),
+    "42501": N_("Bu amalga ruxsat yo'q. Laboratoriyada faqat o'z jadvallaringiz bilan ishlashingiz mumkin; jadval nomi oldiga sxema nomi (masalan, public.) yozmang."),
+    "22P02": N_("Qiymat ustun turiga to'g'ri kelmaydi (masalan, son ustuniga matn yozilgan)."),
+    "22001": N_("Matn ustun uchun belgilangan uzunlikdan (VARCHAR(n)) oshib ketdi."),
+    "22003": N_("Son ustun turi sig'dira oladigan chegaradan chiqib ketdi."),
+    "22012": N_("Nolga bo'lish. Bo'luvchi nol bo'lmasligini tekshiring (NULLIF yordam beradi)."),
+    "21000": N_("Ichki so'rov bitta qiymat o'rniga bir nechta qator qaytardi. = o'rniga IN ishlating yoki ichki so'rovni toraytiring."),
+    "23502": N_("NOT NULL ustunga qiymat berilmagan. INSERT da shu ustunni ham to'ldiring."),
+    "23503": N_("Tashqi kalit buzildi: bog'langan jadvalda bunday qiymat yo'q (yoki o'chirilayotgan qatorga boshqa jadval bog'langan)."),
+    "23505": N_("UNIQUE yoki PRIMARY KEY buzildi: bunday qiymat jadvalda allaqachon bor."),
+    "23514": N_("CHECK cheklovi buzildi: qiymat ustunga qo'yilgan shartga to'g'ri kelmaydi."),
+    "40001": N_("Serializatsiya xatosi: tranzaksiya parallel tranzaksiya bilan to'qnashdi va bekor qilindi. Haqiqiy dasturda bunday tranzaksiya qayta uriniladi; bu laboratoriyada esa qatorni qulflang yoki o'zgarishni bitta atomar buyruq bilan qiling."),
+    "40P01": N_("O'zaro qulflanish (deadlock): ikki tranzaksiya bir-birining qulfini kutib qoldi va biri bekor qilindi. Qatorlarni har doim bir xil tartibda qulflang."),
+    "55P03": N_("Qulfni kutish vaqti tugadi: boshqa tranzaksiya qatorni uzoq vaqt qulflab turdi."),
+    "25P02": N_("Tranzaksiya avvalgi xato tufayli bekor qilingan: undagi keyingi buyruqlar bajarilmaydi."),
+    "57014": N_("Kod juda uzoq ishladi. Cheksiz sikl yoki shartsiz JOIN (juda ko'p qator) yo'qligini tekshiring."),
 }
 
 CONSTRAINT_KINDS = ("PRIMARY KEY", "FOREIGN KEY", "UNIQUE", "CHECK")
@@ -99,23 +90,21 @@ def _compare_results(student, expected, ordered):
     if expected is None:
         return []
     if student is None:
-        return ["Kod natija qaytarmadi: oxirgi buyruq natija chiqaradigan so'rov (SELECT) bo'lishi kerak."]
+        return [tr("Kod natija qaytarmadi: oxirgi buyruq natija chiqaradigan so'rov (SELECT) bo'lishi kerak.")]
     if len(student.columns) != len(expected.columns):
         return [
-            f"Natijadagi ustunlar soni farq qiladi: sizda {len(student.columns)} ta, "
-            f"kutilgan {len(expected.columns)} ta."
+            tr("Natijadagi ustunlar soni farq qiladi: sizda {columns} ta, kutilgan {columns2} ta.", columns=len(student.columns), columns2=len(expected.columns))
         ]
     if student.row_count != expected.row_count:
         return [
-            f"Natijadagi qatorlar soni farq qiladi: sizda {student.row_count} ta, "
-            f"kutilgan {expected.row_count} ta."
+            tr("Natijadagi qatorlar soni farq qiladi: sizda {row_count} ta, kutilgan {row_count2} ta.", row_count=student.row_count, row_count2=expected.row_count)
         ]
     if student.rows == expected.rows:
         return []
     if Counter(student.rows) != Counter(expected.rows):
-        return ["Qatorlar soni to'g'ri, lekin ayrim qiymatlar kutilganidan farq qiladi."]
+        return [tr("Qatorlar soni to'g'ri, lekin ayrim qiymatlar kutilganidan farq qiladi.")]
     if ordered:
-        return ["Qatorlar to'g'ri, lekin tartibi kutilganidan farq qiladi (ORDER BY ni tekshiring)."]
+        return [tr("Qatorlar to'g'ri, lekin tartibi kutilganidan farq qiladi (ORDER BY ni tekshiring).")]
     return []
 
 
@@ -127,7 +116,7 @@ def _compare_tables(student, expected):
     """Koddan keyingi jadvallar holatini solishtiradi: tuzilish, cheklovlar va ma'lumotlar."""
     differences = []
     for table in sorted(expected.keys() - student.keys()):
-        differences.append(f"«{table}» jadvali yo'q (yaratilmagan yoki o'chirib yuborilgan).")
+        differences.append(tr("«{table}» jadvali yo'q (yaratilmagan yoki o'chirib yuborilgan).", table=table))
     for table in sorted(student.keys() - expected.keys()):
         differences.append(f"Ortiqcha jadval: «{table}».")
 
@@ -136,57 +125,53 @@ def _compare_tables(student, expected):
         missing_columns = sorted(wanted.columns.keys() - mine.columns.keys())
         extra_columns = sorted(mine.columns.keys() - wanted.columns.keys())
         if missing_columns:
-            differences.append(f"«{table}» jadvalida ustun yetishmaydi: {', '.join(missing_columns)}.")
+            differences.append(tr("«{table}» jadvalida ustun yetishmaydi: {missing_columns}.", table=table, missing_columns=', '.join(missing_columns)))
         if extra_columns:
-            differences.append(f"«{table}» jadvalida ortiqcha ustun: {', '.join(extra_columns)}.")
+            differences.append(tr("«{table}» jadvalida ortiqcha ustun: {extra_columns}.", table=table, extra_columns=', '.join(extra_columns)))
         for column in sorted(wanted.columns.keys() & mine.columns.keys()):
             (my_type, my_not_null), (wanted_type, wanted_not_null) = mine.columns[column], wanted.columns[column]
             if my_type != wanted_type:
                 differences.append(
-                    f"«{table}.{column}» ustunining turi: sizda {my_type}, kutilgan {wanted_type}."
+                    tr("«{table}.{column}» ustunining turi: sizda {my_type}, kutilgan {wanted_type}.", table=table, column=column, my_type=my_type, wanted_type=wanted_type)
                 )
             elif my_not_null != wanted_not_null:
                 differences.append(
-                    f"«{table}.{column}» ustuni NOT NULL bo'lishi kerak."
+                    tr("«{table}.{column}» ustuni NOT NULL bo'lishi kerak.", table=table, column=column)
                     if wanted_not_null
-                    else f"«{table}.{column}» ustuni bo'sh (NULL) qiymatga ruxsat berishi kerak."
+                    else tr("«{table}.{column}» ustuni bo'sh (NULL) qiymatga ruxsat berishi kerak.", table=table, column=column)
                 )
 
         # Talaba qo'shgan ortiqcha cheklovlar xato hisoblanmaydi
         missing_constraints = Counter(wanted.constraints) - Counter(mine.constraints)
         for kind, count in sorted(Counter(_constraint_kind(item) for item in missing_constraints.elements()).items()):
             differences.append(
-                f"«{table}» jadvalida {kind} cheklovi yetishmaydi yoki kutilganidan boshqacha"
-                + (f" ({count} ta)." if count > 1 else ".")
+                tr("«{table}» jadvalida {kind} cheklovi yetishmaydi yoki kutilganidan boshqacha", table=table, kind=kind)
+                + (tr(" ({count} ta).", count=count) if count > 1 else ".")
             )
 
         if not missing_columns and not extra_columns and mine.rows != wanted.rows:
             if len(mine.rows) == len(wanted.rows):
                 differences.append(
-                    f"«{table}» jadvalida qatorlar soni to'g'ri, lekin ayrim qiymatlar kutilganidan farq qiladi "
-                    "(ortiqcha bo'sh joy, harf yoki raqam xatosi bo'lishi mumkin)."
+                    tr("«{table}» jadvalida qatorlar soni to'g'ri, lekin ayrim qiymatlar kutilganidan farq qiladi (ortiqcha bo'sh joy, harf yoki raqam xatosi bo'lishi mumkin).", table=table)
                 )
             else:
                 differences.append(
-                    f"«{table}» jadvalidagi ma'lumotlar kutilganidan farq qiladi "
-                    f"(sizda {len(mine.rows)} qator, kutilgan {len(wanted.rows)} qator)."
+                    tr("«{table}» jadvalidagi ma'lumotlar kutilganidan farq qiladi (sizda {rows} qator, kutilgan {rows2} qator).", table=table, rows=len(mine.rows), rows2=len(wanted.rows))
                 )
     return differences
 
 
 # Yashirin ma'lumotlarda farq chiqqanda: qaysi qator yoki qiymat farq qilgani aytilmaydi (yashirin ma'lumot sir)
 HIDDEN_MISMATCH = (
-    "Kod ko'rinib turgan ma'lumotlarda to'g'ri natija berdi, lekin boshqa (yashirin) ma'lumotlarda natija "
-    "kutilganidan farq qildi. Natijani qo'lda yozmang: so'rov istalgan ma'lumotlar uchun to'g'ri ishlashi kerak "
-    "(shartlar, JOIN va guruhlashni tekshiring)."
+    N_("Kod ko'rinib turgan ma'lumotlarda to'g'ri natija berdi, lekin boshqa (yashirin) ma'lumotlarda natija kutilganidan farq qildi. Natijani qo'lda yozmang: so'rov istalgan ma'lumotlar uchun to'g'ri ishlashi kerak (shartlar, JOIN va guruhlashni tekshiring).")
 )
 
 
 # Indeks laboratoriyasida taqiqlash mumkin bo'lgan reja tugunlari va talabaga tushuntirish
 PLAN_NODE_TIPS = {
-    "Seq Scan": "jadval boshidan oxirigacha to'liq o'qilyapti — shartdagi ustun(lar)ga mos indeks kerak",
-    "Sort": "natija alohida saralanyapti — indeks saralash tartibini ham qamrab olsin",
-    "Bitmap Heap Scan": "indeks faqat qisman ishlatilyapti — shartning barcha ustunlarini qamrab oluvchi indeks kerak",
+    "Seq Scan": N_("jadval boshidan oxirigacha to'liq o'qilyapti — shartdagi ustun(lar)ga mos indeks kerak"),
+    "Sort": N_("natija alohida saralanyapti — indeks saralash tartibini ham qamrab olsin"),
+    "Bitmap Heap Scan": N_("indeks faqat qisman ishlatilyapti — shartning barcha ustunlarini qamrab oluvchi indeks kerak"),
 }
 
 
@@ -201,13 +186,13 @@ def forbidden_nodes(lab):
 
 def _plan_differences(outcome, forbidden):
     if outcome.plan_error:
-        return [f"Tekshiriladigan so'rovning rejasini olib bo'lmadi: {outcome.plan_error.message}"]
+        return [tr("Tekshiriladigan so'rovning rejasini olib bo'lmadi: {message}", message=outcome.plan_error.message)]
     differences = []
     for node_type in forbidden:
         relations = sorted({node.relation for node in outcome.plan_nodes if node.node_type == node_type and node.relation})
         if any(node.node_type == node_type for node in outcome.plan_nodes):
             where = f" ({', '.join(relations)})" if relations else ""
-            differences.append(f"So'rov rejasida hali ham «{node_type}» bor{where}: {PLAN_NODE_TIPS.get(node_type, '')}.")
+            differences.append(tr("So'rov rejasida hali ham «{node_type}» bor{where}: {node_type2}.", node_type=node_type, where=where, node_type2=PLAN_NODE_TIPS.get(node_type, '')))
     return differences
 
 
@@ -216,7 +201,7 @@ def validate_plan(setup_sql, solution_sql, plan_query, forbidden):
     unknown = [item for item in forbidden if item not in PLAN_NODE_TIPS]
     if unknown or not forbidden:
         raise LabSetupError(
-            "plan_forbidden", SqlError(f"Ruxsat etilgan tugunlar: {', '.join(PLAN_NODE_TIPS)}.")
+            "plan_forbidden", SqlError(tr("Ruxsat etilgan tugunlar: {PLAN_NODE_TIPS}.", PLAN_NODE_TIPS=', '.join(PLAN_NODE_TIPS)))
         )
     before = run_sql("SELECT 1", setup_sql, plan_query)
     if before.error or before.plan_error:
@@ -224,14 +209,14 @@ def validate_plan(setup_sql, solution_sql, plan_query, forbidden):
     if not _plan_differences(before, forbidden):
         raise LabSetupError(
             "plan_query",
-            SqlError("Indekssiz ham rejada taqiqlangan tugun yo'q: laboratoriya hech narsani tekshirmaydi."),
+            SqlError(tr("Indekssiz ham rejada taqiqlangan tugun yo'q: laboratoriya hech narsani tekshirmaydi.")),
         )
     after = run_sql(solution_sql, setup_sql, plan_query)
     if after.error:
         raise LabSetupError("solution_sql", after.error)
     remaining = _plan_differences(after, forbidden)
     if remaining:
-        raise LabSetupError("solution_sql", SqlError(f"Namunaviy yechimdan keyin ham: {remaining[0]}"))
+        raise LabSetupError("solution_sql", SqlError(tr("Namunaviy yechimdan keyin ham: {value}", value=remaining[0])))
 
 
 def _plan_payload(outcome):
@@ -256,7 +241,7 @@ def validate_lab_sql(setup_sql, solution_sql, hidden_setup_sql=""):
         return
     if not solution_sql.strip():
         raise LabSetupError(
-            "hidden_setup_sql", SqlError("Yashirin ma'lumotlar faqat namunaviy yechim bor laboratoriyada ishlatiladi.")
+            "hidden_setup_sql", SqlError(tr("Yashirin ma'lumotlar faqat namunaviy yechim bor laboratoriyada ishlatiladi."))
         )
     visible = run_sql("SELECT 1", setup_sql)
     hidden = run_sql("SELECT 1", hidden_setup_sql)
@@ -265,7 +250,7 @@ def validate_lab_sql(setup_sql, solution_sql, hidden_setup_sql=""):
     if _table_columns(hidden.tables) != _table_columns(visible.tables):
         raise LabSetupError(
             "hidden_setup_sql",
-            SqlError("Yashirin ma'lumotlar boshlang'ich jadvallar bilan bir xil jadval va ustunlarni yaratishi kerak."),
+            SqlError(tr("Yashirin ma'lumotlar boshlang'ich jadvallar bilan bir xil jadval va ustunlarni yaratishi kerak.")),
         )
     hidden_solution = run_sql(solution_sql, hidden_setup_sql)
     if hidden_solution.error:
@@ -328,16 +313,14 @@ def _passes_hidden(lab, sql_code, ordered):
 TRANSACTION_START = re.compile(r"^(BEGIN|START\s+TRANSACTION)\b", re.IGNORECASE)
 TRANSACTION_END = re.compile(r"^(COMMIT|END)\b", re.IGNORECASE)
 CONCURRENCY_MISMATCH = (
-    "Kod ketma-ket ishlaganda to'g'ri, lekin ikki sessiya bir vaqtda ishlaganda natija boshqacha chiqdi: "
-    "bir sessiya ikkinchisi hali COMMIT qilmagan eski qiymatni o'qib, uning o'zgarishini yo'qotdi (yoki ikkalasi "
-    "bir xil shartni bir vaqtda tekshirdi). Vaqt chizig'iga qarang: qaysi sessiya nimani o'qidi?"
+    N_("Kod ketma-ket ishlaganda to'g'ri, lekin ikki sessiya bir vaqtda ishlaganda natija boshqacha chiqdi: bir sessiya ikkinchisi hali COMMIT qilmagan eski qiymatni o'qib, uning o'zgarishini yo'qotdi (yoki ikkalasi bir xil shartni bir vaqtda tekshirdi). Vaqt chizig'iga qarang: qaysi sessiya nimani o'qidi?")
 )
 
 
 def _transaction_format_error(sql_code):
     statements = split_statements(sql_code)
     if len(statements) < 2 or not TRANSACTION_START.match(statements[0]) or not TRANSACTION_END.match(statements[-1]):
-        return "Kod bitta tranzaksiya bo'lsin: BEGIN bilan boshlanib, COMMIT bilan tugasin."
+        return tr("Kod bitta tranzaksiya bo'lsin: BEGIN bilan boshlanib, COMMIT bilan tugasin.")
     return None
 
 
@@ -394,7 +377,7 @@ def check_concurrent(lab, sql_code):
         return {**base, "is_correct": False, "error": _error_payload(serial.error), "differences": []}
     differences = _compare_tables(serial.tables, expected.tables)
     if differences:
-        differences = ["Kod ketma-ket ishlaganda ham natija kutilganidan farq qiladi:"] + differences
+        differences = [tr("Kod ketma-ket ishlaganda ham natija kutilganidan farq qiladi:")] + differences
     elif _compare_tables(concurrent.tables, expected.tables):
         differences = [CONCURRENCY_MISMATCH]
     return {**base, "is_correct": not differences, "error": None, "differences": differences[:MAX_DIFFERENCES]}
@@ -433,7 +416,7 @@ def validate_concurrent(setup_sql, solution_sql):
     result = check_concurrent(SimpleNamespace(setup_sql=setup_sql, solution_sql=solution_sql), solution_sql)
     if not result["is_correct"]:
         problem = (result["error"] or {}).get("message") or result["differences"][0]
-        raise LabSetupError("solution_sql", SqlError(f"Namunaviy yechim ikki sessiyada noto'g'ri ishladi: {problem}"))
+        raise LabSetupError("solution_sql", SqlError(tr("Namunaviy yechim ikki sessiyada noto'g'ri ishladi: {problem}", problem=problem)))
 
 
 def check_code(lab, sql_code):
@@ -474,9 +457,7 @@ def check_code(lab, sql_code):
             and outcome.plan_cost > PLAN_COST_FACTOR * expected.plan_cost
         ):
             plan_differences.append(
-                "Rejada taqiqlangan tugun yo'q, lekin so'rov hali ham sekin: rejalashtiruvchi baholagan narx "
-                f"kutilganidan {outcome.plan_cost / expected.plan_cost:.0f} marta yuqori. Indeks so'rovdagi shartga "
-                "mos kelishini tekshiring (tarkibli indeksda ustunlar tartibi muhim)."
+                tr("Rejada taqiqlangan tugun yo'q, lekin so'rov hali ham sekin: rejalashtiruvchi baholagan narx kutilganidan {value} marta yuqori. Indeks so'rovdagi shartga mos kelishini tekshiring (tarkibli indeksda ustunlar tartibi muhim).", value=format(outcome.plan_cost / expected.plan_cost, ".0f"))
             )
         differences += plan_differences
 

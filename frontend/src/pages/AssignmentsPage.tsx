@@ -14,6 +14,7 @@ import { fullName, useUser } from '@/lib/auth'
 import { formatDateTime } from '@/lib/format'
 import { groupNames, useGroupOptions } from '@/lib/groups'
 import { MAX_SCORE, type Assignment } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 export function AssignmentsPage() {
   const user = useUser()
@@ -26,7 +27,7 @@ export function AssignmentsPage() {
   const addButton = isStaff ? (
     <Button size="lg" onClick={() => setCreating(true)}>
       <Plus aria-hidden="true" />
-      Topshiriq qo'shish
+      {t("Topshiriq qo'shish")}
     </Button>
   ) : null
 
@@ -39,13 +40,13 @@ export function AssignmentsPage() {
     content = (
       <EmptyState
         icon={ClipboardList}
-        title="Hali topshiriq yo'q"
+        title={t("Hali topshiriq yo'q")}
         description={
           isStaff
-            ? 'Guruhlaringiz uchun birinchi topshiriqni yarating.'
+            ? t('Guruhlaringiz uchun birinchi topshiriqni yarating.')
             : user.group
-              ? "O'qituvchi topshiriq berganda shu yerda ko'rinadi."
-              : 'Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.'
+              ? t("O'qituvchi topshiriq berganda shu yerda ko'rinadi.")
+              : t('Siz hali guruhga biriktirilmagansiz. Administratorga murojaat qiling.')
         }
         action={addButton}
       />
@@ -66,7 +67,7 @@ export function AssignmentsPage() {
                     <>
                       <Badge variant="outline" className="tabular-nums">
                         {assignment.my_stages.items.filter((item) => item.status).length} / {assignment.my_stages.items.length}{' '}
-                        bosqich
+                        {t('bosqich')}
                       </Badge>
                       {assignment.my_stages.total_score !== null ? (
                         <Badge variant="outline" className="tabular-nums">
@@ -84,7 +85,7 @@ export function AssignmentsPage() {
                       ) : null}
                     </>
                   ) : !isStaff ? (
-                    <Badge variant="outline">Topshirilmagan</Badge>
+                    <Badge variant="outline">{t('Topshirilmagan')}</Badge>
                   ) : null}
                   <DeadlineBadge deadline={assignment.deadline} />
                 </span>
@@ -93,10 +94,10 @@ export function AssignmentsPage() {
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <CalendarClock className="size-3.5" aria-hidden="true" />
-                  Muddat: {formatDateTime(assignment.deadline)}
+                  {t('Muddat: {deadline}', { deadline: formatDateTime(assignment.deadline) })}
                 </span>
                 <span>{fullName(assignment.author)}</span>
-                {isStaff ? <span>Guruhlar: {groupNames(assignment.groups, groups)}</span> : null}
+                {isStaff ? <span>{t('Guruhlar:')}{' '}{groupNames(assignment.groups, groups)}</span> : null}
               </div>
             </Link>
           </li>
@@ -108,8 +109,8 @@ export function AssignmentsPage() {
   return (
     <>
       <PageHeader
-        title="Topshiriqlar"
-        description={isStaff ? 'Topshiriqlar va ularga kelgan yechimlar.' : 'Guruhingizga berilgan topshiriqlar.'}
+        title={t('Topshiriqlar')}
+        description={isStaff ? t('Topshiriqlar va ularga kelgan yechimlar.') : t('Guruhingizga berilgan topshiriqlar.')}
         actions={assignments.data?.length ? addButton : null}
       />
       {content}

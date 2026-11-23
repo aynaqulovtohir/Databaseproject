@@ -13,6 +13,7 @@ import re
 
 from .er import validate_diagram
 from .sandbox import run_sql
+from config.i18n import tr
 
 COLUMNS = re.compile(r"\(([^)]*)\)")
 FOREIGN_KEY = re.compile(r"^FOREIGN KEY \(([^)]*)\) REFERENCES ([^\s(]+)\s*\(([^)]*)\)", re.IGNORECASE)
@@ -47,7 +48,7 @@ def _keys(state):
 def schema_to_diagram(tables):
     """sandbox.TableState lug'atidan ER-diagramma (er.py formatida, validate_diagram dan o'tgan)."""
     if not tables:
-        raise ReverseError("Berilgan bazada birorta jadval yo'q.")
+        raise ReverseError(tr("Berilgan bazada birorta jadval yo'q."))
     keys = {name: _keys(state) for name, state in tables.items()}
 
     junctions = {}
@@ -96,7 +97,7 @@ def schema_to_diagram(tables):
         primary, unique, foreign = keys[name]
         for columns_, target in foreign:
             if target not in positions:
-                raise ReverseError(f"«{name}» jadvalidagi tashqi kalit «{target}» jadvaliga havola qiladi, u esa oraliq jadval.")
+                raise ReverseError(tr("«{name}» jadvalidagi tashqi kalit «{target}» jadvaliga havola qiladi, u esa oraliq jadval.", name=name, target=target))
             one_to_one = set(columns_) in unique or set(columns_) == set(primary)
             relationships.append(
                 {"source": positions[name], "target": positions[target], "source_card": "1" if one_to_one else "N",

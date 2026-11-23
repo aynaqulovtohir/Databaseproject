@@ -29,8 +29,9 @@ from users.models import User
 
 from . import stats
 from .models import Component, Indicator
+from config.i18n import tr, N_
 
-STAGES = {"initial": "Tajriba boshida", "final": "Tajriba oxirida", "delayed": "Tajribadan keyin"}
+STAGES = {"initial": N_("Tajriba boshida"), "final": N_("Tajriba oxirida"), "delayed": N_("Tajribadan keyin")}
 STAGE_QUIZZES = {"initial": "initial_quizzes", "final": "final_quizzes", "delayed": "delayed_quizzes"}
 LEVELS = {"low": "Past", "medium": "O'rta", "high": "Yuqori", "creative": "Ijodiy-amaliy"}
 # Umumiy daraja (komponentlar o'rtachasi) chegaralari; komponentlarniki admin panelda sozlanadi

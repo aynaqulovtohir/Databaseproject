@@ -24,6 +24,7 @@ from .checker import (
 )
 from .probes import TRANSACTION_CONTROL, message
 from .sandbox import SqlError, run_followups, split_statements
+from config.i18n import tr
 
 MAX_QUERIES = 10
 MAX_QUERY_SQL = 2000
@@ -40,28 +41,28 @@ class QueriesError(ValueError):
 def validate_queries(value):
     """Tuzilishini tekshiradi va toza nusxasini qaytaradi (sandboxsiz)."""
     if not isinstance(value, list):
-        raise QueriesError("So'rovlar ro'yxat ko'rinishida bo'lishi kerak.")
+        raise QueriesError(tr("So'rovlar ro'yxat ko'rinishida bo'lishi kerak."))
     if len(value) > MAX_QUERIES:
-        raise QueriesError(f"So'rovlar {MAX_QUERIES} tadan oshmasligi kerak.")
+        raise QueriesError(tr("So'rovlar {MAX_QUERIES} tadan oshmasligi kerak.", MAX_QUERIES=MAX_QUERIES))
     clean, ids = [], set()
     for item in value:
         if not isinstance(item, dict):
-            raise QueriesError("So'rov noto'g'ri formatda.")
+            raise QueriesError(tr("So'rov noto'g'ri formatda."))
         query_id = item.get("id")
         if not isinstance(query_id, str) or not ID_PATTERN.match(query_id) or query_id in ids:
-            raise QueriesError("So'rov identifikatori (harf, raqam, _ yoki -; 20 belgigacha) takrorlanmasligi kerak.")
+            raise QueriesError(tr("So'rov identifikatori (harf, raqam, _ yoki -; 20 belgigacha) takrorlanmasligi kerak."))
         ids.add(query_id)
         title = item.get("title")
         if not isinstance(title, str) or not title.strip() or len(title) > MAX_TITLE:
-            raise QueriesError(f"«{query_id}» so'rovining nomi bo'sh bo'lmasligi va {MAX_TITLE} belgidan oshmasligi kerak.")
+            raise QueriesError(tr("«{query_id}» so'rovining nomi bo'sh bo'lmasligi va {MAX_TITLE} belgidan oshmasligi kerak.", query_id=query_id, MAX_TITLE=MAX_TITLE))
         sql = item.get("sql")
         if not isinstance(sql, str) or not sql.strip() or len(sql) > MAX_QUERY_SQL:
-            raise QueriesError(f"«{query_id}» so'rovining SQL'i bo'sh bo'lmasligi va {MAX_QUERY_SQL} belgidan oshmasligi kerak.")
+            raise QueriesError(tr("«{query_id}» so'rovining SQL'i bo'sh bo'lmasligi va {MAX_QUERY_SQL} belgidan oshmasligi kerak.", query_id=query_id, MAX_QUERY_SQL=MAX_QUERY_SQL))
         statements = split_statements(sql)
         if not statements or not FINAL_SELECT.match(statements[-1]):
-            raise QueriesError(f"«{query_id}» — oxirgi buyruq natija qaytaradigan so'rov (SELECT) bo'lishi kerak.")
+            raise QueriesError(tr("«{query_id}» — oxirgi buyruq natija qaytaradigan so'rov (SELECT) bo'lishi kerak.", query_id=query_id))
         if any(TRANSACTION_CONTROL.match(statement) for statement in statements):
-            raise QueriesError(f"«{query_id}» so'rovida tranzaksiya buyruqlari bo'lmasligi kerak.")
+            raise QueriesError(tr("«{query_id}» so'rovida tranzaksiya buyruqlari bo'lmasligi kerak.", query_id=query_id))
         clean.append({"id": query_id, "title": " ".join(title.split()), "sql": ";\n".join(statements)})
     return clean
 
@@ -77,7 +78,7 @@ def _query_differences(query, student, expected):
     """Bitta so'rov: talaba migratsiyasidan keyin xato yoki natija farqi (matn) yoki None."""
     error, result = student
     if error is not None:
-        return f"Xato berdi: {message(error)}"
+        return tr("Xato berdi: {error}", error=message(error))
     differences = _compare_results(result, expected[1], bool(ORDER_BY.search(query["sql"])))
     return differences[0] if differences else None
 
@@ -86,7 +87,7 @@ def validate_lab_queries(setup_sql, solution_sql, hidden_setup_sql, queries):
     """Saqlashdan oldin: namunaviy yechimdan keyin har bir so'rov ishlaydi (yashirin ma'lumotlarda ham); yechimsiz esa
     kamida bittasi xato beradi yoki boshqa natija qaytaradi — aks holda so'rovlar yechimni tekshirmaydi."""
     if not solution_sql.strip():
-        raise LabSetupError("solution_sql", SqlError("Migratsiya laboratoriyasida namunaviy migratsiya bo'lishi kerak."))
+        raise LabSetupError("solution_sql", SqlError(tr("Migratsiya laboratoriyasida namunaviy migratsiya bo'lishi kerak.")))
     setups = [("setup_sql", setup_sql)] + ([("hidden", hidden_setup_sql)] if hidden_setup_sql.strip() else [])
     for field, setup in setups:
         migrated, after = _run(solution_sql, setup, queries, field)
@@ -94,7 +95,7 @@ def validate_lab_queries(setup_sql, solution_sql, hidden_setup_sql, queries):
             raise LabSetupError("solution_sql", migrated.error)
         for query, (error, _) in zip(queries, after):
             if error is not None:
-                raise LabSetupError("check_queries", SqlError(f"«{query['title']}» namunaviy migratsiyadan keyin xato berdi: {message(error)}"))
+                raise LabSetupError("check_queries", SqlError(tr("«{title}» namunaviy migratsiyadan keyin xato berdi: {error}", title=query['title'], error=message(error))))
     # Hech bo'lmaganda bitta so'rov yechimsiz boshqacha natija berishi kerak. Ayrim so'rovlar o'zgarmaslikni tekshiradi
     # (ma'lumot saqlangan, bosh shifokor hammasini ko'radi) — ular yechimsiz ham bir xil bo'lishi tabiiy
     _, before = _run("SELECT 1", setup_sql, queries)
@@ -102,7 +103,7 @@ def validate_lab_queries(setup_sql, solution_sql, hidden_setup_sql, queries):
     if all(old[0] is None and not _compare_results(old[1], new[1], True) for old, new in zip(before, after)):
         raise LabSetupError(
             "check_queries",
-            SqlError("Barcha so'rovlar namunaviy yechimsiz ham xuddi shu natijani beradi — ular yechimni tekshirmaydi."),
+            SqlError(tr("Barcha so'rovlar namunaviy yechimsiz ham xuddi shu natijani beradi — ular yechimni tekshirmaydi.")),
         )
 
 
@@ -121,7 +122,7 @@ def check_evolution(lab, sql_code):
             problem = _query_differences(query, mine, wanted)
             items.append({"id": query["id"], "title": query["title"], "passed": problem is None, "message": problem or ""})
             if problem:
-                differences.append(f"«{query['title']}» so'rovi: {problem}")
+                differences.append(tr("«{title}» so'rovi: {problem}", title=query['title'], problem=problem))
         if not differences and lab.hidden_setup_sql.strip() and not _passes_hidden(lab, sql_code):
             differences.append(HIDDEN_MISMATCH)
     return {

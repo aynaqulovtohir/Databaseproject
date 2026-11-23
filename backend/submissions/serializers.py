@@ -4,6 +4,7 @@ from grading.serializers import StaffGradeSerializer, StudentGradeSerializer
 from users.models import User
 
 from .models import MAX_SQL_CODE_LENGTH, Submission
+from config.i18n import N_, tr
 
 
 class StudentShortSerializer(serializers.ModelSerializer):
@@ -67,9 +68,9 @@ class SubmissionCreateSerializer(serializers.Serializer):
         max_length=MAX_SQL_CODE_LENGTH,
         trim_whitespace=False,
         error_messages={
-            "blank": "SQL kod bo'sh bo'lmasligi kerak.",
-            "required": "SQL kod kiritilishi shart.",
-            "max_length": "SQL kod {max_length} belgidan oshmasligi kerak.",
+            "blank": N_("SQL kod bo'sh bo'lmasligi kerak."),
+            "required": N_("SQL kod kiritilishi shart."),
+            "max_length": N_("SQL kod {max_length} belgidan oshmasligi kerak."),
         },
     )
 
@@ -80,14 +81,14 @@ class SubmissionCreateSerializer(serializers.Serializer):
         data = self.validated_data
         if stage is not None and stage.kind == stage.Kind.ER:
             if data["diagram"] is None:
-                raise serializers.ValidationError({"diagram": "ER-diagrammani chizing."})
+                raise serializers.ValidationError({"diagram": tr("ER-diagrammani chizing.")})
             try:
                 diagram = validate_diagram(data["diagram"])
             except DiagramError as exc:
                 raise serializers.ValidationError({"diagram": str(exc)})
             if not diagram["entities"]:
-                raise serializers.ValidationError({"diagram": "Diagrammada kamida bitta obyekt bo'lsin."})
+                raise serializers.ValidationError({"diagram": tr("Diagrammada kamida bitta obyekt bo'lsin.")})
             return "", diagram
         if not data["sql_code"].strip():
-            raise serializers.ValidationError({"sql_code": "SQL kod bo'sh bo'lmasligi kerak."})
+            raise serializers.ValidationError({"sql_code": tr("SQL kod bo'sh bo'lmasligi kerak.")})
         return data["sql_code"], None

@@ -1,6 +1,7 @@
 """Telegram bog'lanishi va bildirishnomalar navbati."""
 from django.conf import settings
 from django.db import models
+from config.i18n import N_
 
 
 class TelegramAccount(models.Model):
@@ -42,18 +43,18 @@ class TelegramLinkCode(models.Model):
 
 class Notification(models.Model):
     class Kind(models.TextChoices):
-        NEW_ASSIGNMENT = "new_assignment", "Yangi topshiriq"
-        GRADED = "graded", "Ish baholandi"
-        RETURNED = "returned", "Ish qaytarildi"
-        DEADLINE_REMINDER = "deadline_reminder", "Muddat eslatmasi"
-        NEW_SUBMISSION = "new_submission", "Yangi yechim"
+        NEW_ASSIGNMENT = "new_assignment", N_("Yangi topshiriq")
+        GRADED = "graded", N_("Ish baholandi")
+        RETURNED = "returned", N_("Ish qaytarildi")
+        DEADLINE_REMINDER = "deadline_reminder", N_("Muddat eslatmasi")
+        NEW_SUBMISSION = "new_submission", N_("Yangi yechim")
         # O'qituvchiga haftalik: e'tibor kerak bo'lgan talabalar (labs/risk.py)
-        RISK_DIGEST = "risk_digest", "Erta ogohlantirish"
+        RISK_DIGEST = "risk_digest", N_("Erta ogohlantirish")
 
     class Status(models.TextChoices):
-        PENDING = "pending", "Navbatda"
-        SENT = "sent", "Yuborilgan"
-        FAILED = "failed", "Yuborilmadi"
+        PENDING = "pending", N_("Navbatda")
+        SENT = "sent", N_("Yuborilgan")
+        FAILED = "failed", N_("Yuborilmadi")
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

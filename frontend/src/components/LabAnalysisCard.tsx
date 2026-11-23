@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { api } from '@/lib/api'
 import type { LabAnalysis, LabAnalysisRow } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 /** Qiyinlik darajasi: 5 bo'lakli shkala (to'ldirilgan bo'laklar soni = daraja), rangga tayanmaydi */
 function LevelMeter({ level }: { level: number }) {
@@ -35,7 +36,7 @@ function LabRow({ row }: { row: LabAnalysisRow }) {
       <TableRow>
         <TableCell className="max-w-72 whitespace-normal font-medium">{row.title}</TableCell>
         <TableCell colSpan={6} className="text-sm text-muted-foreground">
-          Ma'lumot kam: {row.started} ta talaba boshlagan
+          {t("Ma'lumot kam: {started} ta talaba boshlagan", { started: row.started })}
         </TableCell>
       </TableRow>
     )
@@ -53,14 +54,14 @@ function LabRow({ row }: { row: LabAnalysisRow }) {
         ) : null}
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-2" aria-label={`Daraja ${row.level.number} — ${row.level.label}`}>
+        <div className="flex items-center gap-2" aria-label={t('Daraja {number} — {label}', { number: row.level.number, label: row.level.label })}>
           <LevelMeter level={row.level.number} />
           <span className="text-sm whitespace-nowrap">
             {row.level.number} · {row.level.label}
           </span>
         </div>
         <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-          p = {format(row.p)} · {row.started} talaba
+          {t('p = {p} · {started} talaba', { p: format(row.p), started: row.started })}
         </div>
       </TableCell>
       <TableCell className="text-right tabular-nums">
@@ -99,14 +100,14 @@ export function LabAnalysisCard({ groupId }: { groupId: string }) {
           <p className="flex items-start gap-2 text-sm text-muted-foreground">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              Tahlilga tadqiqotga rozi bo'lgan {data.students} ta talaba kirdi
-              {data.excluded_no_consent ? ` (${data.excluded_no_consent} tasi rozilik bermagan yoki hali qaror qilmagan)` : ''}.
+              {t("Tahlilga tadqiqotga rozi bo'lgan {students} ta talaba kirdi", { students: data.students })}
+              {data.excluded_no_consent ? t(' ({excluded_no_consent} tasi rozilik bermagan yoki hali qaror qilmagan)', { excluded_no_consent: data.excluded_no_consent }) : ''}.
             </span>
           </p>
         ) : null}
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <div className="grid grid-cols-5 gap-2" aria-label="Laboratoriyalar darajalar bo'yicha">
+          <div className="grid grid-cols-5 gap-2" aria-label={t("Laboratoriyalar darajalar bo'yicha")}>
             {data.distribution.map((item) => (
               <div key={item.key} className="rounded-xl border bg-card p-3">
                 <LevelMeter level={item.number} />
@@ -118,19 +119,19 @@ export function LabAnalysisCard({ groupId }: { groupId: string }) {
             ))}
           </div>
           <div className="rounded-xl border bg-card p-3">
-            <div className="text-sm text-muted-foreground">Ishonchlilik (Cronbach α)</div>
+            <div className="text-sm text-muted-foreground">{t('Ishonchlilik (Cronbach α)')}</div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-semibold tabular-nums">{format(reliability.alpha, 3)}</span>
               {reliability.interpretation ? <Badge variant="outline">{reliability.interpretation.label}</Badge> : null}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {reliability.alpha === null
-                ? `Hisoblash uchun kamida 2 ta umumiy laboratoriya va ularning hammasini boshlagan ${data.min_students} ta talaba kerak.`
-                : `${reliability.labs} ta laboratoriya, ${reliability.students} ta talaba · o'rtacha ${format(reliability.mean, 1)}, SD ${format(reliability.sd, 1)}, SEM ${format(reliability.sem, 1)} (100 ballik)`}
+                ? t('Hisoblash uchun kamida 2 ta umumiy laboratoriya va ularning hammasini boshlagan {min_students} ta talaba kerak.', { min_students: data.min_students })
+                : t("{labs} ta laboratoriya, {students} ta talaba · o'rtacha {mean}, SD {sd}, SEM {sem} (100 ballik)", { labs: reliability.labs, students: reliability.students, mean: format(reliability.mean, 1), sd: format(reliability.sd, 1), sem: format(reliability.sem, 1) })}
             </div>
             {reliability.alpha !== null && reliability.students < data.reliable_students ? (
               <div className="mt-1 text-xs text-muted-foreground">
-                {data.reliable_students} tadan kam talaba: natija dastlabki.
+                {t('{reliable_students} tadan kam talaba: natija dastlabki.', { reliable_students: data.reliable_students })}
               </div>
             ) : null}
           </div>
@@ -140,19 +141,19 @@ export function LabAnalysisCard({ groupId }: { groupId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Laboratoriya</TableHead>
-                <TableHead>Qiyinlik darajasi</TableHead>
-                <TableHead className="text-right" title="Tuzatilgan korrelyatsiya: laboratoriya bali va boshqa laboratoriyalardagi o'rtacha bal">
-                  Ajratish r
+                <TableHead>{t('Laboratoriya')}</TableHead>
+                <TableHead>{t('Qiyinlik darajasi')}</TableHead>
+                <TableHead className="text-right" title={t("Tuzatilgan korrelyatsiya: laboratoriya bali va boshqa laboratoriyalardagi o'rtacha bal")}>
+                  {t('Ajratish r')}
                 </TableHead>
-                <TableHead className="text-right" title="Yuqori va quyi 27% talabalar farqi">
-                  D
+                <TableHead className="text-right" title={t('Yuqori va quyi 27% talabalar farqi')}>
+                  {t('D')}
                 </TableHead>
-                <TableHead className="text-right" title="Shu laboratoriyasiz Cronbach α">
-                  α olib tashlansa
+                <TableHead className="text-right" title={t('Shu laboratoriyasiz Cronbach α')}>
+                  {t('α olib tashlansa')}
                 </TableHead>
-                <TableHead className="text-right">p: AI / nazorat</TableHead>
-                <TableHead>Xulosa</TableHead>
+                <TableHead className="text-right">{t('p: AI / nazorat')}</TableHead>
+                <TableHead>{t('Xulosa')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,7 +163,7 @@ export function LabAnalysisCard({ groupId }: { groupId: string }) {
             </TableBody>
           </Table>
         ) : (
-          <p className="text-sm text-muted-foreground">Bu guruhlarga hali laboratoriya berilmagan.</p>
+          <p className="text-sm text-muted-foreground">{t('Bu guruhlarga hali laboratoriya berilmagan.')}</p>
         )}
       </div>
     )
@@ -171,12 +172,9 @@ export function LabAnalysisCard({ groupId }: { groupId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Laboratoriyalar psixometrikasi</CardTitle>
+        <CardTitle>{t('Laboratoriyalar psixometrikasi')}</CardTitle>
         <CardDescription>
-          Har bir laboratoriya test savoli kabi tahlil qilinadi. Qiyinlik p — boshlagan talabalar o'rtacha bahosining
-          ulushi: 1 juda oson (p &gt; 0.80), 2 oson, 3 o'rtacha, 4 qiyin, 5 juda qiyin (p ≤ 0.20). Ajratish r ≥ 0.30
-          yaxshi, 0.20 dan past — laboratoriya kuchli va kuchsiz talabalarni farqlamaydi. Natija tadqiqot eksportida ham
-          bor (laboratoriyalar_tahlili.csv).
+          {t("Har bir laboratoriya test savoli kabi tahlil qilinadi. Qiyinlik p — boshlagan talabalar o'rtacha bahosining ulushi: 1 juda oson (p > 0.80), 2 oson, 3 o'rtacha, 4 qiyin, 5 juda qiyin (p ≤ 0.20). Ajratish r ≥ 0.30 yaxshi, 0.20 dan past — laboratoriya kuchli va kuchsiz talabalarni farqlamaydi. Natija tadqiqot eksportida ham bor (laboratoriyalar_tahlili.csv).")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>

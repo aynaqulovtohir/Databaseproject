@@ -15,6 +15,7 @@ from users.models import User
 from .access import visible_submissions
 from .models import Submission
 from .serializers import MissingStudentSerializer, SubmissionCreateSerializer, SubmissionSerializer
+from config.i18n import tr
 
 
 class AssignmentSubmissionsView(APIView):
@@ -35,7 +36,7 @@ class AssignmentSubmissionsView(APIView):
             student_id = request.query_params.get("student")
             if student_id is not None:
                 if not student_id.isdigit():
-                    raise ValidationError({"student": "Talaba id raqam bo'lishi kerak."})
+                    raise ValidationError({"student": tr("Talaba id raqam bo'lishi kerak.")})
                 # Bitta talabaning barcha urinishlari
                 submissions = submissions.filter(student_id=student_id).order_by("-attempt_number")
             else:
@@ -48,7 +49,7 @@ class AssignmentSubmissionsView(APIView):
 
     def post(self, request, assignment_pk):
         if not request.user.is_student:
-            raise PermissionDenied("Yechimni faqat talaba topshira oladi.")
+            raise PermissionDenied(tr("Yechimni faqat talaba topshira oladi."))
         assignment = self.get_assignment()
 
         serializer = SubmissionCreateSerializer(data=request.data)
@@ -67,12 +68,12 @@ class AssignmentSubmissionsView(APIView):
                 if last_submission and last_submission.status == Submission.Status.GRADED:
                     what = "Bu bosqich" if stage else "Bu topshiriq"
                     raise ValidationError(
-                        {"detail": f"{what} baholangan. Qayta topshirish uchun o'qituvchi uni qaytarishi kerak."}
+                        {"detail": tr("{what} baholangan. Qayta topshirish uchun o'qituvchi uni qaytarishi kerak.", what=what)}
                     )
                 if stage and stage.order > 0 and not Submission.objects.filter(
                     assignment=assignment, student=request.user, stage__order=stage.order - 1
                 ).exists():
-                    raise ValidationError({"detail": "Avval oldingi bosqichni topshiring."})
+                    raise ValidationError({"detail": tr("Avval oldingi bosqichni topshiring.")})
                 submission = Submission.objects.create(
                     assignment=assignment,
                     student=request.user,
@@ -85,7 +86,7 @@ class AssignmentSubmissionsView(APIView):
         except IntegrityError:
             # Bir vaqtda ikki marta yuborilgan (masalan, tugma ikki marta bosilgan)
             return Response(
-                {"detail": "Yechim allaqachon yuborilmoqda. Qayta urinib ko'ring."},
+                {"detail": tr("Yechim allaqachon yuborilmoqda. Qayta urinib ko'ring.")},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -100,13 +101,13 @@ class AssignmentSubmissionsView(APIView):
         stages = assignment.stages.all()
         if not stages.exists():
             if stage_id is not None:
-                raise ValidationError({"stage": "Bu topshiriq bosqichlarga bo'linmagan."})
+                raise ValidationError({"stage": tr("Bu topshiriq bosqichlarga bo'linmagan.")})
             return None
         if stage_id is None:
-            raise ValidationError({"stage": "Qaysi bosqichni topshirayotganingizni tanlang."})
+            raise ValidationError({"stage": tr("Qaysi bosqichni topshirayotganingizni tanlang.")})
         stage = stages.filter(pk=stage_id).first()
         if stage is None:
-            raise ValidationError({"stage": "Bunday bosqich yo'q."})
+            raise ValidationError({"stage": tr("Bunday bosqich yo'q.")})
         return stage
 
 
@@ -117,7 +118,7 @@ class AssignmentMissingStudentsView(APIView):
 
     def get(self, request, assignment_pk):
         if not (request.user.is_admin or request.user.is_teacher):
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         assignment = get_object_or_404(visible_assignments(request.user), pk=assignment_pk)
         students = (
             User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=assignment.groups.all())

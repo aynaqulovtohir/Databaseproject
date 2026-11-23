@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, errorMessage } from '@/lib/api'
 import { cleanDiagram } from '@/lib/er'
 import type { ErDiagram, LabChatState } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 const MAX_QUESTION_LENGTH = 2000
 
@@ -74,8 +75,7 @@ export function LabCoach({ labId, getWork }: { labId: number; getWork: () => Lab
       <div className="grid max-h-96 min-h-32 content-start gap-2 overflow-y-auto rounded-lg border p-3" aria-live="polite">
         {chat.data.messages.length || send.isPending ? null : (
           <p className="py-4 text-center text-sm text-muted-foreground">
-            Qayerda qiynalayotganingizni yozing. Murabbiy javobni aytmaydi: savollar bilan o'zingiz topishingizga yordam
-            beradi va kurs materiallariga tayanadi. Savol bilan birga hozirgi ishingiz ham yuboriladi.
+            {t("Qayerda qiynalayotganingizni yozing. Murabbiy javobni aytmaydi: savollar bilan o'zingiz topishingizga yordam beradi va kurs materiallariga tayanadi. Savol bilan birga hozirgi ishingiz ham yuboriladi.")}
           </p>
         )}
         {chat.data.messages.map((message) => (
@@ -88,7 +88,7 @@ export function LabCoach({ labId, getWork }: { labId: number; getWork: () => Lab
             <Bubble role="user">{send.variables}</Bubble>
             <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Murabbiy o'ylamoqda…
+              {t("Murabbiy o'ylamoqda…")}
             </div>
           </>
         ) : null}
@@ -97,21 +97,21 @@ export function LabCoach({ labId, getWork }: { labId: number; getWork: () => Lab
       <form onSubmit={handleSubmit} className="grid gap-2">
         <div className="flex items-end gap-2">
           <Textarea
-            aria-label="Murabbiyga savol"
+            aria-label={t('Murabbiyga savol')}
             className="max-h-40 min-h-10"
-            placeholder={limitReached ? 'Bugungi AI limiti tugadi' : 'Masalan: bu bog\'lanish 1:N mi yoki M:N?'}
+            placeholder={limitReached ? t('Bugungi AI limiti tugadi') : t("Masalan: bu bog'lanish 1:N mi yoki M:N?")}
             maxLength={MAX_QUESTION_LENGTH}
             disabled={limitReached}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <Button type="submit" size="icon-lg" className="size-10" aria-label="Yuborish" disabled={!canSend}>
+          <Button type="submit" size="icon-lg" className="size-10" aria-label={t('Yuborish')} disabled={!canSend}>
             <SendHorizontal />
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Bugun yana {chat.data.ai_left} ta AI yordami qoldi (maslahatlar va murabbiy umumiy limitda).
+          {t('Bugun yana {ai_left} ta AI yordami qoldi (maslahatlar va murabbiy umumiy limitda).', { ai_left: chat.data.ai_left })}
         </p>
       </form>
     </div>

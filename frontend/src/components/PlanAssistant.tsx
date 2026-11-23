@@ -6,6 +6,7 @@ import { SqlCode } from '@/components/SqlCode'
 import { Button } from '@/components/ui/button'
 import { api, errorMessage } from '@/lib/api'
 import type { PlanExplanation, PlanMeasure, PlanSuggestion } from '@/lib/types'
+import { t } from '@/lib/i18n'
 
 function MeasureView({ title, measure }: { title: string; measure: PlanMeasure }) {
   return (
@@ -13,7 +14,7 @@ function MeasureView({ title, measure }: { title: string; measure: PlanMeasure }
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm font-medium">
         {title}
         {measure.cost !== null ? (
-          <span className="text-xs font-normal text-muted-foreground tabular-nums">narx: {measure.cost}</span>
+          <span className="text-xs font-normal text-muted-foreground tabular-nums">{t('narx: {cost}', { cost: measure.cost })}</span>
         ) : null}
       </div>
       {measure.ok ? (
@@ -27,7 +28,7 @@ function MeasureView({ title, measure }: { title: string; measure: PlanMeasure }
           ) : (
             <p className="flex gap-1.5 text-xs text-emerald-700">
               <CircleCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              Rejada taqiqlangan tugun yo'q.
+              {t("Rejada taqiqlangan tugun yo'q.")}
             </p>
           )}
         </>
@@ -57,23 +58,23 @@ export function PlanAssistant({ labId, code, solved }: { labId: number; code: st
     <div className="grid gap-3 rounded-lg border p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium">
         <Gauge className="size-4" aria-hidden="true" />
-        Reja yordamchisi
+        {t('Reja yordamchisi')}
       </div>
       <p className="text-xs text-muted-foreground">
-        AI kodingizdan oldingi va keyingi rejani o'zbekcha tushuntiradi, lekin qaysi indeks kerakligini aytmaydi.
+        {t("AI kodingizdan oldingi va keyingi rejani o'zbekcha tushuntiradi, lekin qaysi indeks kerakligini aytmaydi.")}
         {solved
-          ? " Laboratoriyani yechdingiz: endi AI muqobil indeksini ham ko'rishingiz mumkin, tizim uni haqiqatan yaratib o'lchaydi."
-          : ' Laboratoriyani yechganingizdan keyin AI muqobil indeksini taklif qiladi.'}
+          ? t(" Laboratoriyani yechdingiz: endi AI muqobil indeksini ham ko'rishingiz mumkin, tizim uni haqiqatan yaratib o'lchaydi.")
+          : t(' Laboratoriyani yechganingizdan keyin AI muqobil indeksini taklif qiladi.')}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={!canRun} onClick={() => explain.mutate()}>
           {explain.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
-          Rejani tushuntirish
+          {t('Rejani tushuntirish')}
         </Button>
         {solved ? (
           <Button type="button" variant="outline" disabled={!canRun} onClick={() => suggest.mutate()}>
             {suggest.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Gauge aria-hidden="true" />}
-            AI muqobil indeksi
+            {t('AI muqobil indeksi')}
           </Button>
         ) : null}
       </div>
@@ -82,24 +83,23 @@ export function PlanAssistant({ labId, code, solved }: { labId: number; code: st
         <div className="grid gap-3" aria-live="polite">
           <p className="text-sm whitespace-pre-wrap">{explain.data.explanation}</p>
           <div className="grid gap-3 lg:grid-cols-2">
-            <MeasureView title="Kodingizsiz" measure={explain.data.before} />
-            <MeasureView title="Kodingizdan keyin" measure={explain.data.after} />
+            <MeasureView title={t('Kodingizsiz')} measure={explain.data.before} />
+            <MeasureView title={t('Kodingizdan keyin')} measure={explain.data.after} />
           </div>
         </div>
       ) : null}
 
       {suggest.data ? (
         <div className="grid gap-3 border-t pt-3" aria-live="polite">
-          <div className="text-sm font-medium">AI taklifi</div>
+          <div className="text-sm font-medium">{t('AI taklifi')}</div>
           <SqlCode code={suggest.data.index_sql} />
           <p className="text-sm whitespace-pre-wrap">{suggest.data.explanation}</p>
           <div className="grid gap-3 lg:grid-cols-2">
-            <MeasureView title="Sizning indeksingiz" measure={suggest.data.mine} />
-            <MeasureView title="AI indeksi (tizim o'lchadi)" measure={suggest.data.suggestion} />
+            <MeasureView title={t('Sizning indeksingiz')} measure={suggest.data.mine} />
+            <MeasureView title={t("AI indeksi (tizim o'lchadi)")} measure={suggest.data.suggestion} />
           </div>
           <p className="text-xs text-muted-foreground">
-            Narx — rejalashtiruvchining shartli baholashi: kichikroq bo'lsa, so'rov tezroq. AI gapiga emas, shu o'lchovga
-            ishoning.
+            {t("Narx — rejalashtiruvchining shartli baholashi: kichikroq bo'lsa, so'rov tezroq. AI gapiga emas, shu o'lchovga ishoning.")}
           </p>
         </div>
       ) : null}
