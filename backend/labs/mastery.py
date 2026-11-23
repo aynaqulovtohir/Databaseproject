@@ -12,6 +12,7 @@ from collections import defaultdict
 
 from .models import Lab, LabAttempt
 from .sequence import chain, lock_map
+from config.i18n import tr
 
 P_INIT = 0.2  # boshlanishda bilish ehtimoli
 P_LEARN = 0.15  # har bir imkoniyatda o'rganish
@@ -78,14 +79,13 @@ def recommend(labs, topics, solved_ids):
         if candidates:
             started = state["observations"] > 0
             reason = (
-                f"«{TOPIC_LABELS[topic]}» mavzusi hali to'liq o'zlashtirilmagan ({round(100 * state['mastery'])}%): "
-                "keyingi mavzularga o'tishdan oldin uni mustahkamlang."
+                tr("«{value}» mavzusi hali to'liq o'zlashtirilmagan ({value2}%): keyingi mavzularga o'tishdan oldin uni mustahkamlang.", value=TOPIC_LABELS[topic], value2=round(100 * state['mastery']))
                 if started
-                else f"Kurs tartibida navbatdagi mavzu: «{TOPIC_LABELS[topic]}»."
+                else tr("Kurs tartibida navbatdagi mavzu: «{value}».", value=TOPIC_LABELS[topic])
             )
             return candidates[0], reason
     if unsolved:
-        return unsolved[0], "Barcha mavzular yaxshi o'zlashtirilgan: qolgan laboratoriyalarni ham yeching."
+        return unsolved[0], tr("Barcha mavzular yaxshi o'zlashtirilgan: qolgan laboratoriyalarni ham yeching.")
     return None, ""
 
 
@@ -120,7 +120,7 @@ def student_report(student, labs):
     chained = [item for item in chain(labs) if item.pk not in solved_ids]
     if chained:
         lab = chained[0]
-        reason = f"«{lab.module.title}» modulida navbatdagi laboratoriya: keyingilari shu yechilgandan keyin ochiladi."
+        reason = tr("«{title}» modulida navbatdagi laboratoriya: keyingilari shu yechilgandan keyin ochiladi.", title=lab.module.title)
     else:
         locks = lock_map(student, labs)
         lab, reason = recommend([item for item in labs if locks[item.pk] is None], topics, solved_ids)

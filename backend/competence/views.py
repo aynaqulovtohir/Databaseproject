@@ -19,6 +19,7 @@ from .services import (
     load_model,
     model_payload,
 )
+from config.i18n import tr
 
 
 class StaffView(APIView):
@@ -27,7 +28,7 @@ class StaffView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if request.user.is_student:
-            raise PermissionDenied("Kompetentlik hisobotlari faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Kompetentlik hisobotlari faqat admin va o'qituvchi uchun."))
 
 
 class CompetenceModelView(StaffView):
@@ -52,10 +53,10 @@ class CompetenceReportView(StaffView):
     def get(self, request):
         group_id = request.query_params.get("group", "")
         if not group_id.isdigit():
-            raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
         stage = request.query_params.get("stage", "final")
         if stage not in STAGES:
-            raise ValidationError({"stage": f"Kesim quyidagilardan biri bo'lishi kerak: {', '.join(STAGES)}."})
+            raise ValidationError({"stage": tr("Kesim quyidagilardan biri bo'lishi kerak: {STAGES}.", STAGES=', '.join(STAGES))})
         group = get_object_or_404(allowed_groups(request.user), pk=group_id)
         return Response(group_report(load_model(), group, stage))
 

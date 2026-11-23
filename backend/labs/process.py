@@ -13,6 +13,7 @@ from datetime import timedelta
 from xml.sax.saxutils import quoteattr
 
 from .er import compare, normalize
+from config.i18n import N_, tr
 
 EMPTY = {"entities": [], "relationships": []}
 
@@ -32,31 +33,31 @@ TRIAL_CHECK_GAP_MINUTES = 1.0
 ENTITIES_FIRST_SHARE = 0.8
 
 ACTIVITIES = {
-    "obyekt_qoshildi": "Obyekt qo'shildi",
-    "obyekt_ochirildi": "Obyekt o'chirildi",
-    "obyekt_nomi_ozgardi": "Obyekt nomi o'zgardi",
-    "atribut_qoshildi": "Atribut qo'shildi",
-    "atribut_ochirildi": "Atribut o'chirildi",
-    "atribut_nomi_ozgardi": "Atribut nomi o'zgardi",
-    "kalit_ozgardi": "Kalit belgisi o'zgardi",
-    "boglanish_qoshildi": "Bog'lanish qo'shildi",
-    "boglanish_ochirildi": "Bog'lanish o'chirildi",
-    "boglanish_nomi_ozgardi": "Bog'lanish nomi o'zgardi",
-    "boglanish_qayta_ulandi": "Bog'lanish boshqa obyektga ulandi",
-    "kardinallik_ozgardi": "Kardinallik o'zgardi",
-    "joylashuv_ozgardi": "Obyektlar joyi o'zgardi",
+    "obyekt_qoshildi": N_("Obyekt qo'shildi"),
+    "obyekt_ochirildi": N_("Obyekt o'chirildi"),
+    "obyekt_nomi_ozgardi": N_("Obyekt nomi o'zgardi"),
+    "atribut_qoshildi": N_("Atribut qo'shildi"),
+    "atribut_ochirildi": N_("Atribut o'chirildi"),
+    "atribut_nomi_ozgardi": N_("Atribut nomi o'zgardi"),
+    "kalit_ozgardi": N_("Kalit belgisi o'zgardi"),
+    "boglanish_qoshildi": N_("Bog'lanish qo'shildi"),
+    "boglanish_ochirildi": N_("Bog'lanish o'chirildi"),
+    "boglanish_nomi_ozgardi": N_("Bog'lanish nomi o'zgardi"),
+    "boglanish_qayta_ulandi": N_("Bog'lanish boshqa obyektga ulandi"),
+    "kardinallik_ozgardi": N_("Kardinallik o'zgardi"),
+    "joylashuv_ozgardi": N_("Obyektlar joyi o'zgardi"),
     "tekshirish": "Tekshirish",
-    "topshirish": "Baholashga topshirish",
+    "topshirish": N_("Baholashga topshirish"),
 }
 CHECK_ACTIVITIES = {"run": "tekshirish", "submit": "topshirish"}
 EDIT_ACTIVITIES = {"obyekt_nomi_ozgardi", "atribut_nomi_ozgardi", "kalit_ozgardi", "boglanish_nomi_ozgardi",
                    "boglanish_qayta_ulandi"}
 
 STRATEGIES = {
-    "avval_obyektlar": "Avval obyektlar, keyin bog'lanishlar",
-    "aralash": "Obyekt va bog'lanishlar aralash (bosqichma-bosqich)",
-    "sinab_korish": "Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish",
-    "aniqlanmadi": "Aniqlanmadi (hodisalar kam)",
+    "avval_obyektlar": N_("Avval obyektlar, keyin bog'lanishlar"),
+    "aralash": N_("Obyekt va bog'lanishlar aralash (bosqichma-bosqich)"),
+    "sinab_korish": N_("Sinab ko'rish: ko'p o'chirish yoki tez-tez tekshirish"),
+    "aniqlanmadi": N_("Aniqlanmadi (hodisalar kam)"),
 }
 
 

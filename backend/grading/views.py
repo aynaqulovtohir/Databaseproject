@@ -15,6 +15,7 @@ from submissions.serializers import SubmissionSerializer
 
 from .models import MAX_SCORE, Grade
 from .serializers import GradeInputSerializer, ReturnInputSerializer
+from config.i18n import tr
 
 
 class ReviewBaseView(APIView):
@@ -25,7 +26,7 @@ class ReviewBaseView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not (request.user.is_admin or request.user.is_teacher):
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
 
     def get_locked_latest_submission(self, submission_pk):
         """Yechimni qulflab oladi va u talabaning oxirgi urinishi ekanini tekshiradi.
@@ -46,7 +47,7 @@ class ReviewBaseView(APIView):
         )
         if attempts[0].pk != submission.pk:
             raise ValidationError(
-                {"detail": "Faqat talabaning oxirgi urinishini baholash yoki qaytarish mumkin."}
+                {"detail": tr("Faqat talabaning oxirgi urinishini baholash yoki qaytarish mumkin.")}
             )
         return attempts[0]
 
@@ -93,14 +94,14 @@ class SubmissionGradeView(ReviewBaseView):
         criteria = criteria_for(submission.assignment, submission.stage)
         if not criteria:
             if data.get("score") is None:
-                raise ValidationError({"score": "Ball kiritilishi shart."})
+                raise ValidationError({"score": tr("Ball kiritilishi shart.")})
             return data["score"], MAX_SCORE, None
         scores = data.get("rubric_scores")
         if scores is None or len(scores) != len(criteria):
-            raise ValidationError({"rubric_scores": f"Har bir mezon ({len(criteria)} ta) uchun ball qo'ying."})
+            raise ValidationError({"rubric_scores": tr("Har bir mezon ({criteria} ta) uchun ball qo'ying.", criteria=len(criteria))})
         for item, value in zip(criteria, scores):
             if value > item["points"]:
-                raise ValidationError({"rubric_scores": f"«{item['name']}» uchun ball {item['points']} dan oshmasin."})
+                raise ValidationError({"rubric_scores": tr("«{name}» uchun ball {points} dan oshmasin.", name=item['name'], points=item['points'])})
         rubric_scores = [
             {"name": item["name"], "points": item["points"], "score": value} for item, value in zip(criteria, scores)
         ]
@@ -123,7 +124,7 @@ class SubmissionReturnView(ReviewBaseView):
         with transaction.atomic():
             submission = self.get_locked_latest_submission(submission_pk)
             if submission.status == Submission.Status.RETURNED:
-                raise ValidationError({"detail": "Bu yechim allaqachon qayta ishlashga qaytarilgan."})
+                raise ValidationError({"detail": tr("Bu yechim allaqachon qayta ishlashga qaytarilgan.")})
             submission.status = Submission.Status.RETURNED
             submission.return_comment = serializer.validated_data["comment"]
             submission.save(update_fields=["status", "return_comment"])

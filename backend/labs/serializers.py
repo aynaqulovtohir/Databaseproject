@@ -11,14 +11,15 @@ from .probes import ProbesError, validate_lab_probes, validate_probes
 from .norm import NormError, parse_answer, parse_task, reference_solution
 from .models import MAX_LEVEL, MAX_SQL_LENGTH, Lab, LabModule
 from .sandbox import SandboxUnavailable
+from config.i18n import N_, tr
 
-SQL_TOO_LONG = "SQL kod {max_length} belgidan oshmasligi kerak."
+SQL_TOO_LONG = N_("SQL kod {max_length} belgidan oshmasligi kerak.")
 
 
 def _task_input(value):
     """norm_task ni matn ({"attributes": "a, b", "fds": "a -> b", ...}) yoki saqlangan tuzilma ko'rinishida qabul qiladi."""
     if not isinstance(value, dict):
-        raise NormError("Normallashtirish topshirig'i noto'g'ri formatda.")
+        raise NormError(tr("Normallashtirish topshirig'i noto'g'ri formatda."))
     attributes = value.get("attributes", "")
     if isinstance(attributes, list):
         attributes = ", ".join(map(str, attributes))
@@ -49,9 +50,9 @@ class LabModuleSerializer(serializers.ModelSerializer):
         starts = attrs.get("exam_starts_at", current.exam_starts_at if current else None)
         ends = attrs.get("exam_ends_at", current.exam_ends_at if current else None)
         if (starts is None) != (ends is None):
-            raise serializers.ValidationError({"exam_ends_at": "Imtihonning boshlanishi va tugashi birga belgilanadi."})
+            raise serializers.ValidationError({"exam_ends_at": tr("Imtihonning boshlanishi va tugashi birga belgilanadi.")})
         if starts is not None and ends <= starts:
-            raise serializers.ValidationError({"exam_ends_at": "Imtihon boshlanishidan keyin tugashi kerak."})
+            raise serializers.ValidationError({"exam_ends_at": tr("Imtihon boshlanishidan keyin tugashi kerak.")})
         return attrs
 
     def get_labs(self, module):
@@ -76,7 +77,7 @@ def module_short(module):
 
 def validate_level(value):
     if value is not None and not 1 <= value <= MAX_LEVEL:
-        raise serializers.ValidationError(f"Murakkablik 1 dan {MAX_LEVEL} gacha bo'lishi kerak.")
+        raise serializers.ValidationError(tr("Murakkablik 1 dan {MAX_LEVEL} gacha bo'lishi kerak.", MAX_LEVEL=MAX_LEVEL))
     return value
 
 
@@ -163,7 +164,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         """O'qituvchi faqat o'zi yaratgan modulni tanlaydi (admin — istalganini)."""
         user = self.context["request"].user
         if module is not None and not user.is_admin and module.author_id != user.pk:
-            raise serializers.ValidationError("Faqat o'zingiz yaratgan modulni tanlashingiz mumkin.")
+            raise serializers.ValidationError(tr("Faqat o'zingiz yaratgan modulni tanlashingiz mumkin."))
         return module
 
     def get_norm_reference(self, lab):
@@ -173,7 +174,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         current = self.instance
         kind = attrs.get("kind", current.kind if current else Lab.Kind.SQL)
         if current and kind != current.kind:
-            raise serializers.ValidationError({"kind": "Laboratoriya turini o'zgartirib bo'lmaydi."})
+            raise serializers.ValidationError({"kind": tr("Laboratoriya turini o'zgartirib bo'lmaydi.")})
         if kind == Lab.Kind.ER:
             return self.validate_er(attrs)
         if kind == Lab.Kind.NORM:
@@ -198,19 +199,19 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         if setup_sql.strip():
             if attrs.get("requirements", current.requirements if current else []):
                 raise serializers.ValidationError(
-                    {"setup_sql": "Berilgan baza va buyurtmachi bilan suhbat bitta laboratoriyada ishlatilmaydi."}
+                    {"setup_sql": tr("Berilgan baza va buyurtmachi bilan suhbat bitta laboratoriyada ishlatilmaydi.")}
                 )
             if current is None or setup_sql != current.setup_sql or not current.reference_diagram:
                 attrs["reference_diagram"] = self.reverse_diagram(setup_sql)
         diagram = attrs.get("reference_diagram", current.reference_diagram if current else None)
         if diagram is None:
-            raise serializers.ValidationError({"reference_diagram": "Namunaviy ER-diagrammani chizing."})
+            raise serializers.ValidationError({"reference_diagram": tr("Namunaviy ER-diagrammani chizing.")})
         try:
             diagram = validate_diagram(diagram)
         except DiagramError as exc:
             raise serializers.ValidationError({"reference_diagram": str(exc)})
         if not diagram["entities"]:
-            raise serializers.ValidationError({"reference_diagram": "Namunaviy diagrammada kamida bitta obyekt bo'lsin."})
+            raise serializers.ValidationError({"reference_diagram": tr("Namunaviy diagrammada kamida bitta obyekt bo'lsin.")})
         attrs["reference_diagram"] = diagram
         if "requirements" in attrs:
             try:
@@ -233,19 +234,19 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         try:
             return diagram_from_sql(setup_sql)
         except LabSetupError as exc:
-            raise serializers.ValidationError({"setup_sql": f"Kod xato berdi. {format_error(exc.error)}"})
+            raise serializers.ValidationError({"setup_sql": tr("Kod xato berdi. {error}", error=format_error(exc.error))})
         except (ReverseError, DiagramError) as exc:
             raise serializers.ValidationError({"setup_sql": str(exc)})
         except SandboxUnavailable:
             raise serializers.ValidationError(
-                {"detail": "Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."}
+                {"detail": tr("Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")}
             )
 
     def validate_norm(self, attrs):
         current = self.instance
         task = attrs.get("norm_task", current.norm_task if current else None)
         if task is None:
-            raise serializers.ValidationError({"norm_task": "Atributlar va funksional bog'liqliklarni kiriting."})
+            raise serializers.ValidationError({"norm_task": tr("Atributlar va funksional bog'liqliklarni kiriting.")})
         try:
             attrs["norm_task"] = _task_input(task)
         except NormError as exc:
@@ -280,7 +281,7 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         attrs["check_queries"] = queries
         if queries and (probes or concurrent or plan_query.strip()):
             raise serializers.ValidationError(
-                {"check_queries": "Migratsiyadan keyingi so'rovlar cheklov sinovlari, ikki sessiyali tekshiruv va reja bilan birga ishlatilmaydi."}
+                {"check_queries": tr("Migratsiyadan keyingi so'rovlar cheklov sinovlari, ikki sessiyali tekshiruv va reja bilan birga ishlatilmaydi.")}
             )
         values = (setup_sql, solution_sql, hidden_sql, plan_query, plan_forbidden, concurrent, probes, queries)
         changed = current is None or values != (
@@ -295,16 +296,16 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
         )
         if probes and (concurrent or plan_query.strip() or hidden_sql.strip()):
             raise serializers.ValidationError(
-                {"probes": "Cheklov sinovlari ikki sessiyali tekshiruv, reja va yashirin ma'lumotlar bilan birga ishlatilmaydi."}
+                {"probes": tr("Cheklov sinovlari ikki sessiyali tekshiruv, reja va yashirin ma'lumotlar bilan birga ishlatilmaydi.")}
             )
         if concurrent and (plan_query.strip() or hidden_sql.strip()):
             raise serializers.ValidationError(
-                {"concurrent": "Ikki sessiyali tekshiruv reja va yashirin ma'lumotlar bilan birga ishlatilmaydi."}
+                {"concurrent": tr("Ikki sessiyali tekshiruv reja va yashirin ma'lumotlar bilan birga ishlatilmaydi.")}
             )
         if concurrent and not solution_sql.strip():
-            raise serializers.ValidationError({"solution_sql": "Tranzaksiya laboratoriyasida namunaviy yechim kerak."})
+            raise serializers.ValidationError({"solution_sql": tr("Tranzaksiya laboratoriyasida namunaviy yechim kerak.")})
         if plan_query.strip() and not solution_sql.strip():
-            raise serializers.ValidationError({"solution_sql": "Reja tekshiriladigan laboratoriyada namunaviy yechim (indeks) kerak."})
+            raise serializers.ValidationError({"solution_sql": tr("Reja tekshiriladigan laboratoriyada namunaviy yechim (indeks) kerak.")})
         if changed and (setup_sql.strip() or solution_sql.strip() or hidden_sql.strip()):
             try:
                 validate_lab_sql(setup_sql, solution_sql, hidden_sql)
@@ -319,10 +320,10 @@ class LabSerializer(GroupsValidationMixin, serializers.ModelSerializer):
                         setup_sql, solution_sql, plan_query, [item.strip() for item in plan_forbidden.split(",") if item.strip()]
                     )
             except LabSetupError as exc:
-                raise serializers.ValidationError({exc.field: f"Kod xato berdi. {format_error(exc.error)}"})
+                raise serializers.ValidationError({exc.field: tr("Kod xato berdi. {error}", error=format_error(exc.error))})
             except SandboxUnavailable:
                 raise serializers.ValidationError(
-                    {"detail": "Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."}
+                    {"detail": tr("Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")}
                 )
         return attrs
 
@@ -452,7 +453,7 @@ def fix_payload(attempt):
 
 
 class DiagramRunSerializer(serializers.Serializer):
-    diagram = serializers.JSONField(error_messages={"required": "Diagramma yuborilmadi."})
+    diagram = serializers.JSONField(error_messages={"required": N_("Diagramma yuborilmadi.")})
 
     def validate_diagram(self, value):
         try:
@@ -462,7 +463,7 @@ class DiagramRunSerializer(serializers.Serializer):
 
 
 class NormAnswerSerializer(serializers.Serializer):
-    answer = serializers.JSONField(error_messages={"required": "Javob yuborilmadi."})
+    answer = serializers.JSONField(error_messages={"required": N_("Javob yuborilmadi.")})
 
     def __init__(self, *args, task=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -480,13 +481,13 @@ class RunSerializer(serializers.Serializer):
         max_length=MAX_SQL_LENGTH,
         trim_whitespace=False,
         error_messages={
-            "blank": "SQL kod bo'sh bo'lmasligi kerak.",
-            "required": "SQL kod kiritilishi shart.",
+            "blank": N_("SQL kod bo'sh bo'lmasligi kerak."),
+            "required": N_("SQL kod kiritilishi shart."),
             "max_length": SQL_TOO_LONG,
         },
     )
 
     def validate_sql_code(self, value):
         if not value.strip():
-            raise serializers.ValidationError("SQL kod bo'sh bo'lmasligi kerak.")
+            raise serializers.ValidationError(tr("SQL kod bo'sh bo'lmasligi kerak."))
         return value

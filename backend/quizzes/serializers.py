@@ -6,6 +6,7 @@ from users.models import StudentGroup
 
 from .models import LIKERT_SCALE, Choice, ExpertPanel, Question, Quiz
 from .services import attempt_status, percent
+from config.i18n import tr
 
 MAX_QUESTIONS = 100
 MIN_CHOICES = 2
@@ -41,13 +42,13 @@ class QuestionSerializer(serializers.ModelSerializer):
         choices = attrs.get("choices", [])
         if not MIN_CHOICES <= len(choices) <= MAX_CHOICES:
             raise serializers.ValidationError(
-                {"choices": f"Javob variantlari {MIN_CHOICES} tadan {MAX_CHOICES} tagacha bo'lsin."}
+                {"choices": tr("Javob variantlari {MIN_CHOICES} tadan {MAX_CHOICES} tagacha bo'lsin.", MIN_CHOICES=MIN_CHOICES, MAX_CHOICES=MAX_CHOICES)}
             )
         correct = sum(1 for choice in attrs["choices"] if choice.get("is_correct"))
         if attrs.get("kind", Question.Kind.SINGLE) == Question.Kind.SINGLE and correct != 1:
-            raise serializers.ValidationError({"choices": "Bitta to'g'ri javobli savolda aynan bitta to'g'ri variant belgilang."})
+            raise serializers.ValidationError({"choices": tr("Bitta to'g'ri javobli savolda aynan bitta to'g'ri variant belgilang.")})
         if correct < 1:
-            raise serializers.ValidationError({"choices": "Kamida bitta to'g'ri variant belgilang."})
+            raise serializers.ValidationError({"choices": tr("Kamida bitta to'g'ri variant belgilang.")})
         return attrs
 
 
@@ -93,16 +94,16 @@ class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
 
     def validate_questions(self, questions):
         if not 1 <= len(questions) <= MAX_QUESTIONS:
-            raise serializers.ValidationError(f"Testda 1 tadan {MAX_QUESTIONS} tagacha savol bo'lsin.")
+            raise serializers.ValidationError(tr("Testda 1 tadan {MAX_QUESTIONS} tagacha savol bo'lsin.", MAX_QUESTIONS=MAX_QUESTIONS))
         return questions
 
     def validate(self, attrs):
         current = self.instance
         if current is None and "questions" not in attrs:
-            raise serializers.ValidationError({"questions": "Kamida bitta savol qo'shing."})
+            raise serializers.ValidationError({"questions": tr("Kamida bitta savol qo'shing.")})
         if current is not None and "questions" in attrs and current.attempts.exists():
             raise serializers.ValidationError(
-                {"questions": "Talabalar testni boshlagan: natijalar solishtirilishi uchun savollarni o'zgartirib bo'lmaydi."}
+                {"questions": tr("Talabalar testni boshlagan: natijalar solishtirilishi uchun savollarni o'zgartirib bo'lmaydi.")}
             )
         opens_at = attrs.get("opens_at", current.opens_at if current else None)
         closes_at = attrs.get("closes_at", current.closes_at if current else None)
@@ -115,16 +116,16 @@ class QuizSerializer(GroupsValidationMixin, serializers.ModelSerializer):
             kinds = set()
         # So'rovnomada faqat Likert savollari, testda esa faqat ball qo'yiladigan savollar bo'ladi
         if kind == Quiz.Kind.SURVEY and kinds - {Question.Kind.LIKERT}:
-            raise serializers.ValidationError({"questions": "So'rovnomada faqat Likert shkalali savollar bo'ladi."})
+            raise serializers.ValidationError({"questions": tr("So'rovnomada faqat Likert shkalali savollar bo'ladi.")})
         if kind != Quiz.Kind.SURVEY and Question.Kind.LIKERT in kinds:
-            raise serializers.ValidationError({"questions": "Likert shkalali savollar faqat so'rovnomada bo'ladi."})
+            raise serializers.ValidationError({"questions": tr("Likert shkalali savollar faqat so'rovnomada bo'ladi.")})
         if opens_at and closes_at and closes_at <= opens_at:
-            raise serializers.ValidationError({"closes_at": "Yopilish vaqti ochilish vaqtidan keyin bo'lsin."})
+            raise serializers.ValidationError({"closes_at": tr("Yopilish vaqti ochilish vaqtidan keyin bo'lsin.")})
         form = attrs.get("form", current.form if current else "")
         if form and kind not in RESEARCH_KINDS:
-            raise serializers.ValidationError({"form": "Parallel variant faqat kirish, chiqish va kechiktirilgan testga beriladi."})
+            raise serializers.ValidationError({"form": tr("Parallel variant faqat kirish, chiqish va kechiktirilgan testga beriladi.")})
         if current is not None and "form" in attrs and attrs["form"] != current.form and current.attempts.exists():
-            raise serializers.ValidationError({"form": "Talabalar testni boshlagan: variantni o'zgartirib bo'lmaydi."})
+            raise serializers.ValidationError({"form": tr("Talabalar testni boshlagan: variantni o'zgartirib bo'lmaydi.")})
         return attrs
 
     @staticmethod
@@ -218,9 +219,9 @@ class ExpertPanelSerializer(serializers.ModelSerializer):
         from .views import visible_quizzes
 
         if not visible_quizzes(self.context["request"].user).filter(pk=quiz.pk).exists():
-            raise serializers.ValidationError("Faqat o'zingizning testingizni tanlashingiz mumkin.")
+            raise serializers.ValidationError(tr("Faqat o'zingizning testingizni tanlashingiz mumkin."))
         if not quiz.questions.exists():
-            raise serializers.ValidationError("Testda hali savol yo'q.")
+            raise serializers.ValidationError(tr("Testda hali savol yo'q."))
         return quiz
 
     def get_items_count(self, panel):

@@ -23,6 +23,7 @@ from .serializers import (
     StudentAssignmentSerializer,
     StudentMaterialSerializer,
 )
+from config.i18n import tr
 
 
 class MaterialViewSet(viewsets.ModelViewSet):
@@ -75,7 +76,7 @@ class MaterialFileDetailView(APIView):
 
     def delete(self, request, pk):
         if not (request.user.is_admin or request.user.is_teacher):
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         get_visible_material_file(request.user, pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -90,7 +91,7 @@ class MaterialFileDownloadView(APIView):
         try:
             opened_file = material_file.file.open("rb")
         except FileNotFoundError:
-            raise NotFound("Fayl serverda topilmadi.")
+            raise NotFound(tr("Fayl serverda topilmadi."))
         return FileResponse(opened_file, as_attachment=True, filename=material_file.original_name)
 
 
@@ -125,5 +126,5 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             instance.delete()
         except ProtectedError:
             raise ValidationError(
-                {"detail": "Bu topshiriqqa yechimlar kelgan, shuning uchun uni o'chirib bo'lmaydi."}
+                {"detail": tr("Bu topshiriqqa yechimlar kelgan, shuning uchun uni o'chirib bo'lmaydi.")}
             )

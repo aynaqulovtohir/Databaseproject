@@ -12,6 +12,8 @@ import anthropic
 import requests
 from django.conf import settings
 
+from config.i18n import localize_prompt
+
 logger = logging.getLogger(__name__)
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -108,6 +110,9 @@ def _record_usage(purpose, fast, response=None, error=None):
         logger.exception("AI so'rovi hisobini yozib bo'lmadi")
 
 
+UZBEK_ONLY_PURPOSES = {"analysis", "variant", "buggy_code"}
+
+
 def create_message(purpose="other", fast=False, **params):
     """Modelga so'rov yuboradi, xatolarni o'zimizning turlarga o'tkazadi va so'rov hisobini yozadi.
 
@@ -118,6 +123,10 @@ def create_message(purpose="other", fast=False, **params):
     """
     if not is_configured():
         raise AINotConfigured("AI uchun API kalit .env faylida ko'rsatilmagan.")
+    # Javob foydalanuvchi tanlagan tilda (so'rov tili). Laboratoriya mazmuni (variant, xatoli kod) va
+    # fon tahlili o'zbekcha qoladi: ular bazada hamma uchun saqlanadi.
+    if isinstance(params.get("system"), str) and purpose not in UZBEK_ONLY_PURPOSES:
+        params["system"] = localize_prompt(params["system"])
     model = current_model(fast)
     try:
         if uses_gemini():

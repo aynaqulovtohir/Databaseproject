@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from config.i18n import N_
 
 # Vaqt tugaganidan keyin ham tarmoq kechikishi uchun qabul qilinadigan qo'shimcha vaqt
 GRACE_SECONDS = 30
@@ -26,16 +27,16 @@ LIKERT_SCALE = [
 
 class Quiz(models.Model):
     class Kind(models.TextChoices):
-        PRE = "pre", "Kirish testi"
-        POST = "post", "Chiqish testi"
+        PRE = "pre", N_("Kirish testi")
+        POST = "post", N_("Chiqish testi")
         # Kurs tugagandan bir necha hafta keyin o'sha savollar bilan: bilim qanchalik saqlanganini o'lchaydi
-        DELAYED = "delayed", "Kechiktirilgan test"
-        PRACTICE = "practice", "Oddiy test"
-        SURVEY = "survey", "So'rovnoma"
+        DELAYED = "delayed", N_("Kechiktirilgan test")
+        PRACTICE = "practice", N_("Oddiy test")
+        SURVEY = "survey", N_("So'rovnoma")
 
     class Form(models.TextChoices):
-        A = "A", "A variant"
-        B = "B", "B variant"
+        A = "A", N_("A variant")
+        B = "B", N_("B variant")
 
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.PRACTICE)
     # Parallel variant (kirish/chiqish/kechiktirilgan testlar uchun): kirish va chiqishga turli variant beriladi,
@@ -70,9 +71,9 @@ class Quiz(models.Model):
 
 class Question(models.Model):
     class Kind(models.TextChoices):
-        SINGLE = "single", "Bitta to'g'ri javob"
-        MULTIPLE = "multiple", "Bir nechta to'g'ri javob"
-        LIKERT = "likert", "Likert shkalasi (1-5)"
+        SINGLE = "single", N_("Bitta to'g'ri javob")
+        MULTIPLE = "multiple", N_("Bir nechta to'g'ri javob")
+        LIKERT = "likert", N_("Likert shkalasi (1-5)")
 
     quiz = models.ForeignKey(Quiz, verbose_name="test", on_delete=models.CASCADE, related_name="questions")
     order = models.PositiveSmallIntegerField("tartib raqami")

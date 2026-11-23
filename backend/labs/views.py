@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
+from django.utils import timezone, translation
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -68,6 +68,7 @@ from .serializers import (
     fix_payload,
     grade_payload,
 )
+from config.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -214,15 +215,15 @@ class LabViewSet(viewsets.ModelViewSet):
         except SandboxUnavailable:
             logger.exception("Laboratoriya bazasiga ulanib bo'lmadi")
             return Response(
-                {"detail": "Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
+                {"detail": tr("Laboratoriya bazasi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             ), None
         except LabSetupError as exc:
             logger.error("Laboratoriya #%s sozlamasida xato: %s", lab.pk, exc)
             if request.user.is_student:
-                detail = "Laboratoriya sozlamasida xato bor. O'qituvchiga xabar bering."
+                detail = tr("Laboratoriya sozlamasida xato bor. O'qituvchiga xabar bering.")
             else:
-                detail = f"Laboratoriya sozlamasida xato ({exc.field}): {exc}"
+                detail = tr("Laboratoriya sozlamasida xato ({field}): {exc}", field=exc.field, exc=exc)
             return Response({"detail": detail}, status=status.HTTP_409_CONFLICT), None
 
     @staticmethod
@@ -232,7 +233,7 @@ class LabViewSet(viewsets.ModelViewSet):
         if value in (None, ""):
             return None
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
-            raise ValidationError({"confidence": "Ishonch 1 dan 5 gacha butun son bo'lishi kerak."})
+            raise ValidationError({"confidence": tr("Ishonch 1 dan 5 gacha butun son bo'lishi kerak.")})
         return value
 
     @staticmethod
@@ -244,10 +245,10 @@ class LabViewSet(viewsets.ModelViewSet):
         if value is None:
             return ""
         if not isinstance(value, str):
-            raise ValidationError({"justification": "Asoslash matn bo'lishi kerak."})
+            raise ValidationError({"justification": tr("Asoslash matn bo'lishi kerak.")})
         value = value.strip()
         if len(value) > 2000:
-            raise ValidationError({"justification": "Asoslash 2000 belgidan oshmasligi kerak."})
+            raise ValidationError({"justification": tr("Asoslash 2000 belgidan oshmasligi kerak.")})
         return value
 
     @staticmethod
@@ -277,7 +278,9 @@ class LabViewSet(viewsets.ModelViewSet):
         """Kodni ishga tushirib tekshiradi. Talabaning har bir ishga tushirishi urinish sifatida saqlanadi."""
         lab = self.get_object()
         confidence = self.confidence(request)
-        result, payload = self.check(request, lab)
+        # Natija bazaga o'zbekcha yoziladi (xatolar hisoboti matn bo'yicha guruhlaydi); javobni renderer o'giradi
+        with translation.override("uz"):
+            result, payload = self.check(request, lab)
         if payload is None:
             return result
 
@@ -303,7 +306,7 @@ class LabViewSet(viewsets.ModelViewSet):
         """Erkin sinash: kod bajariladi va natijasi ko'rsatiladi, lekin tekshirilmaydi va urinish hisoblanmaydi."""
         lab = self.get_object()
         if lab.kind != Lab.Kind.SQL:
-            raise ValidationError({"detail": "Erkin sinash faqat SQL laboratoriyalarida bor."})
+            raise ValidationError({"detail": tr("Erkin sinash faqat SQL laboratoriyalarida bor.")})
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result, payload = self.execute(request, lab, try_code, serializer.validated_data["sql_code"])
@@ -324,10 +327,10 @@ class LabViewSet(viewsets.ModelViewSet):
 
         lab = self.get_object()
         if lab.kind != Lab.Kind.SQL or not lab.plan_query.strip():
-            raise ValidationError({"detail": "Reja tushuntirishi faqat indeks (EXPLAIN) laboratoriyasida bor."})
+            raise ValidationError({"detail": tr("Reja tushuntirishi faqat indeks (EXPLAIN) laboratoriyasida bor.")})
         mode = request.data.get("mode", "explain")
         if mode not in ("explain", "suggest"):
-            raise ValidationError({"mode": "Rejim explain yoki suggest bo'lishi kerak."})
+            raise ValidationError({"mode": tr("Rejim explain yoki suggest bo'lishi kerak.")})
         serializer = RunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         if (
@@ -335,7 +338,7 @@ class LabViewSet(viewsets.ModelViewSet):
             and request.user.is_student
             and not LabAttempt.objects.filter(lab=lab, student=request.user, is_correct=True).exists()
         ):
-            raise PermissionDenied("Muqobil indeks taklifi laboratoriyani to'g'ri yechgandan keyin ochiladi.")
+            raise PermissionDenied(tr("Muqobil indeks taklifi laboratoriyani to'g'ri yechgandan keyin ochiladi."))
         refused = refuse_ai(request.user)
         if refused:
             return refused
@@ -363,11 +366,13 @@ class LabViewSet(viewsets.ModelViewSet):
         Qayta topshirish mumkin; talabaning bahosi sifatida eng yuqori ball saqlanadi.
         """
         if not request.user.is_student:
-            raise PermissionDenied("Baholashga faqat talaba topshira oladi.")
+            raise PermissionDenied(tr("Baholashga faqat talaba topshira oladi."))
         lab = self.get_object()
         confidence = self.confidence(request)
         justification = self.justification(request, lab)
-        result, payload = self.check(request, lab)
+        # Natija bazaga o'zbekcha yoziladi (xatolar hisoboti matn bo'yicha guruhlaydi); javobni renderer o'giradi
+        with translation.override("uz"):
+            result, payload = self.check(request, lab)
         if payload is None:
             return result
 
@@ -385,9 +390,9 @@ class LabViewSet(viewsets.ModelViewSet):
             score, comment = auto_grade_diagram(attempt, payload["ratio"])
             source = LabGrade.Source.AUTO
             if not attempt.is_correct:
-                comment = "Javobda xatolar bor. Ro'yxatdagi farqlarni ko'rib chiqing, tuzating va qayta topshiring."
+                comment = tr("Javobda xatolar bor. Ro'yxatdagi farqlarni ko'rib chiqing, tuzating va qayta topshiring.")
             else:
-                comment = "Kalitlar, normal forma va dekompozitsiya to'g'ri."
+                comment = tr("Kalitlar, normal forma va dekompozitsiya to'g'ri.")
         else:
             score, comment, source = grade_attempt(attempt)
         with transaction.atomic():
@@ -424,10 +429,10 @@ class LabViewSet(viewsets.ModelViewSet):
         from .process import MAX_SNAPSHOTS
 
         if not request.user.is_student:
-            raise PermissionDenied("Chizish jarayoni faqat talaba uchun yoziladi.")
+            raise PermissionDenied(tr("Chizish jarayoni faqat talaba uchun yoziladi."))
         lab = self.get_object()
         if lab.kind != Lab.Kind.ER:
-            raise ValidationError({"detail": "Bu laboratoriyada ER-diagramma chizilmaydi."})
+            raise ValidationError({"detail": tr("Bu laboratoriyada ER-diagramma chizilmaydi.")})
         serializer = DiagramRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         diagram = serializer.validated_data["diagram"]
@@ -443,13 +448,13 @@ class LabViewSet(viewsets.ModelViewSet):
         from .process import process_payload
 
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         if lab.kind != Lab.Kind.ER:
-            raise ValidationError({"detail": "Jarayon tahlili faqat ER-diagramma laboratoriyasida bor."})
+            raise ValidationError({"detail": tr("Jarayon tahlili faqat ER-diagramma laboratoriyasida bor.")})
         student_id = request.query_params.get("student", "")
         if not student_id.isdigit():
-            raise ValidationError({"student": "Talaba raqami butun son bo'lishi kerak."})
+            raise ValidationError({"student": tr("Talaba raqami butun son bo'lishi kerak.")})
         student = get_object_or_404(
             User.objects.filter(role=User.Role.STUDENT, group__in=lab.groups.all()), pk=student_id
         )
@@ -464,12 +469,12 @@ class LabViewSet(viewsets.ModelViewSet):
         Admin — barcha, o'qituvchi — o'z laboratoriyalari. ?lab=<id> bilan alohida laboratoriyalarni tanlash mumkin.
         """
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         labs = visible_labs(request.user)
         lab_ids = request.query_params.getlist("lab")
         if lab_ids:
             if not all(lab_id.isdigit() for lab_id in lab_ids):
-                raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+                raise ValidationError({"lab": tr("Laboratoriya raqami butun son bo'lishi kerak.")})
             labs = labs.filter(pk__in=lab_ids)
         from quizzes.views import visible_quizzes
 
@@ -483,12 +488,12 @@ class LabViewSet(viewsets.ModelViewSet):
     def staff_labs(self, request):
         """Admin — barcha, o'qituvchi — o'z laboratoriyalari; ?lab=<id> bilan bittasi."""
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         labs = visible_labs(request.user)
         lab_id = request.query_params.get("lab")
         if lab_id:
             if not lab_id.isdigit():
-                raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+                raise ValidationError({"lab": tr("Laboratoriya raqami butun son bo'lishi kerak.")})
             labs = labs.filter(pk=lab_id)
         return labs
 
@@ -520,13 +525,13 @@ class LabViewSet(viewsets.ModelViewSet):
 
         attempt_id, score = request.data.get("attempt"), request.data.get("score")
         if not isinstance(attempt_id, int) or isinstance(attempt_id, bool):
-            raise ValidationError({"attempt": "Urinish raqami butun son bo'lishi kerak."})
+            raise ValidationError({"attempt": tr("Urinish raqami butun son bo'lishi kerak.")})
         if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 100:
-            raise ValidationError({"score": "Ball 0 dan 100 gacha butun son bo'lsin."})
+            raise ValidationError({"score": tr("Ball 0 dan 100 gacha butun son bo'lsin.")})
         # Faqat navbatdagi ishlar: o'z laboratoriyasidagi, hozir baho sifatida turgan urinish
         grade = LabGrade.objects.filter(lab__in=labs, attempt_id=attempt_id).first()
         if grade is None:
-            raise ValidationError({"attempt": "Bu ish ko'r baholash navbatida yo'q."})
+            raise ValidationError({"attempt": tr("Bu ish ko'r baholash navbatida yo'q.")})
         review, created = BlindReview.objects.get_or_create(
             attempt_id=attempt_id,
             reviewer=request.user,
@@ -534,7 +539,7 @@ class LabViewSet(viewsets.ModelViewSet):
         )
         if not created:
             return Response(
-                {"detail": "Bu ishni allaqachon baholagansiz: ko'r baholash natijasi o'zgartirilmaydi."},
+                {"detail": tr("Bu ishni allaqachon baholagansiz: ko'r baholash natijasi o'zgartirilmaydi.")},
                 status=status.HTTP_409_CONFLICT,
             )
         return Response({"saved": True}, status=status.HTTP_201_CREATED)
@@ -557,7 +562,7 @@ class LabViewSet(viewsets.ModelViewSet):
             return Response(student_report(request.user, list(visible_labs(request.user).select_related("module"))))
         group_id = request.query_params.get("group", "")
         if not group_id.isdigit():
-            raise ValidationError({"group": "Guruhni tanlang."})
+            raise ValidationError({"group": tr("Guruhni tanlang.")})
         from .statistics import allowed_groups
 
         group = get_object_or_404(allowed_groups(request.user), pk=group_id)
@@ -574,7 +579,7 @@ class LabViewSet(viewsets.ModelViewSet):
         O'qituvchining nusxasiga faqat o'zi o'qitadigan guruhlar o'tadi.
         """
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         groups = lab.groups.all()
         if request.user.is_teacher:
@@ -607,15 +612,14 @@ class LabViewSet(viewsets.ModelViewSet):
         from .generate import supports_generation
 
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         if not supports_generation(lab):
             raise ValidationError(
-                {"detail": "AI yaratish faqat namunaviy yechimi bor oddiy SQL laboratoriyasi uchun (indeks, tranzaksiya "
-                 "va ER → SQL laboratoriyalaridan tashqari)."}
+                {"detail": tr("AI yaratish faqat namunaviy yechimi bor oddiy SQL laboratoriyasi uchun (indeks, tranzaksiya va ER → SQL laboratoriyalaridan tashqari).")}
             )
         if not is_configured():
-            raise ValidationError({"detail": "AI hali sozlanmagan."})
+            raise ValidationError({"detail": tr("AI hali sozlanmagan.")})
         return lab
 
     def run_generation(self, request, lab, generator, *args):
@@ -626,7 +630,7 @@ class LabViewSet(viewsets.ModelViewSet):
             return generator(lab, *args), None
         except GenerationError as exc:
             return None, Response(
-                {"detail": f"AI ikki urinishda ham tekshiruvdan o'tadigan natija bera olmadi: {exc}"},
+                {"detail": tr("AI ikki urinishda ham tekshiruvdan o'tadigan natija bera olmadi: {exc}", exc=exc)},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         except SandboxUnavailable:
@@ -634,7 +638,7 @@ class LabViewSet(viewsets.ModelViewSet):
             return None, sandbox_down_response()
         except LabSetupError as exc:
             return None, Response(
-                {"detail": f"Laboratoriya sozlamasida xato ({exc.field}): {exc}"}, status=status.HTTP_409_CONFLICT
+                {"detail": tr("Laboratoriya sozlamasida xato ({field}): {exc}", field=exc.field, exc=exc)}, status=status.HTTP_409_CONFLICT
             )
         except AIError as exc:
             return None, ai_error_response(exc, "so'rov")
@@ -656,7 +660,7 @@ class LabViewSet(viewsets.ModelViewSet):
         lab = self.generation_lab(request)
         domain = request.data.get("domain", "")
         if not isinstance(domain, str) or len(domain) > 100:
-            raise ValidationError({"domain": "Soha nomi 100 belgidan oshmasin."})
+            raise ValidationError({"domain": tr("Soha nomi 100 belgidan oshmasin.")})
         data, failure = self.run_generation(request, lab, generate_variant, domain)
         if failure:
             return failure
@@ -693,13 +697,13 @@ class LabViewSet(viewsets.ModelViewSet):
 
     def mistakes_report(self, request):
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         groups = lab.groups.all()
         group_id = request.query_params.get("group")
         if group_id:
             if not group_id.isdigit():
-                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+                raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
             groups = groups.filter(pk=group_id)
         student_ids = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups).values_list(
             "pk", flat=True
@@ -725,7 +729,7 @@ class LabViewSet(viewsets.ModelViewSet):
 
         lab, report = self.mistakes_report(request)
         if not report["wrong_attempts"]:
-            raise ValidationError({"detail": "Hali noto'g'ri urinishlar yo'q: xulosa qilinadigan narsa yo'q."})
+            raise ValidationError({"detail": tr("Hali noto'g'ri urinishlar yo'q: xulosa qilinadigan narsa yo'q.")})
         try:
             return Response({"summary": summarize_report(lab, report)})
         except AIError as exc:
@@ -735,7 +739,7 @@ class LabViewSet(viewsets.ModelViewSet):
     def progress(self, request, pk=None):
         """O'qituvchi uchun: laboratoriya berilgan guruhlardagi har bir talabaning holati."""
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         students = (
             User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=lab.groups.all())
@@ -789,7 +793,7 @@ class LabViewSet(viewsets.ModelViewSet):
         from .similarity import THRESHOLD, find_similar
 
         if request.user.is_student:
-            raise PermissionDenied("Bu amal faqat admin yoki o'qituvchi uchun.")
+            raise PermissionDenied(tr("Bu amal faqat admin yoki o'qituvchi uchun."))
         lab = self.get_object()
         students = {
             student.pk: student
@@ -843,25 +847,25 @@ class LabAttemptAdviceView(APIView):
         ensure_unlocked(request.user, attempt.lab)
         ensure_exam(request.user, attempt.lab, AI)
         if attempt.is_correct:
-            raise ValidationError({"detail": "Bu urinish to'g'ri: maslahat kerak emas."})
+            raise ValidationError({"detail": tr("Bu urinish to'g'ri: maslahat kerak emas.")})
         if not request.user.ai_allowed:
-            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
+            raise PermissionDenied(tr("Guruhingizda AI yordamchisi o'chirilgan."))
         # Darajalar joriy etilishidan oldingi urinishlarda bitta maslahat saqlangan
         hints = list(attempt.ai_hints) or ([attempt.ai_advice] if attempt.ai_advice else [])
         level = request.data.get("level", max(1, len(hints)))
         if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= MAX_HINT_LEVEL:
-            raise ValidationError({"level": f"Daraja 1 dan {MAX_HINT_LEVEL} gacha bo'lishi kerak."})
+            raise ValidationError({"level": tr("Daraja 1 dan {MAX_HINT_LEVEL} gacha bo'lishi kerak.", MAX_HINT_LEVEL=MAX_HINT_LEVEL)})
         if level <= len(hints):
             return Response(self.payload(hints))
         if level > len(hints) + 1:
-            raise ValidationError({"level": "Avval oldingi darajadagi maslahatni oling."})
+            raise ValidationError({"level": tr("Avval oldingi darajadagi maslahatni oling.")})
         if not is_configured():
             return Response(
-                {"detail": "AI maslahatchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+                {"detail": tr("AI maslahatchi hali sozlanmagan.")}, status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         if ai_advice_left(request.user) <= 0:
             return Response(
-                {"detail": "Bugungi AI maslahatlari limiti tugadi. Ertaga yana urinib ko'ring."},
+                {"detail": tr("Bugungi AI maslahatlari limiti tugadi. Ertaga yana urinib ko'ring.")},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -870,14 +874,14 @@ class LabAttemptAdviceView(APIView):
         except AITransientError as exc:
             record_ai_failure(request.user, attempt.lab, AIFailure.Kind.HINT, exc)
             return Response(
-                {"detail": "AI maslahatchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring."},
+                {"detail": tr("AI maslahatchi vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko'ring.")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except AIError as exc:
             record_ai_failure(request.user, attempt.lab, AIFailure.Kind.HINT, exc)
             logger.error("Laboratoriya maslahati xatosi: %s", exc)
             return Response(
-                {"detail": "AI bu kod bo'yicha maslahat bera olmadi."}, status=status.HTTP_502_BAD_GATEWAY
+                {"detail": tr("AI bu kod bo'yicha maslahat bera olmadi.")}, status=status.HTTP_502_BAD_GATEWAY
             )
 
         # Faqat muvaffaqiyatli maslahat kunlik limitdan yechiladi
@@ -910,12 +914,12 @@ class LabAttemptExplainView(APIView):
         ensure_unlocked(request.user, attempt.lab)
         ensure_exam(request.user, attempt.lab, AI)
         if not attempt.is_correct:
-            raise ValidationError({"detail": "Tushuntirish to'g'ri yechimdan keyin yoziladi."})
+            raise ValidationError({"detail": tr("Tushuntirish to'g'ri yechimdan keyin yoziladi.")})
         text = request.data.get("text")
         if not isinstance(text, str) or len(text.strip()) < self.MIN_LENGTH:
-            raise ValidationError({"text": f"Kamida {self.MIN_LENGTH} belgi yozing: yechim nima qiladi va nega shunday?"})
+            raise ValidationError({"text": tr("Kamida {MIN_LENGTH} belgi yozing: yechim nima qiladi va nega shunday?", MIN_LENGTH=self.MIN_LENGTH)})
         if len(text) > self.MAX_LENGTH:
-            raise ValidationError({"text": f"Tushuntirish {self.MAX_LENGTH} belgidan oshmasin."})
+            raise ValidationError({"text": tr("Tushuntirish {MAX_LENGTH} belgidan oshmasin.", MAX_LENGTH=self.MAX_LENGTH)})
         refused = refuse_ai(request.user)
         if refused:
             return refused
@@ -947,9 +951,9 @@ class LabChatView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
-            raise PermissionDenied("Murabbiy faqat talaba uchun.")
+            raise PermissionDenied(tr("Murabbiy faqat talaba uchun."))
         if not request.user.ai_allowed:
-            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan.")
+            raise PermissionDenied(tr("Guruhingizda AI yordamchisi o'chirilgan."))
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
         ensure_exam(request.user, self.lab, AI)
@@ -976,9 +980,9 @@ class LabChatView(APIView):
 
         content = request.data.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise ValidationError({"content": "Savol matni bo'sh bo'lmasligi kerak."})
+            raise ValidationError({"content": tr("Savol matni bo'sh bo'lmasligi kerak.")})
         if len(content) > 2000:
-            raise ValidationError({"content": "Savol 2000 belgidan oshmasligi kerak."})
+            raise ValidationError({"content": tr("Savol 2000 belgidan oshmasligi kerak.")})
         sql_code, diagram = "", None
         if self.lab.kind == Lab.Kind.ER and request.data.get("diagram") is not None:
             serializer = DiagramRunSerializer(data={"diagram": request.data["diagram"]})
@@ -1037,14 +1041,14 @@ class LabInterviewView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
-            raise PermissionDenied("Buyurtmachi bilan suhbat faqat talaba uchun.")
+            raise PermissionDenied(tr("Buyurtmachi bilan suhbat faqat talaba uchun."))
         if not request.user.ai_allowed:
-            raise PermissionDenied("Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shartida berilgan.")
+            raise PermissionDenied(tr("Guruhingizda AI yordamchisi o'chirilgan: talablar laboratoriya shartida berilgan."))
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
         ensure_exam(request.user, self.lab, WORK if request.method == "POST" else VIEW)
         if not self.lab.is_interview:
-            raise PermissionDenied("Bu laboratoriyada buyurtmachi bilan suhbat yo'q.")
+            raise PermissionDenied(tr("Bu laboratoriyada buyurtmachi bilan suhbat yo'q."))
 
     def own_messages(self):
         return InterviewMessage.objects.filter(lab=self.lab, student=self.request.user)
@@ -1076,15 +1080,15 @@ class LabInterviewView(APIView):
 
         content = request.data.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise ValidationError({"content": "Savol matni bo'sh bo'lmasligi kerak."})
+            raise ValidationError({"content": tr("Savol matni bo'sh bo'lmasligi kerak.")})
         if len(content) > 1000:
-            raise ValidationError({"content": "Savol 1000 belgidan oshmasligi kerak."})
+            raise ValidationError({"content": tr("Savol 1000 belgidan oshmasligi kerak.")})
         if not is_configured():
-            return Response({"detail": "AI yordamchi hali sozlanmagan."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response({"detail": tr("AI yordamchi hali sozlanmagan.")}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         asked = self.own_messages().filter(role=InterviewMessage.Role.USER).count()
         if asked >= settings.LAB_INTERVIEW_QUESTION_LIMIT:
             return Response(
-                {"detail": "Bu laboratoriyada savollar soni tugadi. Aniqlagan talablaringiz asosida diagrammani chizing."},
+                {"detail": tr("Bu laboratoriyada savollar soni tugadi. Aniqlagan talablaringiz asosida diagrammani chizing.")},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -1121,12 +1125,12 @@ class LabPeerReviewView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
-            raise PermissionDenied("O'zaro baholash faqat talaba uchun.")
+            raise PermissionDenied(tr("O'zaro baholash faqat talaba uchun."))
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
         ensure_exam(request.user, self.lab, AI)
         if self.lab.kind != Lab.Kind.ER:
-            raise PermissionDenied("O'zaro baholash faqat ER-diagramma laboratoriyalarida.")
+            raise PermissionDenied(tr("O'zaro baholash faqat ER-diagramma laboratoriyalarida."))
 
     def get(self, request, pk):
         from .peer_review import state
@@ -1138,7 +1142,7 @@ class LabPeerReviewView(APIView):
 
         attempt_id = request.data.get("attempt")
         if isinstance(attempt_id, bool) or not isinstance(attempt_id, int):
-            raise ValidationError({"attempt": "Ish raqami butun son bo'lishi kerak."})
+            raise ValidationError({"attempt": tr("Ish raqami butun son bo'lishi kerak.")})
         try:
             create(self.lab, request.user, attempt_id, request.data.get("scores"), request.data.get("comment"))
         except ReviewError as exc:
@@ -1156,7 +1160,7 @@ class PeerReviewHelpfulView(APIView):
     def post(self, request, pk):
         helpful = request.data.get("helpful")
         if not isinstance(helpful, bool):
-            raise ValidationError({"helpful": "true yoki false bo'lishi kerak."})
+            raise ValidationError({"helpful": tr("true yoki false bo'lishi kerak.")})
         # Faqat o'z ishiga berilgan baholash (boshqasiniki — 404, mavjudligi ham oshkor qilinmaydi)
         review = get_object_or_404(PeerReview, pk=pk, attempt__student=request.user)
         review.helpful = helpful
@@ -1178,7 +1182,7 @@ class AIQualityView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if request.user.is_student:
-            raise PermissionDenied("AI sifatini baholash faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("AI sifatini baholash faqat admin va o'qituvchi uchun."))
         from .statistics import allowed_groups
 
         self.groups = allowed_groups(request.user)
@@ -1203,16 +1207,16 @@ class AIQualityView(APIView):
         kind, level, rating = data.get("kind"), data.get("level"), data.get("rating")
         comment = data.get("comment", "")
         if rating not in AIOutputReview.Rating.values:
-            raise ValidationError({"rating": "Noma'lum baho."})
+            raise ValidationError({"rating": tr("Noma'lum baho.")})
         if not isinstance(comment, str) or len(comment) > 1000:
-            raise ValidationError({"comment": "Izoh 1000 belgidan oshmasin."})
+            raise ValidationError({"comment": tr("Izoh 1000 belgidan oshmasin.")})
         attempt_id = data.get("attempt")
         if isinstance(attempt_id, bool) or not isinstance(attempt_id, int) or isinstance(level, bool) or not isinstance(level, int):
-            raise ValidationError({"detail": "Urinish va daraja butun son bo'lishi kerak."})
+            raise ValidationError({"detail": tr("Urinish va daraja butun son bo'lishi kerak.")})
         # Faqat o'z guruhlari doirasidagi, haqiqatan mavjud AI matni baholanadi
         attempt = get_object_or_404(scope(self.groups), pk=attempt_id)
         if not any(item_kind == kind and item_level == level for _, item_kind, item_level, _ in outputs([attempt])):
-            raise ValidationError({"detail": "Bunday AI matni yo'q."})
+            raise ValidationError({"detail": tr("Bunday AI matni yo'q.")})
         AIOutputReview.objects.update_or_create(
             attempt=attempt, kind=kind, level=level, reviewer=request.user,
             defaults={"rating": rating, "comment": comment.strip()},
@@ -1230,10 +1234,10 @@ class RiskView(APIView):
         from .statistics import allowed_groups
 
         if request.user.is_student:
-            raise PermissionDenied("Erta ogohlantirish faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Erta ogohlantirish faqat admin va o'qituvchi uchun."))
         group_id = request.query_params.get("group", "")
         if not group_id.isdigit():
-            raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+            raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
         group = get_object_or_404(allowed_groups(request.user), pk=group_id)
         return Response(group_risk(group))
 
@@ -1247,12 +1251,12 @@ class StatisticsView(APIView):
         from .statistics import allowed_groups, build_statistics
 
         if request.user.is_student:
-            raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Statistika faqat admin va o'qituvchi uchun."))
         group = None
         group_id = request.query_params.get("group")
         if group_id:
             if not group_id.isdigit():
-                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+                raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
             group = get_object_or_404(allowed_groups(request.user), pk=group_id)
         return Response(build_statistics(request.user, group))
 
@@ -1270,15 +1274,15 @@ class ErProcessStatisticsView(APIView):
         from .statistics import research_groups
 
         if request.user.is_student:
-            raise PermissionDenied("Statistika faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Statistika faqat admin va o'qituvchi uchun."))
         groups = research_groups(request.user)
         group_id, lab_id = request.query_params.get("group"), request.query_params.get("lab")
         if group_id:
             if not group_id.isdigit():
-                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+                raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
             groups = [get_object_or_404(groups, pk=group_id)]
         if lab_id and not lab_id.isdigit():
-            raise ValidationError({"lab": "Laboratoriya raqami butun son bo'lishi kerak."})
+            raise ValidationError({"lab": tr("Laboratoriya raqami butun son bo'lishi kerak.")})
         return Response(build(request.user, groups, int(lab_id) if lab_id else None))
 
 
@@ -1295,12 +1299,12 @@ class LabAnalysisView(APIView):
         from .statistics import research_groups
 
         if request.user.is_student:
-            raise PermissionDenied("Tahlil faqat admin va o'qituvchi uchun.")
+            raise PermissionDenied(tr("Tahlil faqat admin va o'qituvchi uchun."))
         groups = research_groups(request.user)
         group_id = request.query_params.get("group")
         if group_id:
             if not group_id.isdigit():
-                raise ValidationError({"group": "Guruh raqami butun son bo'lishi kerak."})
+                raise ValidationError({"group": tr("Guruh raqami butun son bo'lishi kerak.")})
             groups = [get_object_or_404(groups, pk=group_id)]
         return Response(analyse(lab_queryset(request.user), groups))
 
@@ -1320,7 +1324,7 @@ class LabStudyAdviceView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user.is_student:
-            raise PermissionDenied("Tavsiya faqat talaba uchun.")
+            raise PermissionDenied(tr("Tavsiya faqat talaba uchun."))
         self.lab = get_object_or_404(visible_labs(request.user).select_related("module"), pk=kwargs["pk"])
         ensure_unlocked(request.user, self.lab)
         ensure_exam(request.user, self.lab, AI)
@@ -1339,7 +1343,7 @@ class LabStudyAdviceView(APIView):
             return Response(current)
         if current["wrong_attempts"] < current["min_wrong"]:
             raise ValidationError(
-                {"detail": f"Tavsiya kamida {current['min_wrong']} ta noto'g'ri urinishdan keyin beriladi: avval o'zingiz urinib ko'ring."}
+                {"detail": tr("Tavsiya kamida {min_wrong} ta noto'g'ri urinishdan keyin beriladi: avval o'zingiz urinib ko'ring.", min_wrong=current['min_wrong'])}
             )
         use_ai = ai_usable(request.user)
         if use_ai:
@@ -1365,7 +1369,7 @@ class LabModuleViewSet(viewsets.ModelViewSet):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if request.user.is_student:
-            raise PermissionDenied("Modullarni faqat admin va o'qituvchi boshqaradi.")
+            raise PermissionDenied(tr("Modullarni faqat admin va o'qituvchi boshqaradi."))
 
     def get_queryset(self):
         from .models import LabModule
@@ -1389,12 +1393,12 @@ class LabModuleViewSet(viewsets.ModelViewSet):
         module = self.get_object()
         ids = request.data.get("labs")
         if not isinstance(ids, list) or not all(isinstance(item, int) and not isinstance(item, bool) for item in ids):
-            raise ValidationError({"labs": "Laboratoriyalar id ro'yxati kerak."})
+            raise ValidationError({"labs": tr("Laboratoriyalar id ro'yxati kerak.")})
         if len(set(ids)) != len(ids):
-            raise ValidationError({"labs": "Laboratoriya takrorlangan."})
+            raise ValidationError({"labs": tr("Laboratoriya takrorlangan.")})
         labs = {lab.pk: lab for lab in visible_labs(request.user).filter(pk__in=ids)}
         if len(labs) != len(ids):
-            raise ValidationError({"labs": "Faqat o'zingizning laboratoriyalaringizni qo'shishingiz mumkin."})
+            raise ValidationError({"labs": tr("Faqat o'zingizning laboratoriyalaringizni qo'shishingiz mumkin.")})
         with transaction.atomic():
             Lab.objects.filter(module=module).exclude(pk__in=ids).update(module=None, position=0)
             for position, lab_id in enumerate(ids, start=1):

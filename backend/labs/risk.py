@@ -16,6 +16,7 @@ from users.models import User
 
 from . import mastery
 from .models import InterviewMessage, Lab, LabAttempt
+from config.i18n import N_, tr
 
 INACTIVE_DAYS = 7
 STUCK_ATTEMPTS = 8  # bitta laboratoriyada shuncha urinish va hali yechilmagan
@@ -30,7 +31,7 @@ MIN_HINT_ATTEMPTS = 6
 
 WEIGHTS = {"inactive": 2, "behind": 2, "stuck": 1, "low_mastery": 1, "low_test": 1, "hints": 1}
 LEVELS = [(3, "high"), (2, "medium"), (1, "low")]
-LEVEL_LABELS = {"high": "Yuqori", "medium": "O'rta", "low": "Past", "none": "Xavf yo'q"}
+LEVEL_LABELS = {"high": "Yuqori", "medium": "O'rta", "low": "Past", "none": N_("Xavf yo'q")}
 
 
 def level_of(score):
@@ -80,26 +81,26 @@ def group_risk(group, now=None):
         reasons = []
         last = last_activity.get(student.pk)
         if labs and last is None:
-            reasons.append(("inactive", "Hali hech qanday faollik yo'q (laboratoriya va test)."))
+            reasons.append(("inactive", tr("Hali hech qanday faollik yo'q (laboratoriya va test).")))
         elif last is not None and now - last >= timedelta(days=INACTIVE_DAYS):
-            reasons.append(("inactive", f"{(now - last).days} kundan beri faol emas."))
+            reasons.append(("inactive", tr("{days} kundan beri faol emas.", days=(now - last).days)))
         if group_median >= MIN_MEDIAN and len(solved[student.pk]) < BEHIND_RATIO * group_median:
-            reasons.append(("behind", f"{len(solved[student.pk])} ta laboratoriya yechgan (guruh medianasi {group_median:g})."))
+            reasons.append(("behind", tr("{value} ta laboratoriya yechgan (guruh medianasi {group_median}).", value=len(solved[student.pk]), group_median=format(group_median, "g"))))
         by_lab = defaultdict(list)
         for attempt in items:
             by_lab[attempt.lab_id].append(attempt)
         stuck = [lab_id for lab_id, lab_attempts in by_lab.items() if len(lab_attempts) >= STUCK_ATTEMPTS and lab_id not in solved[student.pk]]
         if stuck:
             names = ", ".join(f"«{titles[lab_id]}»" for lab_id in stuck[:2])
-            reasons.append(("stuck", f"{names} laboratoriyasida {STUCK_ATTEMPTS}+ urinish, hali yechilmagan."))
+            reasons.append(("stuck", tr("{names} laboratoriyasida {STUCK_ATTEMPTS}+ urinish, hali yechilmagan.", names=names, STUCK_ATTEMPTS=STUCK_ATTEMPTS)))
         topics = mastery.student_mastery(labs, items)
         weak = [mastery.TOPIC_LABELS[topic] for topic, state in topics.items() if state["observations"] >= MIN_OBSERVATIONS and state["mastery"] < LOW_MASTERY]
         if weak:
-            reasons.append(("low_mastery", f"Past o'zlashtirish: {', '.join(weak[:3])}."))
+            reasons.append(("low_mastery", tr("Past o'zlashtirish: {value}.", value=', '.join(weak[:3]))))
         if student.pk in latest_test and latest_test[student.pk] < LOW_TEST:
             reasons.append(("low_test", f"Oxirgi test natijasi {latest_test[student.pk]:g}%."))
         if len(items) >= MIN_HINT_ATTEMPTS and sum(1 for a in items if a.ai_hint_level >= HINT_LEVEL) >= HINT_SHARE * len(items):
-            reasons.append(("hints", "Urinishlarning yarmidan ko'pida chuqur AI maslahatiga tayangan."))
+            reasons.append(("hints", tr("Urinishlarning yarmidan ko'pida chuqur AI maslahatiga tayangan.")))
         score = sum(WEIGHTS[code] for code, _ in reasons)
         level = level_of(score)
         rows.append(
@@ -131,7 +132,7 @@ def digest_text(groups):
         high = [row for row in report["students"] if row["level"] == "high"]
         if high:
             lines = [f"• {row['name']}: {' '.join(reason['text'] for reason in row['reasons'][:2])}" for row in high[:10]]
-            parts.append(f"{group.name} — {len(high)} ta talaba:\n" + "\n".join(lines))
+            parts.append(tr("{name} — {high} ta talaba:\n", name=group.name, high=len(high)) + "\n".join(lines))
     if not parts:
         return None
-    return "Erta ogohlantirish: e'tibor kerak bo'lgan talabalar\n\n" + "\n\n".join(parts)
+    return tr("Erta ogohlantirish: e'tibor kerak bo'lgan talabalar\n\n") + "\n\n".join(parts)

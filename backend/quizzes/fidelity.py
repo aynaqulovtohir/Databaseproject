@@ -22,6 +22,7 @@ from labs.models import LabAttempt
 from labs.research import ai_events
 
 from .models import Quiz, QuizAttempt
+from config.i18n import tr
 
 # Yuqori bajarilish chegarasi (Borrelli, 2011: ≥ 80%)
 FIDELITY_TARGET = 0.8
@@ -131,41 +132,32 @@ def conclusions(result):
     lines = []
     if exp["students"]:
         lines.append(
-            f"Aralashuvning bajarilishi: tajriba guruhidagi {exp['students']} ta talabadan {exp['users']} tasi "
-            f"({round(100 * exp['uptake'])}%) kirish va chiqish testlari orasida platformadagi AI dan foydalangan "
-            f"(mediana {exp['dose']['median']:g} ta murojaat)."
+            tr("Aralashuvning bajarilishi: tajriba guruhidagi {students} ta talabadan {users} tasi ({value}%) kirish va chiqish testlari orasida platformadagi AI dan foydalangan (mediana {median} ta murojaat).", students=exp['students'], users=exp['users'], value=round(100 * exp['uptake']), median=format(exp['dose']['median'], "g"))
         )
         if exp["uptake"] < result["target"]:
             lines.append(
-                f"Diqqat: AI dan foydalanganlar {round(100 * result['target'])}% dan kam — \"AI yoqilgan\" guruh AI ni to'liq "
-                "ishlatmagan, shuning uchun asosiy tahlil AI imkoniyati effektini o'lchaydi, AI ning o'zi effektini kam ko'rsatishi mumkin."
+                tr("Diqqat: AI dan foydalanganlar {value}% dan kam — \"AI yoqilgan\" guruh AI ni to'liq ishlatmagan, shuning uchun asosiy tahlil AI imkoniyati effektini o'lchaydi, AI ning o'zi effektini kam ko'rsatishi mumkin.", value=round(100 * result['target']))
             )
     if ctrl["users"]:
         lines.append(
-            f"Shart buzilishi: nazorat guruhida {ctrl['users']} ta talaba kirish va chiqish testlari orasida platformadagi AI ga "
-            "murojaat qilgan. Guruh sozlamalari tajriba davomida o'zgarmaganini tekshiring."
+            tr("Shart buzilishi: nazorat guruhida {users} ta talaba kirish va chiqish testlari orasida platformadagi AI ga murojaat qilgan. Guruh sozlamalari tajriba davomida o'zgarmaganini tekshiring.", users=ctrl['users'])
         )
     changed = exp["changed_condition"] + ctrl["changed_condition"]
     if changed:
         lines.append(
-            f"Shart buzilishi: {changed} ta talabaning urinishlarida AI holati hozirgi guruh shartiga mos emas (AI sozlamasi "
-            "o'zgartirilgan yoki talaba boshqa guruhga o'tgan). Ular noto'g'ri guruhda hisoblangan bo'lishi mumkin."
+            tr("Shart buzilishi: {changed} ta talabaning urinishlarida AI holati hozirgi guruh shartiga mos emas (AI sozlamasi o'zgartirilgan yoki talaba boshqa guruhga o'tgan). Ular noto'g'ri guruhda hisoblangan bo'lishi mumkin.", changed=changed)
         )
     response = result["dose_response"]
     if response:
         interval = f", {_ci_text(response['ci'])}" if response["ci"] else ""
-        verdict = "ahamiyatli" if response["significant"] else "ahamiyatli emas"
+        verdict = "ahamiyatli" if response["significant"] else tr("ahamiyatli emas")
         lines.append(
-            f"Doza va natija: tajriba guruhida AI murojaatlari soni va kirish testini hisobga olgan chiqish natijasi orasida "
-            f"Spirmen ρ = {response['rho']}{interval}, {_p_text(response['p'])} — {verdict}. Bu kuzatuv natijasi, sabab emas: "
-            "talabalar yordamni o'zlari tanlaydi, qiynalganlar ko'proq so'raydi."
+            tr("Doza va natija: tajriba guruhida AI murojaatlari soni va kirish testini hisobga olgan chiqish natijasi orasida Spirmen ρ = {rho}{interval}, {p} — {verdict}. Bu kuzatuv natijasi, sabab emas: talabalar yordamni o'zlari tanlaydi, qiynalganlar ko'proq so'raydi.", rho=response['rho'], interval=interval, p=_p_text(response['p']), verdict=verdict)
         )
     protocol = result["per_protocol"]
     if protocol:
-        verdict = "ahamiyatli" if protocol["significant"] else "ahamiyatli emas"
+        verdict = "ahamiyatli" if protocol["significant"] else tr("ahamiyatli emas")
         lines.append(
-            f"Sezgirlik tahlili (per-protocol): shartga amal qilmagan {protocol['excluded']} ta talaba chiqarilganda ANCOVA "
-            f"F({protocol['df1']}, {protocol['df2']}) = {protocol['f']}, {_p_text(protocol['p'])} — {verdict}. Guruhlar tengligi "
-            "buziladi, asosiy xulosa o'rnini bosmaydi."
+            tr("Sezgirlik tahlili (per-protocol): shartga amal qilmagan {excluded} ta talaba chiqarilganda ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}. Guruhlar tengligi buziladi, asosiy xulosa o'rnini bosmaydi.", excluded=protocol['excluded'], df1=protocol['df1'], df2=protocol['df2'], f=protocol['f'], p=_p_text(protocol['p']), verdict=verdict)
         )
     return lines

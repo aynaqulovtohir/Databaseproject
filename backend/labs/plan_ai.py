@@ -15,6 +15,7 @@ from ai.client import AIPermanentError, create_message, extract_text
 
 from .checker import _plan_differences, forbidden_nodes
 from .sandbox import run_sql, split_statements
+from config.i18n import tr
 
 EXPLAIN_MAX_TOKENS = 4000
 SUGGEST_MAX_TOKENS = 4000
@@ -188,7 +189,7 @@ def suggest_index(lab, sql_code):
 
     statement = valid_index_sql(index_sql)
     if statement is None:
-        suggestion = {"ok": False, "error": "AI bitta CREATE INDEX buyrug'idan boshqa narsa yozdi: taklif rad etildi.",
+        suggestion = {"ok": False, "error": tr("AI bitta CREATE INDEX buyrug'idan boshqa narsa yozdi: taklif rad etildi."),
                       "plan": [], "cost": None, "remaining": []}
     else:
         # Faqat qum qutida, talaba kodi bilan bir xil cheklovlar ostida bajariladi

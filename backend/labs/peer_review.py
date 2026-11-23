@@ -19,20 +19,21 @@ from django.conf import settings
 
 from .er import compare
 from .models import Lab, LabAttempt, PeerReview
+from config.i18n import N_, tr
 
 REVIEWS_PER_LAB = 3
 MIN_COMMENT_LENGTH = 20
 MAX_COMMENT_LENGTH = 2000
 SCALE = (1, 2, 3, 4)
 CRITERIA = [
-    {"key": "entities", "name": "Obyektlar", "hint": "Kerakli obyektlar bor, ortiqchasi yo'q"},
-    {"key": "attributes", "name": "Atributlar va kalitlar", "hint": "Kerakli atributlar va har bir obyektda asosiy kalit"},
-    {"key": "relationships", "name": "Bog'lanishlar va kardinallik", "hint": "Bog'lanishlar to'g'ri, kardinallik (1 yoki N) mos"},
-    {"key": "clarity", "name": "Nomlash va tushunarlilik", "hint": "Nomlar aniq, diagrammani o'qish oson"},
+    {"key": "entities", "name": N_("Obyektlar"), "hint": N_("Kerakli obyektlar bor, ortiqchasi yo'q")},
+    {"key": "attributes", "name": N_("Atributlar va kalitlar"), "hint": N_("Kerakli atributlar va har bir obyektda asosiy kalit")},
+    {"key": "relationships", "name": N_("Bog'lanishlar va kardinallik"), "hint": N_("Bog'lanishlar to'g'ri, kardinallik (1 yoki N) mos")},
+    {"key": "clarity", "name": N_("Nomlash va tushunarlilik"), "hint": N_("Nomlar aniq, diagrammani o'qish oson")},
 ]
 # Tizim bahosi bilan solishtiriladigan mezonlar (nomlash va tushunarlilikni tizim o'lchamaydi)
 STRUCTURAL = ("entities", "attributes", "relationships")
-SCALE_LABELS = {1: "Ko'p xato", 2: "Sezilarli kamchilik", 3: "Kichik kamchilik", 4: "To'liq to'g'ri"}
+SCALE_LABELS = {1: N_("Ko'p xato"), 2: N_("Sezilarli kamchilik"), 3: N_("Kichik kamchilik"), 4: N_("To'liq to'g'ri")}
 
 
 class ReviewError(ValueError):
@@ -41,13 +42,13 @@ class ReviewError(ValueError):
 
 def validate(scores, comment):
     if not isinstance(scores, dict) or set(scores) != {item["key"] for item in CRITERIA}:
-        raise ReviewError("Har bir mezonga ball qo'ying.")
+        raise ReviewError(tr("Har bir mezonga ball qo'ying."))
     if any(isinstance(value, bool) or value not in SCALE for value in scores.values()):
-        raise ReviewError("Ball 1 dan 4 gacha bo'lishi kerak.")
+        raise ReviewError(tr("Ball 1 dan 4 gacha bo'lishi kerak."))
     if not isinstance(comment, str) or len(comment.strip()) < MIN_COMMENT_LENGTH:
-        raise ReviewError(f"Izoh kamida {MIN_COMMENT_LENGTH} belgi bo'lsin: nima yaxshi va nimani yaxshilash mumkinligini yozing.")
+        raise ReviewError(tr("Izoh kamida {MIN_COMMENT_LENGTH} belgi bo'lsin: nima yaxshi va nimani yaxshilash mumkinligini yozing.", MIN_COMMENT_LENGTH=MIN_COMMENT_LENGTH))
     if len(comment) > MAX_COMMENT_LENGTH:
-        raise ReviewError(f"Izoh {MAX_COMMENT_LENGTH} belgidan oshmasin.")
+        raise ReviewError(tr("Izoh {MAX_COMMENT_LENGTH} belgidan oshmasin.", MAX_COMMENT_LENGTH=MAX_COMMENT_LENGTH))
     return {key: int(value) for key, value in scores.items()}, comment.strip()
 
 
@@ -64,9 +65,9 @@ def accuracy(review):
 def eligible(lab, student):
     """(baholay oladimi, sabab)."""
     if lab.kind != Lab.Kind.ER:
-        return False, "O'zaro baholash faqat ER-diagramma laboratoriyalarida."
+        return False, tr("O'zaro baholash faqat ER-diagramma laboratoriyalarida.")
     if not LabAttempt.objects.filter(lab=lab, student=student, is_correct=True).exists():
-        return False, "Guruhdoshlaringiz ishini baholash uchun avval laboratoriyani o'zingiz to'g'ri yeching."
+        return False, tr("Guruhdoshlaringiz ishini baholash uchun avval laboratoriyani o'zingiz to'g'ri yeching.")
     return True, ""
 
 
@@ -102,10 +103,10 @@ def create(lab, reviewer, attempt_id, scores, comment):
     if not ok:
         raise ReviewError(reason)
     if PeerReview.objects.filter(reviewer=reviewer, attempt__lab=lab).count() >= REVIEWS_PER_LAB:
-        raise ReviewError("Bu laboratoriyada baholash uchun ishlar tugadi. Rahmat!")
+        raise ReviewError(tr("Bu laboratoriyada baholash uchun ishlar tugadi. Rahmat!"))
     expected = next_attempt(lab, reviewer)
     if expected is None or expected.pk != attempt_id:
-        raise ReviewError("Bu ish sizga baholash uchun berilmagan. Sahifani yangilang.")
+        raise ReviewError(tr("Bu ish sizga baholash uchun berilmagan. Sahifani yangilang."))
     scores, comment = validate(scores, comment)
     return PeerReview.objects.create(
         attempt=expected,
@@ -126,9 +127,9 @@ def state(lab, student):
         if attempt is not None:
             current = {"attempt_id": attempt.pk, "diagram": attempt.diagram}
         else:
-            reason = "Hozircha baholash uchun guruhdoshlaringizning topshirilgan ishlari yo'q."
+            reason = tr("Hozircha baholash uchun guruhdoshlaringizning topshirilgan ishlari yo'q.")
     elif ok:
-        reason = "Bu laboratoriyada barcha baholashlarni bajardingiz. Rahmat!"
+        reason = tr("Bu laboratoriyada barcha baholashlarni bajardingiz. Rahmat!")
     received = PeerReview.objects.filter(attempt__lab=lab, attempt__student=student).order_by("-id")
     return {
         "criteria": CRITERIA,

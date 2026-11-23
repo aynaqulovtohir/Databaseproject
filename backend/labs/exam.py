@@ -10,6 +10,7 @@ Admin va o'qituvchi uchun cheklov yo'q.
 """
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
+from config.i18n import tr
 
 UPCOMING, ACTIVE, FINISHED = "upcoming", "active", "finished"
 # Murojaat turlari: ko'rish, ishlash (tekshirish, topshirish), AI yordami
@@ -52,8 +53,8 @@ def ensure_exam(user, lab, kind=VIEW):
         return
     state = lab_exam_state(lab)
     if state == UPCOMING:
-        raise PermissionDenied(f"Imtihon {_local(lab.module.exam_starts_at)} da boshlanadi.")
+        raise PermissionDenied(tr("Imtihon {exam_starts_at} da boshlanadi.", exam_starts_at=_local(lab.module.exam_starts_at)))
     if state == ACTIVE and kind == AI:
-        raise PermissionDenied("Imtihon davomida AI yordami va o'zaro baholash o'chirilgan.")
+        raise PermissionDenied(tr("Imtihon davomida AI yordami va o'zaro baholash o'chirilgan."))
     if state == FINISHED and kind == WORK:
-        raise PermissionDenied(f"Imtihon {_local(lab.module.exam_ends_at)} da tugagan: yechimni endi yuborib bo'lmaydi.")
+        raise PermissionDenied(tr("Imtihon {exam_ends_at} da tugagan: yechimni endi yuborib bo'lmaydi.", exam_ends_at=_local(lab.module.exam_ends_at)))

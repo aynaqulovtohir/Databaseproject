@@ -11,6 +11,7 @@ Talabaga farqlar aytiladi, lekin to'g'ri javob (kalitlar, jadvallar) oshkor qili
 """
 import re
 from itertools import combinations
+from config.i18n import tr
 
 MAX_ATTRIBUTES = 10
 MAX_FDS = 30
@@ -31,11 +32,11 @@ def _names(text, known=None, what="atribut"):
     names = [part.strip().lower() for part in str(text).split(",") if part.strip()]
     for name in names:
         if not NAME.match(name):
-            raise NormError(f"«{name}» — noto'g'ri {what} nomi (lotin harflari, raqam va _).")
+            raise NormError(tr("«{name}» — noto'g'ri {what} nomi (lotin harflari, raqam va _).", name=name, what=what))
         if known is not None and name not in known:
-            raise NormError(f"«{name}» atributi munosabatda yo'q.")
+            raise NormError(tr("«{name}» atributi munosabatda yo'q.", name=name))
     if len(set(names)) != len(names):
-        raise NormError(f"{what.capitalize()}lar takrorlangan: {', '.join(names)}.")
+        raise NormError(tr("{capitalize}lar takrorlangan: {names}.", capitalize=what.capitalize(), names=', '.join(names)))
     return names
 
 
@@ -43,27 +44,27 @@ def parse_task(attributes_text, fds_text, target):
     """O'qituvchi kiritgan matnni tekshiradi. Qaytaradi: {"attributes", "fds": [{"lhs", "rhs"}], "target"}."""
     attributes = _names(attributes_text)
     if not 2 <= len(attributes) <= MAX_ATTRIBUTES:
-        raise NormError(f"Atributlar soni 2 dan {MAX_ATTRIBUTES} gacha bo'lsin.")
+        raise NormError(tr("Atributlar soni 2 dan {MAX_ATTRIBUTES} gacha bo'lsin.", MAX_ATTRIBUTES=MAX_ATTRIBUTES))
     fds = []
     for line in str(fds_text).splitlines():
         if not line.strip():
             continue
         if "->" not in line:
-            raise NormError(f"«{line.strip()}» qatorida -> yo'q. Format: a, b -> c")
+            raise NormError(tr("«{strip}» qatorida -> yo'q. Format: a, b -> c", strip=line.strip()))
         left, right = line.split("->", 1)
         lhs, rhs = _names(left, attributes), _names(right, attributes)
         if not lhs or not rhs:
-            raise NormError(f"«{line.strip()}» qatorining ikki tomoni ham to'ldirilsin.")
+            raise NormError(tr("«{strip}» qatorining ikki tomoni ham to'ldirilsin.", strip=line.strip()))
         fds.append({"lhs": sorted(lhs), "rhs": sorted(rhs)})
     if not 1 <= len(fds) <= MAX_FDS:
-        raise NormError(f"Funksional bog'liqliklar soni 1 dan {MAX_FDS} gacha bo'lsin.")
+        raise NormError(tr("Funksional bog'liqliklar soni 1 dan {MAX_FDS} gacha bo'lsin.", MAX_FDS=MAX_FDS))
     if target not in TARGETS:
-        raise NormError("Maqsad normal forma 3NF yoki BCNF bo'lsin.")
+        raise NormError(tr("Maqsad normal forma 3NF yoki BCNF bo'lsin."))
     return {"attributes": attributes, "fds": fds, "target": target}
 
 
 def task_text(task):
-    lines = [f"R({', '.join(task['attributes'])})", "Funksional bog'liqliklar:"]
+    lines = [f"R({', '.join(task['attributes'])})", tr("Funksional bog'liqliklar:")]
     lines += [f"  {', '.join(fd['lhs'])} -> {', '.join(fd['rhs'])}" for fd in task["fds"]]
     lines.append(f"Maqsad: {task['target']}")
     return "\n".join(lines)
@@ -72,12 +73,12 @@ def task_text(task):
 def parse_answer(data, task):
     """Talaba javobi: {"keys": [[...]], "normal_form": "2NF", "decomposition": [[...]]} (ro'yxatlar yoki "a, b")."""
     if not isinstance(data, dict):
-        raise NormError("Javob noto'g'ri formatda.")
+        raise NormError(tr("Javob noto'g'ri formatda."))
     known = set(task["attributes"])
 
     def name_sets(items, what):
         if not isinstance(items, list) or len(items) > MAX_RELATIONS:
-            raise NormError(f"{what}: ro'yxat {MAX_RELATIONS} tadan oshmasin.")
+            raise NormError(tr("{what}: ro'yxat {MAX_RELATIONS} tadan oshmasin.", what=what, MAX_RELATIONS=MAX_RELATIONS))
         result = []
         for item in items:
             text = ", ".join(map(str, item)) if isinstance(item, list) else str(item)
@@ -94,17 +95,17 @@ def parse_answer(data, task):
     decomposition = name_sets(data.get("decomposition", []), "Jadvallar")
     normal_form = data.get("normal_form")
     if normal_form not in NORMAL_FORMS:
-        raise NormError("Hozirgi normal formani tanlang.")
+        raise NormError(tr("Hozirgi normal formani tanlang."))
     if not keys:
-        raise NormError("Kamida bitta nomzod kalitni yozing.")
+        raise NormError(tr("Kamida bitta nomzod kalitni yozing."))
     if not decomposition:
-        raise NormError("Dekompozitsiyani (yangi jadvallarni) yozing.")
+        raise NormError(tr("Dekompozitsiyani (yangi jadvallarni) yozing."))
     return {"keys": keys, "normal_form": normal_form, "decomposition": decomposition}
 
 
 def answer_text(answer):
     """Javobning o'qiladigan ko'rinishi (o'qituvchi sahifasi, o'xshashlik va eksport uchun)."""
-    lines = ["Nomzod kalitlar: " + "; ".join("{" + ", ".join(key) + "}" for key in answer["keys"])]
+    lines = [tr("Nomzod kalitlar: ") + "; ".join("{" + ", ".join(key) + "}" for key in answer["keys"])]
     lines.append(f"Hozirgi normal forma: {answer['normal_form']}")
     lines.append("Dekompozitsiya:")
     lines += [f"  R{index}({', '.join(relation)})" for index, relation in enumerate(answer["decomposition"], start=1)]
@@ -256,16 +257,15 @@ def check(task, answer):
     given = [frozenset(key) for key in answer["keys"]]
     for key in given:
         if closure(key, fds) < attributes:
-            differences.append(f"{_set_text(key)} — kalit emas: uning yopilmasi barcha atributlarni qamrab olmaydi.")
+            differences.append(tr("{key} — kalit emas: uning yopilmasi barcha atributlarni qamrab olmaydi.", key=_set_text(key)))
             parts["keys"] = False
         elif key not in keys:
-            differences.append(f"{_set_text(key)} — superkalit, lekin minimal emas: undan atribut olib tashlash mumkin.")
+            differences.append(tr("{key} — superkalit, lekin minimal emas: undan atribut olib tashlash mumkin.", key=_set_text(key)))
             parts["keys"] = False
     missing = [key for key in keys if key not in given]
     if missing:
         differences.append(
-            f"Barcha nomzod kalitlar topilmadi: yana {len(missing)} ta kalit bor. Har bir atribut to'plamining "
-            "yopilmasini hisoblab ko'ring."
+            tr("Barcha nomzod kalitlar topilmadi: yana {missing} ta kalit bor. Har bir atribut to'plamining yopilmasini hisoblab ko'ring.", missing=len(missing))
         )
         parts["keys"] = False
 
@@ -274,8 +274,7 @@ def check(task, answer):
     if answer["normal_form"] != actual:
         direction = "yuqori" if NORMAL_FORMS.index(answer["normal_form"]) > NORMAL_FORMS.index(actual) else "past"
         differences.append(
-            f"Hozirgi normal forma noto'g'ri: siz ko'rsatgan {answer['normal_form']} haqiqiysidan {direction}. "
-            "Qisman (kalit qismiga) va tranzitiv bog'liqliklarni tekshiring."
+            tr("Hozirgi normal forma noto'g'ri: siz ko'rsatgan {normal_form} haqiqiysidan {direction}. Qisman (kalit qismiga) va tranzitiv bog'liqliklarni tekshiring.", normal_form=answer['normal_form'], direction=direction)
         )
         parts["normal_form"] = False
 
@@ -283,7 +282,7 @@ def check(task, answer):
     relations = [frozenset(relation) for relation in answer["decomposition"]]
     covered = frozenset().union(*relations)
     if covered != attributes:
-        differences.append(f"Dekompozitsiya barcha atributlarni qamramaydi: {_set_text(attributes - covered)} yo'q.")
+        differences.append(tr("Dekompozitsiya barcha atributlarni qamramaydi: {value} yo'q.", value=_set_text(attributes - covered)))
         parts["decomposition"] = False
     for index, relation in enumerate(dict.fromkeys(relations), start=1):
         # Jadval asl FB lar bilan tekshiriladi (X+ ∩ R_i): proyeksiya ro'yxatini (2^n tagacha FB) qurib, unda qayta
@@ -294,23 +293,21 @@ def check(task, answer):
                 None,
             )
             reason = (
-                f": {_set_text(violation[0])} -> {_set_text(violation[1])} bog'liqligida chap tomon bu jadvalda kalit emas"
+                tr(": {value} -> {value2} bog'liqligida chap tomon bu jadvalda kalit emas", value=_set_text(violation[0]), value2=_set_text(violation[1]))
                 if violation
                 else ""
             )
-            differences.append(f"R{index}{_set_text(relation)} {task['target']} da emas{reason}.")
+            differences.append(tr("R{index}{relation} {target} da emas{reason}.", index=index, relation=_set_text(relation), target=task['target'], reason=reason))
             parts["decomposition"] = False
     if covered == attributes and not lossless(attributes, fds, relations):
         differences.append(
-            "Dekompozitsiya yo'qotishli: jadvallarni qayta birlashtirganda ortiqcha (soxta) qatorlar paydo bo'ladi. "
-            "Jadvallar umumiy atributlar orqali kalit bilan bog'lanishi kerak."
+            tr("Dekompozitsiya yo'qotishli: jadvallarni qayta birlashtirganda ortiqcha (soxta) qatorlar paydo bo'ladi. Jadvallar umumiy atributlar orqali kalit bilan bog'lanishi kerak.")
         )
         parts["decomposition"] = False
     if task["target"] == "3NF":
         for lhs, rhs in preserves(fds, relations):
             differences.append(
-                f"{_set_text(lhs)} -> {_set_text(rhs)} bog'liqligi saqlanmadi: uni tekshirish uchun jadvallarni "
-                "birlashtirish kerak bo'ladi (3NF dekompozitsiyasi bog'liqliklarni saqlashi shart)."
+                tr("{lhs} -> {rhs} bog'liqligi saqlanmadi: uni tekshirish uchun jadvallarni birlashtirish kerak bo'ladi (3NF dekompozitsiyasi bog'liqliklarni saqlashi shart).", lhs=_set_text(lhs), rhs=_set_text(rhs))
             )
             parts["decomposition"] = False
 

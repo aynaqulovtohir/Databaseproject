@@ -15,6 +15,7 @@ p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes
 Natijalar scipy.stats bilan solishtirib tekshirilgan (tests.py dagi namunaviy qiymatlar).
 """
 import math
+from config.i18n import tr
 
 ALPHA = 0.05
 MIN_EXPECTED = 5  # χ² ishonchli bo'lishi uchun har bir katakdagi kutilgan son (Kochran qoidasi)
@@ -392,7 +393,7 @@ _ACKLAM_D = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00,
 def normal_ppf(p):
     """Standart normal taqsimot kvantili (Acklam yaqinlashishi + bitta Galley aniqlashtirishi)."""
     if not 0 < p < 1:
-        raise ValueError("p 0 va 1 orasida bo'lishi kerak")
+        raise ValueError(tr("p 0 va 1 orasida bo'lishi kerak"))
     a, b, c, d = _ACKLAM_A, _ACKLAM_B, _ACKLAM_C, _ACKLAM_D
     low = 0.02425
     if p < low:
@@ -571,16 +572,16 @@ def ancova_with_reason(groups):
     (o'zbekcha matn), aks holda sabab None. Tahlil bo'sh natijani jim qaytarmasligi uchun."""
     names = list(groups)
     if len(names) != 2:
-        return None, f"ANCOVA uchun 2 ta guruh kerak, {len(names)} ta berildi."
+        return None, tr("ANCOVA uchun 2 ta guruh kerak, {names} ta berildi.", names=len(names))
     small = [name for name in names if len(groups[name]) < 2]
     if small:
-        return None, "Guruhlardan birida kirish va chiqish natijasi bor talabalar 2 tadan kam."
+        return None, tr("Guruhlardan birida kirish va chiqish natijasi bor talabalar 2 tadan kam.")
     pre = [x for name in names for x, _ in groups[name]]
     post = [y for name in names for _, y in groups[name]]
     group = [1.0 if index < len(groups[names[0]]) else 0.0 for index in range(len(pre))]
     n = len(pre)
     if n < ANCOVA_MIN_N:
-        return None, f"Kuzatuvlar soni {n} ta: ANCOVA uchun kamida {ANCOVA_MIN_N} ta kerak."
+        return None, tr("Kuzatuvlar soni {n} ta: ANCOVA uchun kamida {ANCOVA_MIN_N} ta kerak.", n=n, ANCOVA_MIN_N=ANCOVA_MIN_N)
     ones = [1.0] * n
     sse_full, beta = _ols_sse([ones, group, pre], post)
     sse_reduced, _ = _ols_sse([ones, pre], post)
@@ -589,13 +590,11 @@ def ancova_with_reason(groups):
     sse_group_on_pre, _ = _ols_sse([ones, pre], group)
     if sse_full is None or sse_reduced is None:
         return None, (
-            "Regressiya modelini qurib bo'lmadi: kirish testi natijalari hammada bir xil yoki guruh bilan to'liq "
-            "bog'liq (masalan, bir guruhda hamma 0, ikkinchisida hamma 100)."
+            tr("Regressiya modelini qurib bo'lmadi: kirish testi natijalari hammada bir xil yoki guruh bilan to'liq bog'liq (masalan, bir guruhda hamma 0, ikkinchisida hamma 100).")
         )
     if sse_full <= SSE_EPSILON * max(1.0, sum((y - _mean(post)) ** 2 for y in post)):
         return None, (
-            "Model ma'lumotga aniq mos keldi (qoldiqlar yig'indisi 0): xatolik dispersiyasi nol bo'lgani uchun F va p "
-            "aniqlanmaydi. Bu odatda sun'iy yoki juda kam xilma-xil ballarda bo'ladi."
+            tr("Model ma'lumotga aniq mos keldi (qoldiqlar yig'indisi 0): xatolik dispersiyasi nol bo'lgani uchun F va p aniqlanmaydi. Bu odatda sun'iy yoki juda kam xilma-xil ballarda bo'ladi.")
         )
     df_error = n - 3
     ss_group = max(0.0, sse_reduced - sse_full)

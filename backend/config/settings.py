@@ -45,6 +45,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Accept-Language bo'yicha so'rov tili (uz/en/ru): config/i18n.py dagi tr() shunga qaraydi.
+    # ResetLanguageMiddleware javobdan keyin tilni standart holatga qaytaradi (oqimda qolib ketmasin).
+    "config.middleware.ResetLanguageMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -94,6 +98,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "uz"
+# Interfeys tillari. Django o'zi "uz" ni qo'llab-quvvatlaydi; en va ru — standart.
+LANGUAGES = [("uz", "O'zbekcha"), ("en", "English"), ("ru", "Русский")]
 TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
 USE_TZ = True
@@ -109,6 +115,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # API'ga faqat JWT token bilan kirgan foydalanuvchilar murojaat qila oladi
 REST_FRAMEWORK = {
+    # Javobdagi o'zbekcha xabarlar so'rov tiliga o'giriladi (config/i18n.py)
+    "DEFAULT_RENDERER_CLASSES": ["config.renderers.LocalizedJSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],

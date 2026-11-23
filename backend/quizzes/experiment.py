@@ -66,14 +66,15 @@ from . import forms as parallel_forms
 from .models import Question, Quiz, QuizAttempt
 from .services import finalize_if_expired, likert_value, percent
 from .survey_bank import EXTERNAL_AI_TEXTS
+from config.i18n import N_, tr
 
-COHORTS = {"experimental": "Tajriba (AI yoqilgan)", "control": "Nazorat"}
+COHORTS = {"experimental": N_("Tajriba (AI yoqilgan)"), "control": "Nazorat"}
 MIN_GROUP = 3
 MEDIUM_EFFECT = 0.5
 TARGET_POWER = 0.8
 # Asosiy (oldindan belgilangan) natija ko'rsatkichi: tajriba boshlanishidan oldin qayd etiladi va o'zgartirilmaydi
 PRIMARY_OUTCOME = "ancova"
-PRIMARY_LABEL = "Chiqish testi, kirish testini hisobga olgan holda (ANCOVA: chiqish ~ guruh + kirish)"
+PRIMARY_LABEL = N_("Chiqish testi, kirish testini hisobga olgan holda (ANCOVA: chiqish ~ guruh + kirish)")
 SECONDARY = ("post", "gain", "delayed")
 # Tashqi AI dan "ko'p foydalangan": shu savollar o'rtachasi (1-5) shu qiymatdan kichik emas
 HEAVY_EXTERNAL = 4
@@ -85,9 +86,9 @@ ATTRITION_LOW, ATTRITION_HIGH = 0.05, 0.20
 TEST_LABELS = {
     "student": "Styudent t-testi",
     "welch": "Uelch t-testi",
-    "mann_whitney": "Mann–Uitni U testi",
-    "paired_t": "Juftlangan t-testi",
-    "wilcoxon": "Uilkokson ishorali ranglar testi",
+    "mann_whitney": N_("Mann–Uitni U testi"),
+    "paired_t": N_("Juftlangan t-testi"),
+    "wilcoxon": N_("Uilkokson ishorali ranglar testi"),
 }
 
 
@@ -102,7 +103,7 @@ def _effect_label(kind, value):
     value = abs(value)
     bounds = {"d": (0.2, 0.5, 0.8), "r": (0.1, 0.3, 0.5), "eta2": (0.01, 0.06, 0.14)}[kind]
     if value < bounds[0]:
-        return "juda kichik"
+        return tr("juda kichik")
     if value < bounds[1]:
         return "kichik"
     if value < bounds[2]:
@@ -137,7 +138,7 @@ def _estimate(test, a, b):
     result = mean_difference_ci(a, b, equal_var=test == "student")
     if result is None:
         return None
-    return {"name": "O'rtachalar farqi", "value": _r(result["diff"]), "ci": _ci(result["ci"], 3), "approximate": False}
+    return {"name": tr("O'rtachalar farqi"), "value": _r(result["diff"]), "ci": _ci(result["ci"], 3), "approximate": False}
 
 
 def compare_independent(a, b):
@@ -152,13 +153,13 @@ def compare_independent(a, b):
     d = welch["cohens_d"] if welch else None
     if normal and equal_var:
         test, result = "student", student_t_test(a, b)
-        reason = "Ikkala guruhda taqsimot normal va dispersiyalar teng."
+        reason = tr("Ikkala guruhda taqsimot normal va dispersiyalar teng.")
     elif normal:
         test, result = "welch", welch
-        reason = "Taqsimot normal, lekin dispersiyalar teng emas (Levene p < 0.05)."
+        reason = tr("Taqsimot normal, lekin dispersiyalar teng emas (Levene p < 0.05).")
     else:
         test, result = "mann_whitney", mann_whitney(a, b)
-        reason = "Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon."
+        reason = tr("Kamida bitta guruhda taqsimot normal emas (Shapiro–Uilk p < 0.05) yoki tekshirib bo'lmadi: parametrsiz mezon.")
     if result is None:
         return None
     if test == "mann_whitney":
@@ -199,7 +200,7 @@ def compare_paired(before, after):
         return {
             "test": "paired_t",
             "label": TEST_LABELS["paired_t"],
-            "reason": "Farqlar taqsimoti normal.",
+            "reason": tr("Farqlar taqsimoti normal."),
             "statistic": {"name": "t", "value": _r(result["t"]), "df": result["df"]},
             "p": _r(result["p"], 4),
             "significant": result["p"] < ALPHA,
@@ -212,7 +213,7 @@ def compare_paired(before, after):
     return {
         "test": "wilcoxon",
         "label": TEST_LABELS["wilcoxon"],
-        "reason": "Farqlar taqsimoti normal emas yoki tekshirib bo'lmadi: parametrsiz mezon.",
+        "reason": tr("Farqlar taqsimoti normal emas yoki tekshirib bo'lmadi: parametrsiz mezon."),
         "statistic": {"name": "z", "value": _r(result["z"])},
         "p": _r(result["p"], 4),
         "significant": result["p"] < ALPHA,
@@ -328,15 +329,13 @@ def external_conclusions(result):
     lines = []
     if control.get("n"):
         lines.append(
-            f"Tashqi AI vositalari: nazorat guruhida {control['heavy']} ta talaba (ulushi {control['heavy_share']}) ulardan ko'p "
-            f"foydalanganini bildirgan (o'rtacha ≥ {result['threshold']}) — bu AI effektini kamaytirib ko'rsatishi mumkin."
+            tr("Tashqi AI vositalari: nazorat guruhida {heavy} ta talaba (ulushi {heavy_share}) ulardan ko'p foydalanganini bildirgan (o'rtacha ≥ {threshold}) — bu AI effektini kamaytirib ko'rsatishi mumkin.", heavy=control['heavy'], heavy_share=control['heavy_share'], threshold=result['threshold'])
         )
     sensitivity = result["sensitivity"]
     if sensitivity:
-        verdict = "ahamiyatli" if sensitivity["significant"] else "ahamiyatli emas"
+        verdict = "ahamiyatli" if sensitivity["significant"] else tr("ahamiyatli emas")
         lines.append(
-            f"Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {sensitivity['excluded']} ta talaba chiqarilganda ANCOVA "
-            f"F({sensitivity['df1']}, {sensitivity['df2']}) = {sensitivity['f']}, {_p_text(sensitivity['p'])} — {verdict}."
+            tr("Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {excluded} ta talaba chiqarilganda ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.", excluded=sensitivity['excluded'], df1=sensitivity['df1'], df2=sensitivity['df2'], f=sensitivity['f'], p=_p_text(sensitivity['p']), verdict=verdict)
         )
     return lines
 
@@ -372,12 +371,12 @@ def attrition_stage(started, kept_key, score_key):
     if lost_total and all(sum(row) for row in table):
         chi = chi_square(table)
         if chi and chi["reliable"]:
-            result["test"] = {"name": "chi2", "label": "Pirson χ²", "chi2": _r(chi["chi2"]), "df": chi["df"], "p": _r(chi["p"], 4)}
+            result["test"] = {"name": "chi2", "label": tr("Pirson χ²"), "chi2": _r(chi["chi2"]), "df": chi["df"], "p": _r(chi["p"], 4)}
         else:
             # Kutilgan sonlar kichik (yoki bitta guruhda hech kim tashlab ketmagan) — Fisherning aniq testi
             fisher = fisher_exact(table)
             if fisher:
-                result["test"] = {"name": "fisher", "label": "Fisherning aniq testi", "p": _r(fisher["p"], 4)}
+                result["test"] = {"name": "fisher", "label": tr("Fisherning aniq testi"), "p": _r(fisher["p"], 4)}
         if result["test"]:
             result["test"]["significant"] = result["test"]["p"] < ALPHA
     # Tashlab ketganlar boshida qolganlardan farq qilganmi (farq qilsa, qolganlar tanlanmasi siljigan)
@@ -403,28 +402,24 @@ def _attrition_lines(stage, title, score_label):
         return []
     exp, ctrl = stage["cohorts"]["experimental"], stage["cohorts"]["control"]
     lines = [
-        f"{title}: tajriba guruhida {exp['lost']} ta talaba ({_share(exp['rate'])}), nazorat guruhida {ctrl['lost']} ta "
-        f"({_share(ctrl['rate'])}) tashlab ketgan; umumiy {_share(stage['overall'])} — siljish xavfi {stage['level']}."
+        tr("{title}: tajriba guruhida {lost} ta talaba ({rate}), nazorat guruhida {lost2} ta ({rate2}) tashlab ketgan; umumiy {overall} — siljish xavfi {level}.", title=title, lost=exp['lost'], rate=_share(exp['rate']), lost2=ctrl['lost'], rate2=_share(ctrl['rate']), overall=_share(stage['overall']), level=stage['level'])
     ]
     test = stage["test"]
     if test and test["significant"]:
         lines.append(
-            f"Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({test['label']}, {_p_text(test['p'])}) — "
-            "differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p "
-            "imputatsiya yoki chegaraviy baholar) bilan tekshiring."
+            tr("Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p imputatsiya yoki chegaraviy baholar) bilan tekshiring.", label=test['label'], p=_p_text(test['p']))
         )
     baseline = stage["baseline"]
     if baseline and baseline["significant"]:
         lines.append(
-            f"Tashlab ketganlar {score_label} qolganlardan farq qilgan ({baseline['label']}, {_p_text(baseline['p'])}): "
-            "natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling."
+            tr("Tashlab ketganlar {score_label} qolganlardan farq qilgan ({label}, {p}): natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling.", score_label=score_label, label=baseline['label'], p=_p_text(baseline['p']))
         )
     return lines
 
 
 def attrition_conclusions(result):
-    return _attrition_lines(result["post"], "Tashlab ketish (kirish → chiqish)", "kirish testida") + _attrition_lines(
-        result["delayed"], "Kechiktirilgan testgacha tashlab ketish", "chiqish testida"
+    return _attrition_lines(result["post"], "Tashlab ketish (kirish → chiqish)", tr("kirish testida")) + _attrition_lines(
+        result["delayed"], tr("Kechiktirilgan testgacha tashlab ketish"), tr("chiqish testida")
     )
 
 
@@ -603,85 +598,71 @@ def _secondary_text(test):
     """Ikkilamchi natija: xom p va Xolm bo'yicha tuzatilgan p."""
     if "p_holm" not in test:
         return _p_text(test["p"])
-    return f"{_p_text(test['p'])}, Xolm bo'yicha p = {test['p_holm']:.3f}"
+    return tr("{p}, Xolm bo'yicha p = {p_holm}", p=_p_text(test['p']), p_holm=format(test['p_holm'], ".3f"))
 
 
 def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, clustering=None, ancova_reason=None):
     """Dissertatsiya matniga mos qisqa xulosalar (o'zbekcha). Avval asosiy gipoteza, keyin ikkilamchi natijalar."""
     lines = []
     if min(n1, n2) < MIN_GROUP:
-        return ["Har bir guruhda kamida 3 ta talaba kirish va chiqish testini topshirgan bo'lishi kerak."]
+        return [tr("Har bir guruhda kamida 3 ta talaba kirish va chiqish testini topshirgan bo'lishi kerak.")]
     if baseline:
         if baseline["significant"]:
             lines.append(
-                f"Diqqat: tajriba boshida guruhlar kirish testi bo'yicha farq qilgan ({baseline['label']}, {_p_text(baseline['p'])}). "
-                "Asosiy xulosa uchun ANCOVA natijasiga tayaning."
+                tr("Diqqat: tajriba boshida guruhlar kirish testi bo'yicha farq qilgan ({label}, {p}). Asosiy xulosa uchun ANCOVA natijasiga tayaning.", label=baseline['label'], p=_p_text(baseline['p']))
             )
         else:
-            lines.append(f"Tajriba boshida guruhlar kirish testi bo'yicha teng bo'lgan ({baseline['label']}, {_p_text(baseline['p'])}).")
+            lines.append(tr("Tajriba boshida guruhlar kirish testi bo'yicha teng bo'lgan ({label}, {p}).", label=baseline['label'], p=_p_text(baseline['p'])))
     if ancova_result:
-        verdict = "ahamiyatli" if ancova_result["significant"] else "ahamiyatli emas"
+        verdict = "ahamiyatli" if ancova_result["significant"] else tr("ahamiyatli emas")
         lines.append(
-            f"Asosiy gipoteza (oldindan belgilangan): kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi {verdict}: "
-            f"F({ancova_result['df1']}, {ancova_result['df2']}) = {ancova_result['f']}, {_p_text(ancova_result['p'])}, "
-            f"qisman η² = {ancova_result['partial_eta2']} ({ancova_result['effect_label']})."
+            tr("Asosiy gipoteza (oldindan belgilangan): kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi {verdict}: F({df1}, {df2}) = {f}, {p}, qisman η² = {partial_eta2} ({effect_label}).", verdict=verdict, df1=ancova_result['df1'], df2=ancova_result['df2'], f=ancova_result['f'], p=_p_text(ancova_result['p']), partial_eta2=ancova_result['partial_eta2'], effect_label=ancova_result['effect_label'])
         )
         if ancova_result["adjusted_diff_ci"]:
             g = ancova_result["hedges_g"]
             effect = f", Xedjes g = {g['value']}, {_ci_text(g['ci'])}" if g else ""
             lines.append(
-                f"Tuzatilgan farq (tajriba − nazorat): {ancova_result['adjusted_diff']} ball, "
-                f"{_ci_text(ancova_result['adjusted_diff_ci'])}{effect}."
+                tr("Tuzatilgan farq (tajriba − nazorat): {adjusted_diff} ball, {adjusted_diff_ci}{effect}.", adjusted_diff=ancova_result['adjusted_diff'], adjusted_diff_ci=_ci_text(ancova_result['adjusted_diff_ci']), effect=effect)
             )
         if ancova_result["slopes"] and not ancova_result["slopes"]["parallel"]:
-            lines.append("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling.")
+            lines.append(tr("ANCOVA sharti buzilgan (regressiya chiziqlari parallel emas): natijani ehtiyotkorlik bilan talqin qiling."))
     elif ancova_reason:
-        lines.append(f"Asosiy gipoteza (ANCOVA) hisoblanmadi: {ancova_reason}")
+        lines.append(tr("Asosiy gipoteza (ANCOVA) hisoblanmadi: {ancova_reason}", ancova_reason=ancova_reason))
     post = comparisons["post"]
     if post:
         exp, ctrl = cohorts["experimental"]["post"]["mean"], cohorts["control"]["post"]["mean"]
         significant = post.get("significant_holm", post["significant"])
-        verdict = "statistik ahamiyatli farq bor" if significant else "statistik ahamiyatli farq yo'q"
+        verdict = tr("statistik ahamiyatli farq bor") if significant else tr("statistik ahamiyatli farq yo'q")
         lines.append(
-            f"Ikkilamchi: chiqish testida tajriba guruhi o'rtachasi {exp}%, nazorat guruhiniki {ctrl}%: {verdict} "
-            f"({post['label']}, {_secondary_text(post)}, {post['effect']['name']} = {post['effect']['value']} — "
-            f"{post['effect']['label']} effekt{_estimate_text(post)})."
+            tr("Ikkilamchi: chiqish testida tajriba guruhi o'rtachasi {exp}%, nazorat guruhiniki {ctrl}%: {verdict} ({label}, {post}, {name} = {value} — {label2} effekt{post2}).", exp=exp, ctrl=ctrl, verdict=verdict, label=post['label'], post=_secondary_text(post), name=post['effect']['name'], value=post['effect']['value'], label2=post['effect']['label'], post2=_estimate_text(post))
         )
     gain_exp, gain_ctrl = cohorts["experimental"]["gain"], cohorts["control"]["gain"]
     if gain_exp["class"] is not None and gain_ctrl["class"] is not None:
         lines.append(
-            f"Hake o'sishi: tajriba guruhida ⟨g⟩ = {gain_exp['class']} ({gain_exp['level']}), "
-            f"nazorat guruhida ⟨g⟩ = {gain_ctrl['class']} ({gain_ctrl['level']})."
+            tr("Hake o'sishi: tajriba guruhida ⟨g⟩ = {value} ({level}), nazorat guruhida ⟨g⟩ = {value2} ({level2}).", value=gain_exp['class'], level=gain_exp['level'], value2=gain_ctrl['class'], level2=gain_ctrl['level'])
         )
     full_pre = sum(cohorts[key]["gain"]["excluded_full_pre"] for key in COHORTS)
     if full_pre:
-        lines.append(f"Kirish testida 100% olgan {full_pre} ta talaba individual Hake o'sishidan chiqarildi (g aniqlanmaydi).")
+        lines.append(tr("Kirish testida 100% olgan {full_pre} ta talaba individual Hake o'sishidan chiqarildi (g aniqlanmaydi).", full_pre=full_pre))
     ceiling = [cohorts[key]["label"] for key in COHORTS if cohorts[key]["ceiling"]["warning"]]
     if ceiling:
         lines.append(
-            f"Shift effekti: {', '.join(ceiling)} guruhida chiqish testida maksimal ball olganlar 15% dan ko'p — test "
-            "kuchli talabalarni farqlay olmaydi, guruhlar farqi kam ko'rsatilishi mumkin."
+            tr("Shift effekti: {ceiling} guruhida chiqish testida maksimal ball olganlar 15% dan ko'p — test kuchli talabalarni farqlay olmaydi, guruhlar farqi kam ko'rsatilishi mumkin.", ceiling=', '.join(ceiling))
         )
     if clustering:
         if clustering["confounded"]:
             lines.append(
-                "Dizayn cheklovi: kamida bitta shartda faqat bitta akademik guruh bor — AI ta'sirini guruh (o'qituvchi, jadval, "
-                "muhit) ta'siridan statistik ajratib bo'lmaydi. Xulosani kvazi-tajriba sifatida bering yoki har bir shartga "
-                "ikki va undan ko'p guruh oling."
+                tr("Dizayn cheklovi: kamida bitta shartda faqat bitta akademik guruh bor — AI ta'sirini guruh (o'qituvchi, jadval, muhit) ta'siridan statistik ajratib bo'lmaydi. Xulosani kvazi-tajriba sifatida bering yoki har bir shartga ikki va undan ko'p guruh oling.")
             )
         elif clustering["icc"]:
             icc = clustering["icc"]
             lines.append(
-                f"Klasterlash: guruhlararo ICC = {icc['value']}, dizayn effekti {icc['design_effect']}, samarali talabalar soni "
-                f"≈ {icc['effective_n']}. ICC 0.05 dan katta bo'lsa, ko'p darajali model (guruh — tasodifiy effekt) bilan "
-                "tekshiring (qayta hisoblash skripti). Ishonch oraliqlari klasterlashni hisobga olmaydi: ICC katta bo'lsa, "
-                "ular haqiqatdagidan tor."
+                tr("Klasterlash: guruhlararo ICC = {value}, dizayn effekti {design_effect}, samarali talabalar soni ≈ {effective_n}. ICC 0.05 dan katta bo'lsa, ko'p darajali model (guruh — tasodifiy effekt) bilan tekshiring (qayta hisoblash skripti). Ishonch oraliqlari klasterlashni hisobga olmaydi: ICC katta bo'lsa, ular haqiqatdagidan tor.", value=icc['value'], design_effect=icc['design_effect'], effective_n=icc['effective_n'])
             )
     if power["achieved"] is not None:
         if power["achieved"] < power["target"]:
             lines.append(
-                f"Statistik quvvat past ({round(100 * power['achieved'])}%): kuzatilgan effektni ishonchli aniqlash uchun har bir "
-                f"guruhda taxminan {power['required_per_group_observed']} ta talaba kerak (hozir {n1} va {n2})."
+                tr("Statistik quvvat past ({value}%): kuzatilgan effektni ishonchli aniqlash uchun har bir guruhda taxminan {required_per_group_observed} ta talaba kerak (hozir {n1} va {n2}).", value=round(100 * power['achieved']), required_per_group_observed=power['required_per_group_observed'], n1=n1, n2=n2)
             )
         else:
             lines.append(f"Statistik quvvat yetarli ({round(100 * power['achieved'])}%).")

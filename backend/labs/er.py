@@ -21,6 +21,7 @@ To'liq tuzatilgan diagramma (build_fixed) faqat baholashga topshirilgandan keyin
 """
 import math
 import re
+from config.i18n import tr
 
 CARDINALITIES = ("1", "N")
 KEYS = ("pk", "fk", "")
@@ -50,16 +51,16 @@ def normalize(name):
 
 def _name(value, what):
     if not isinstance(value, str) or not value.strip():
-        raise DiagramError(f"{what} nomi bo'sh bo'lmasligi kerak.")
+        raise DiagramError(tr("{what} nomi bo'sh bo'lmasligi kerak.", what=what))
     value = " ".join(value.split())
     if len(value) > MAX_NAME_LENGTH:
-        raise DiagramError(f"{what} nomi {MAX_NAME_LENGTH} belgidan oshmasligi kerak: «{value[:20]}…».")
+        raise DiagramError(tr("{what} nomi {MAX_NAME_LENGTH} belgidan oshmasligi kerak: «{value}…».", what=what, MAX_NAME_LENGTH=MAX_NAME_LENGTH, value=value[:20]))
     return value
 
 
 def _identifier(value, what):
     if not isinstance(value, str) or not value or len(value) > MAX_ID_LENGTH:
-        raise DiagramError(f"{what} identifikatori noto'g'ri.")
+        raise DiagramError(tr("{what} identifikatori noto'g'ri.", what=what))
     return value
 
 
@@ -72,39 +73,39 @@ def _coordinate(value):
 def validate_diagram(data):
     """Diagrammani tekshiradi va faqat ma'lum maydonlardan iborat toza nusxasini qaytaradi."""
     if not isinstance(data, dict):
-        raise DiagramError("Diagramma noto'g'ri formatda.")
+        raise DiagramError(tr("Diagramma noto'g'ri formatda."))
     entities = data.get("entities")
     relationships = data.get("relationships", [])
     if not isinstance(entities, list) or not isinstance(relationships, list):
-        raise DiagramError("Diagramma noto'g'ri formatda.")
+        raise DiagramError(tr("Diagramma noto'g'ri formatda."))
     if len(entities) > MAX_ENTITIES:
-        raise DiagramError(f"Obyektlar soni {MAX_ENTITIES} tadan oshmasligi kerak.")
+        raise DiagramError(tr("Obyektlar soni {MAX_ENTITIES} tadan oshmasligi kerak.", MAX_ENTITIES=MAX_ENTITIES))
     if len(relationships) > MAX_RELATIONSHIPS:
-        raise DiagramError(f"Bog'lanishlar soni {MAX_RELATIONSHIPS} tadan oshmasligi kerak.")
+        raise DiagramError(tr("Bog'lanishlar soni {MAX_RELATIONSHIPS} tadan oshmasligi kerak.", MAX_RELATIONSHIPS=MAX_RELATIONSHIPS))
 
     clean_entities, entity_ids, entity_names = [], set(), set()
     for entity in entities:
         if not isinstance(entity, dict):
-            raise DiagramError("Obyekt noto'g'ri formatda.")
+            raise DiagramError(tr("Obyekt noto'g'ri formatda."))
         entity_id = _identifier(entity.get("id"), "Obyekt")
         name = _name(entity.get("name"), "Obyekt")
         if entity_id in entity_ids:
-            raise DiagramError("Ikki obyektning identifikatori bir xil.")
+            raise DiagramError(tr("Ikki obyektning identifikatori bir xil."))
         if normalize(name) in entity_names:
-            raise DiagramError(f"«{name}» nomli obyekt ikki marta chizilgan.")
+            raise DiagramError(tr("«{name}» nomli obyekt ikki marta chizilgan.", name=name))
         entity_ids.add(entity_id)
         entity_names.add(normalize(name))
 
         attributes = entity.get("attributes", [])
         if not isinstance(attributes, list) or len(attributes) > MAX_ATTRIBUTES:
-            raise DiagramError(f"«{name}» obyektida atributlar {MAX_ATTRIBUTES} tadan oshmasligi kerak.")
+            raise DiagramError(tr("«{name}» obyektida atributlar {MAX_ATTRIBUTES} tadan oshmasligi kerak.", name=name, MAX_ATTRIBUTES=MAX_ATTRIBUTES))
         clean_attributes, attribute_names = [], set()
         for attribute in attributes:
             if not isinstance(attribute, dict):
-                raise DiagramError(f"«{name}» obyektida atribut noto'g'ri formatda.")
+                raise DiagramError(tr("«{name}» obyektida atribut noto'g'ri formatda.", name=name))
             attribute_name = _name(attribute.get("name"), f"«{name}» obyektidagi atribut")
             if normalize(attribute_name) in attribute_names:
-                raise DiagramError(f"«{name}» obyektida «{attribute_name}» atributi ikki marta yozilgan.")
+                raise DiagramError(tr("«{name}» obyektida «{attribute_name}» atributi ikki marta yozilgan.", name=name, attribute_name=attribute_name))
             attribute_names.add(normalize(attribute_name))
             key = attribute.get("key", "")
             clean_attributes.append({"name": attribute_name, "key": key if key in KEYS else ""})
@@ -122,20 +123,20 @@ def validate_diagram(data):
     clean_relationships, relationship_ids = [], set()
     for relationship in relationships:
         if not isinstance(relationship, dict):
-            raise DiagramError("Bog'lanish noto'g'ri formatda.")
+            raise DiagramError(tr("Bog'lanish noto'g'ri formatda."))
         relationship_id = _identifier(relationship.get("id"), "Bog'lanish")
         if relationship_id in relationship_ids:
-            raise DiagramError("Ikki bog'lanishning identifikatori bir xil.")
+            raise DiagramError(tr("Ikki bog'lanishning identifikatori bir xil."))
         relationship_ids.add(relationship_id)
         source, target = relationship.get("source"), relationship.get("target")
         if source not in entity_ids or target not in entity_ids:
-            raise DiagramError("Bog'lanish mavjud bo'lmagan obyektga ulangan.")
+            raise DiagramError(tr("Bog'lanish mavjud bo'lmagan obyektga ulangan."))
         cards = relationship.get("source_card"), relationship.get("target_card")
         if any(card not in CARDINALITIES for card in cards):
-            raise DiagramError("Bog'lanish kardinalligi «1» yoki «N» bo'lishi kerak.")
+            raise DiagramError(tr("Bog'lanish kardinalligi «1» yoki «N» bo'lishi kerak."))
         name = relationship.get("name") or ""
         if not isinstance(name, str) or len(name) > MAX_NAME_LENGTH:
-            raise DiagramError(f"Bog'lanish nomi {MAX_NAME_LENGTH} belgidan oshmasligi kerak.")
+            raise DiagramError(tr("Bog'lanish nomi {MAX_NAME_LENGTH} belgidan oshmasligi kerak.", MAX_NAME_LENGTH=MAX_NAME_LENGTH))
         clean_relationships.append(
             {
                 "id": relationship_id,
@@ -263,7 +264,7 @@ def compare(student, reference):
     total = matched = extras = 0
 
     if missing_entities:
-        differences.append(f"{len(missing_entities)} ta obyekt yetishmaydi.")
+        differences.append(tr("{missing_entities} ta obyekt yetishmaydi.", missing_entities=len(missing_entities)))
     for name in sorted(extra_entities - associative_names):
         differences.append(f"Ortiqcha obyekt: «{_display(student_entities, name)}».")
         extras += 1
@@ -277,10 +278,10 @@ def compare(student, reference):
         missing_attributes = wanted_attributes.keys() - my_attributes.keys()
         extra_attributes = my_attributes.keys() - wanted_attributes.keys()
         if missing_attributes:
-            differences.append(f"«{title}» obyektida {len(missing_attributes)} ta atribut yetishmaydi.")
+            differences.append(tr("«{title}» obyektida {missing_attributes} ta atribut yetishmaydi.", title=title, missing_attributes=len(missing_attributes)))
         if extra_attributes:
             names = ", ".join(my_attributes[key]["name"] for key in sorted(extra_attributes))
-            differences.append(f"«{title}» obyektida ortiqcha atribut: {names}.")
+            differences.append(tr("«{title}» obyektida ortiqcha atribut: {names}.", title=title, names=names))
         total += len(wanted_attributes) + 1
         matched += len(wanted_attributes.keys() & my_attributes.keys())
         extras += len(extra_attributes)
@@ -289,17 +290,14 @@ def compare(student, reference):
         if my_key == wanted_key:
             matched += 1
         elif not my_key:
-            differences.append(f"«{title}» obyektida asosiy kalit (PK) belgilanmagan.")
+            differences.append(tr("«{title}» obyektida asosiy kalit (PK) belgilanmagan.", title=title))
         else:
-            differences.append(f"«{title}» obyektining asosiy kaliti (PK) noto'g'ri tanlangan.")
+            differences.append(tr("«{title}» obyektining asosiy kaliti (PK) noto'g'ri tanlangan.", title=title))
 
     for relationship_id, name in associative.items():
         wanted = next(item for item in reference_relationships if item["id"] == relationship_id)
         differences.append(
-            f"«{_display(reference_entities, wanted['a'])}» va «{_display(reference_entities, wanted['b'])}» "
-            f"orasidagi ko'p-ko'p (M:N) bog'lanishni «{_display(student_entities, name)}» oraliq obyekti orqali "
-            "ifodalagansiz. Mantiqan bu to'g'ri, lekin bu laboratoriyada M:N bog'lanishni ikki obyekt orasida "
-            "to'g'ridan-to'g'ri chizing."
+            tr("«{reference_entities}» va «{reference_entities2}» orasidagi ko'p-ko'p (M:N) bog'lanishni «{student_entities}» oraliq obyekti orqali ifodalagansiz. Mantiqan bu to'g'ri, lekin bu laboratoriyada M:N bog'lanishni ikki obyekt orasida to'g'ridan-to'g'ri chizing.", reference_entities=_display(reference_entities, wanted['a']), reference_entities2=_display(reference_entities, wanted['b']), student_entities=_display(student_entities, name))
         )
 
     total += len(reference_relationships)
@@ -311,28 +309,23 @@ def compare(student, reference):
             matched += 1
             continue
         differences.append(
-            f"«{_display(student_entities, wanted['a'])}» — «{_display(student_entities, wanted['b'])}» "
-            f"bog'lanishining kardinalligi noto'g'ri (sizda {my_cards[0]}:{my_cards[1]}). Bitta "
-            f"«{_display(student_entities, wanted['a'])}» nechta «{_display(student_entities, wanted['b'])}» "
-            "bilan bog'lanishini va aksincha qayta o'ylang."
+            tr("«{student_entities}» — «{student_entities2}» bog'lanishining kardinalligi noto'g'ri (sizda {value}:{value2}). Bitta «{student_entities3}» nechta «{student_entities4}» bilan bog'lanishini va aksincha qayta o'ylang.", student_entities=_display(student_entities, wanted['a']), student_entities2=_display(student_entities, wanted['b']), value=my_cards[0], value2=my_cards[1], student_entities3=_display(student_entities, wanted['a']), student_entities4=_display(student_entities, wanted['b']))
         )
         matched += 0.5
     for wanted in missing_relationships:
         differences.append(
-            f"«{_display(student_entities, wanted['a'])}» va «{_display(student_entities, wanted['b'])}» "
-            "orasida bog'lanish yetishmaydi."
+            tr("«{student_entities}» va «{student_entities2}» orasida bog'lanish yetishmaydi.", student_entities=_display(student_entities, wanted['a']), student_entities2=_display(student_entities, wanted['b']))
         )
     for mine in extra_relationships:
         if mine["a"] in associative_names or mine["b"] in associative_names:
             continue
         differences.append(
-            f"«{_display(student_entities, mine['a'])}» va «{_display(student_entities, mine['b'])}» "
-            "orasida ortiqcha bog'lanish bor."
+            tr("«{student_entities}» va «{student_entities2}» orasida ortiqcha bog'lanish bor.", student_entities=_display(student_entities, mine['a']), student_entities2=_display(student_entities, mine['b']))
         )
         extras += 1
 
     if not student["entities"]:
-        differences = ["Diagramma bo'sh: kamida bitta obyekt chizing."]
+        differences = [tr("Diagramma bo'sh: kamida bitta obyekt chizing.")]
     ratio = max(0.0, matched - 0.5 * extras) / total if total else 0.0
     return {"differences": differences, "ratio": round(min(ratio, 1.0), 3)}
 
@@ -364,7 +357,7 @@ def build_fixed(student, reference):
             entities.append({**entity, "status": "removed", "attributes": [
                 {**item, "status": "removed"} for item in entity["attributes"]
             ]})
-            changes.append(f"«{entity['name']}» obyekti olib tashlandi: shartga ko'ra u kerak emas.")
+            changes.append(tr("«{name}» obyekti olib tashlandi: shartga ko'ra u kerak emas.", name=entity['name']))
             continue
         wanted = reference_entities[key]
         wanted_attributes = {normalize(item["name"]): item for item in wanted["attributes"]}
@@ -387,12 +380,12 @@ def build_fixed(student, reference):
                 attributes.append({**item, "status": "added"})
                 added.append(item["name"])
         if added:
-            changes.append(f"«{entity['name']}» obyektiga atribut qo'shildi: {', '.join(added)}.")
+            changes.append(tr("«{name}» obyektiga atribut qo'shildi: {added}.", name=entity['name'], added=', '.join(added)))
         if removed:
-            changes.append(f"«{entity['name']}» obyektidan ortiqcha atribut olib tashlandi: {', '.join(removed)}.")
+            changes.append(tr("«{name}» obyektidan ortiqcha atribut olib tashlandi: {removed}.", name=entity['name'], removed=', '.join(removed)))
         if rekeyed:
             key_names = [item["name"] for item in attributes if item.get("key", "") == "pk" and item["status"] != "removed"]
-            changes.append(f"«{entity['name']}» obyektining asosiy kaliti (PK): {', '.join(key_names)}.")
+            changes.append(tr("«{name}» obyektining asosiy kaliti (PK): {key_names}.", name=entity['name'], key_names=', '.join(key_names)))
         status = "changed" if added or removed or rekeyed else "ok"
         entities.append({**entity, "attributes": attributes, "status": status})
 
@@ -411,7 +404,7 @@ def build_fixed(student, reference):
                 "status": "added",
             }
         )
-        changes.append(f"«{wanted['name']}» obyekti qo'shildi.")
+        changes.append(tr("«{name}» obyekti qo'shildi.", name=wanted['name']))
 
     def display(key):
         entity = student_entities.get(key) or reference_entities[key]
@@ -435,16 +428,13 @@ def build_fixed(student, reference):
                     {**base, "source_card": wanted_cards[0], "target_card": wanted_cards[1], "status": "changed"}
                 )
                 changes.append(
-                    f"«{display(relationship['a'])}» — «{display(relationship['b'])}» bog'lanishining kardinalligi "
-                    f"{_card_text(relationship['ca'], relationship['cb'])} dan "
-                    f"{_card_text(*wanted_cards)} ga o'zgartirildi."
+                    tr("«{a}» — «{b}» bog'lanishining kardinalligi {ca} dan {value} ga o'zgartirildi.", a=display(relationship['a']), b=display(relationship['b']), ca=_card_text(relationship['ca'], relationship['cb']), value=_card_text(*wanted_cards))
                 )
         else:
             relationships.append({**base, "status": "removed"})
             if relationship["id"] in extra_ids:
                 changes.append(
-                    f"«{display(relationship['a'])}» va «{display(relationship['b'])}» orasidagi ortiqcha "
-                    "bog'lanish olib tashlandi."
+                    tr("«{a}» va «{b}» orasidagi ortiqcha bog'lanish olib tashlandi.", a=display(relationship['a']), b=display(relationship['b']))
                 )
 
     # Yetishmaydigan bog'lanishlar: mavjud obyektlar orasidagilari va yangi qo'shilgan obyektlarnikilari
@@ -464,8 +454,7 @@ def build_fixed(student, reference):
             }
         )
         changes.append(
-            f"«{display(wanted['a'])}» va «{display(wanted['b'])}» orasiga bog'lanish qo'shildi "
-            f"({_card_text(wanted['ca'], wanted['cb'])}"
+            tr("«{a}» va «{b}» orasiga bog'lanish qo'shildi ({ca}", a=display(wanted['a']), b=display(wanted['b']), ca=_card_text(wanted['ca'], wanted['cb']))
             + (f", «{wanted['name']}»" if wanted["name"] else "")
             + ")."
         )
@@ -483,8 +472,8 @@ def diagram_to_text(diagram):
         )
         lines.append(f"- {entity['name']}: {attributes or '(atributsiz)'}")
     if not diagram["entities"]:
-        lines.append("- (yo'q)")
-    lines.append("Bog'lanishlar (qavsda shu obyekt tomonidagi kardinallik):")
+        lines.append(tr("- (yo'q)"))
+    lines.append(tr("Bog'lanishlar (qavsda shu obyekt tomonidagi kardinallik):"))
     for relationship in diagram["relationships"]:
         name = f" — {relationship['name']} —" if relationship["name"] else " —"
         lines.append(
@@ -492,5 +481,5 @@ def diagram_to_text(diagram):
             f"{names[relationship['target']]} ({relationship['target_card']})"
         )
     if not diagram["relationships"]:
-        lines.append("- (yo'q)")
+        lines.append(tr("- (yo'q)"))
     return "\n".join(lines)

@@ -17,6 +17,7 @@ from labs.psychometrics import cronbach_alpha
 from .models import QuizAttempt
 from .services import finalize_if_expired, likert_value
 from .sus_bank import SUS_ITEMS, SUS_TITLE
+from config.i18n import tr, N_
 
 ITEMS = len(SUS_ITEMS)
 BENCHMARK = 68.0
@@ -26,7 +27,7 @@ GRADES = [
     (71.1, "C+"), (65.0, "C"), (62.7, "C−"), (51.7, "D"), (0.0, "F"),
 ]
 # Bangor, Kortum va Miller (2008): qabul qilinish oraliqlari
-ACCEPTABILITY = [(70.0, "qabul qilinadi"), (50.0, "chegaraviy"), (0.0, "qabul qilinmaydi")]
+ACCEPTABILITY = [(70.0, N_("qabul qilinadi")), (50.0, "chegaraviy"), (0.0, N_("qabul qilinmaydi"))]
 
 
 def _r(value, digits=2):

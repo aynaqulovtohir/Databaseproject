@@ -21,6 +21,7 @@ from users.models import User
 
 from .models import ErSnapshot, Lab, LabAttempt, LabGrade
 from .process import STRATEGIES, analyse, build_points, metrics
+from config.i18n import N_, tr
 
 # Egri chiziq nuqtalari: 0%, 5%, ..., 100%
 CURVE_POINTS = 21
@@ -29,10 +30,10 @@ KNOWN_STRATEGIES = [key for key in STRATEGIES if key != "aniqlanmadi"]
 
 METRICS = {
     "active_minutes": "Faol vaqt (daqiqa)",
-    "checks": "Tekshiruvlar soni",
-    "churn": "Qaytarish ulushi (o'chirilgan / qo'shilgan)",
-    "first_relationship_minutes": "Birinchi bog'lanishgacha (daqiqa)",
-    "entities_first_share": "Obyektlarning bog'lanishdan oldin chizilgan ulushi",
+    "checks": N_("Tekshiruvlar soni"),
+    "churn": N_("Qaytarish ulushi (o'chirilgan / qo'shilgan)"),
+    "first_relationship_minutes": N_("Birinchi bog'lanishgacha (daqiqa)"),
+    "entities_first_share": N_("Obyektlarning bog'lanishdan oldin chizilgan ulushi"),
     "first_check_ratio": "Birinchi tekshiruvdagi moslik",
     "final_ratio": "Yakuniy moslik",
 }
@@ -221,38 +222,36 @@ def conclusions(strategies, cohorts, transitions):
         top = max((item for item in strategies["items"] if item["strategy"] in KNOWN_STRATEGIES), key=lambda item: item["count"])
         # Ulush ikki asosda: jadvaldagi «Ishlar» ustuni barcha ishlarga nisbatan, «aniqlanmadi» esa chiqarilgan ulush
         # ham kerak — bittasini izohsiz berish jadval bilan ziddiyatdek ko'rinadi.
-        share = f"barcha {total} ta ishning {round(100 * top['count'] / total)}%"
+        share = tr("barcha {total} ta ishning {value}%", total=total, value=round(100 * top['count'] / total))
         if known < total:
-            share += f", strategiyasi aniqlangan {known} ta ishning {round(100 * top['count'] / known)}%"
-        lines.append(f"Eng ko'p uchragan strategiya — «{top['label']}» ({top['count']} ta ish: {share}).")
+            share += tr(", strategiyasi aniqlangan {known} ta ishning {value}%", known=known, value=round(100 * top['count'] / known))
+        lines.append(tr("Eng ko'p uchragan strategiya — «{label}» ({count} ta ish: {share}).", label=top['label'], count=top['count'], share=share))
     test = strategies["grade_test"]
     if test:
-        verdict = "ahamiyatli farq qiladi" if test["significant"] else "statistik ahamiyatli farq qilmaydi"
+        verdict = tr("ahamiyatli farq qiladi") if test["significant"] else tr("statistik ahamiyatli farq qilmaydi")
         lines.append(
-            f"Strategiyalar bo'yicha baholar {verdict} (Kraskel–Uollis H = {test['h']}, {_p_text(test['p'])}, ε² = {test['epsilon2']})."
+            tr("Strategiyalar bo'yicha baholar {verdict} (Kraskel–Uollis H = {h}, {p}, ε² = {epsilon2}).", verdict=verdict, h=test['h'], p=_p_text(test['p']), epsilon2=test['epsilon2'])
         )
     test = strategies["cohort_test"]
     if test:
-        verdict = "farq qiladi" if test["significant"] else "statistik ahamiyatli farq qilmaydi"
-        note = "" if test["reliable"] else " Diqqat: kataklardagi kutilgan son 5 dan kam, natija taxminiy."
+        verdict = tr("farq qiladi") if test["significant"] else tr("statistik ahamiyatli farq qilmaydi")
+        note = "" if test["reliable"] else tr(" Diqqat: kataklardagi kutilgan son 5 dan kam, natija taxminiy.")
         lines.append(
-            f"Tajriba va nazorat guruhlarida strategiyalar taqsimoti {verdict} (χ² = {test['chi2']}, {_p_text(test['p'])}, "
-            f"Kramer V = {test['cramers_v']}).{note}"
+            tr("Tajriba va nazorat guruhlarida strategiyalar taqsimoti {verdict} (χ² = {chi2}, {p}, Kramer V = {cramers_v}).{note}", verdict=verdict, chi2=test['chi2'], p=_p_text(test['p']), cramers_v=test['cramers_v'], note=note)
         )
     for item in cohorts["comparisons"]:
         test = item["test"]
         if test and test["significant"]:
             higher = "tajriba" if item["experimental"]["mean"] > item["control"]["mean"] else "nazorat"
             lines.append(
-                f"«{item['label']}» {higher} guruhida yuqori ({test['label']}, {_p_text(test['p'])}, "
-                f"{test['effect']['name']} = {test['effect']['value']}, {test['effect']['label']} effekt)."
+                tr("«{label}» {higher} guruhida yuqori ({label2}, {p}, {name} = {value}, {label3} effekt).", label=item['label'], higher=higher, label2=test['label'], p=_p_text(test['p']), name=test['effect']['name'], value=test['effect']['value'], label3=test['effect']['label'])
             )
     if not any(item["test"] for item in cohorts["comparisons"]):
-        lines.append(f"Guruhlarni solishtirish uchun har birida kamida {MIN_GROUP} ta talabaning jarayoni kerak.")
+        lines.append(tr("Guruhlarni solishtirish uchun har birida kamida {MIN_GROUP} ta talabaning jarayoni kerak.", MIN_GROUP=MIN_GROUP))
     if transitions["students"]:
         stayed = sum(transitions["matrix"][index][index] for index in range(len(KNOWN_STRATEGIES)))
         lines.append(
-            f"Kamida ikkita laboratoriyada ishlagan {transitions['students']} talabadan {stayed} tasi strategiyasini saqlagan."
+            tr("Kamida ikkita laboratoriyada ishlagan {students} talabadan {stayed} tasi strategiyasini saqlagan.", students=transitions['students'], stayed=stayed)
         )
     return lines
 

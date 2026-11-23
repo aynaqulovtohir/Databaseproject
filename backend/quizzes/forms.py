@@ -18,12 +18,13 @@ from labs.psychometrics import pearson
 
 from .models import Quiz, QuizAttempt
 from .services import finalize_if_expired, percent
+from config.i18n import N_, tr
 
 FORMS = ("A", "B")
 EQUIVALENCE_MARGIN = 10  # foiz punkti: 20 savolli testda 2 ta savol
 ITEM_GAP = 0.15
 MIN_FORM = 3
-KIND_LABELS = {"pre": "Kirish testi", "post": "Chiqish testi", "delayed": "Kechiktirilgan test"}
+KIND_LABELS = {"pre": "Kirish testi", "post": "Chiqish testi", "delayed": N_("Kechiktirilgan test")}
 
 
 def _r(value, digits=3):
@@ -132,23 +133,20 @@ def conclusions(result):
         low, high = equivalence["ci"]
         if equivalence["equivalent"]:
             lines.append(
-                f"Parallel variantlar ekvivalent ({row['label'].lower()}, TOST, ±{equivalence['margin']} foiz punkti): "
-                f"farq {equivalence['diff']}, 90% ishonch oralig'i [{low}; {high}], p = {equivalence['p']:.3f}."
+                tr("Parallel variantlar ekvivalent ({lower}, TOST, ±{margin} foiz punkti): farq {diff}, 90% ishonch oralig'i [{low}; {high}], p = {p}.", lower=row['label'].lower(), margin=equivalence['margin'], diff=equivalence['diff'], low=low, high=high, p=format(equivalence['p'], ".3f"))
             )
         else:
             lines.append(
-                f"Parallel variantlar ekvivalentligi isbotlanmadi ({row['label'].lower()}, TOST, ±{equivalence['margin']} foiz punkti, "
-                f"p = {equivalence['p']:.3f}): pilot sinovda variantlarni tenglashtiring yoki variantni kovariata sifatida hisobga oling."
+                tr("Parallel variantlar ekvivalentligi isbotlanmadi ({lower}, TOST, ±{margin} foiz punkti, p = {p}): pilot sinovda variantlarni tenglashtiring yoki variantni kovariata sifatida hisobga oling.", lower=row['label'].lower(), margin=equivalence['margin'], p=format(equivalence['p'], ".3f"))
             )
     reliability = result["reliability"]
     if reliability and reliability["r"] is not None:
-        lines.append(f"Parallel variantlar ishonchliligi: r = {reliability['r']} (n = {reliability['n']}).")
+        lines.append(tr("Parallel variantlar ishonchliligi: r = {r} (n = {n}).", r=reliability['r'], n=reliability['n']))
     gaps = [str(item["order"]) for item in result["items"] if item["gap"]]
     if gaps:
-        lines.append(f"Qiyinligi variantlar orasida {round(100 * result['item_gap'])}% dan ko'p farq qiladigan juft savollar: {', '.join(gaps)}.")
+        lines.append(tr("Qiyinligi variantlar orasida {value}% dan ko'p farq qiladigan juft savollar: {gaps}.", value=round(100 * result['item_gap']), gaps=', '.join(gaps)))
     if result["same_form"] or result["without_form"]:
         lines.append(
-            f"Test qilish effekti xavfi: {result['same_form'] + result['without_form']} ta talaba kirish va chiqish testida bir xil "
-            "savollarni olgan (bir xil variant yoki variantsiz test). Parallel variantlardan foydalaning."
+            tr("Test qilish effekti xavfi: {value} ta talaba kirish va chiqish testida bir xil savollarni olgan (bir xil variant yoki variantsiz test). Parallel variantlardan foydalaning.", value=result['same_form'] + result['without_form'])
         )
     return lines

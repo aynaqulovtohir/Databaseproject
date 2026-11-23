@@ -22,6 +22,7 @@ from submissions.models import Submission
 from users.models import StudentGroup, User
 
 from .access import visible_assignments
+from config.i18n import tr
 
 CHART_DAYS = 14
 RECENT_LIMIT = 8
@@ -98,7 +99,7 @@ def recent_activity(user, submissions, lab_attempts, quiz_attempts):
                 "at": attempt.created_at,
                 "title": attempt.lab.title,
                 "actor": person(attempt.student) if staff else None,
-                "status": "To'g'ri" if attempt.is_correct else "Xato",
+                "status": tr("To'g'ri") if attempt.is_correct else tr("Xato"),
                 "tone": "success" if attempt.is_correct else "danger",
                 "link": f"/labs/{attempt.lab_id}",
             }
@@ -111,7 +112,7 @@ def recent_activity(user, submissions, lab_attempts, quiz_attempts):
                 "at": attempt.submitted_at,
                 "title": attempt.quiz.title,
                 "actor": person(attempt.student) if staff else None,
-                "status": f"{percent}%" if percent is not None else "Topshirildi",
+                "status": f"{percent}%" if percent is not None else tr("Topshirildi"),
                 "tone": "info",
                 "link": f"/quizzes/{attempt.quiz_id}",
             }
@@ -135,7 +136,7 @@ def student_alerts(user):
             {
                 "tone": "warning",
                 "title": assignment.title,
-                "text": "Muddat yaqin, yechim hali topshirilmagan",
+                "text": tr("Muddat yaqin, yechim hali topshirilmagan"),
                 "at": assignment.deadline,
                 "link": f"/assignments/{assignment.pk}",
             }
@@ -151,7 +152,7 @@ def student_alerts(user):
             {
                 "tone": "danger",
                 "title": sub.assignment.title,
-                "text": "Qayta ishlashga qaytarilgan",
+                "text": tr("Qayta ishlashga qaytarilgan"),
                 "at": sub.submitted_at,
                 "link": f"/assignments/{sub.assignment_id}",
             }
@@ -165,7 +166,7 @@ def staff_alerts(submissions):
         {
             "tone": "primary",
             "title": sub.assignment.title,
-            "text": f"Tekshirilmagan yechim: {person(sub.student)}",
+            "text": tr("Tekshirilmagan yechim: {student}", student=person(sub.student)),
             "at": sub.submitted_at,
             "link": f"/submissions/{sub.pk}",
         }
@@ -187,10 +188,10 @@ def student_cards(user, submissions, lab_attempts, quiz_attempts):
     quizzes_done = quiz_attempts.exclude(quiz__kind="survey").count()
     average = submissions.filter(grade__isnull=False).aggregate(avg=Avg("grade__score"))["avg"]
     return [
-        card("assignments", "Topshiriqlar", f"{done}/{total}", "topshirilgan"),
-        card("labs", "Laboratoriyalar", f"{labs_solved}/{labs_total}", "to'g'ri yechilgan"),
-        card("quizzes", "Testlar", f"{quizzes_done}/{quizzes_total}", "topshirilgan"),
-        card("grade", "O'rtacha baho", round(average, 1) if average is not None else "—", "baholangan ishlar bo'yicha"),
+        card("assignments", tr("Topshiriqlar"), f"{done}/{total}", tr("topshirilgan")),
+        card("labs", tr("Laboratoriyalar"), f"{labs_solved}/{labs_total}", tr("to'g'ri yechilgan")),
+        card("quizzes", tr("Testlar"), f"{quizzes_done}/{quizzes_total}", tr("topshirilgan")),
+        card("grade", tr("O'rtacha baho"), round(average, 1) if average is not None else "—", tr("baholangan ishlar bo'yicha")),
     ]
 
 
@@ -199,15 +200,15 @@ def teacher_cards(user, submissions, lab_attempts, quiz_attempts):
     groups = StudentGroup.objects.filter(teachers=user)
     students = User.objects.filter(role=User.Role.STUDENT, is_active=True, group__in=groups).count()
     return [
-        card("students", "Talabalar", students, f"{groups.count()} ta guruhda"),
+        card("students", tr("Talabalar"), students, tr("{count} ta guruhda", count=groups.count())),
         card(
             "pending",
-            "Tekshirilmagan yechimlar",
+            tr("Tekshirilmagan yechimlar"),
             submissions.filter(status=Submission.Status.SUBMITTED).count(),
-            "baholashni kutmoqda",
+            tr("baholashni kutmoqda"),
         ),
-        card("labs", "Laboratoriya urinishlari", lab_attempts.filter(created_at__gte=week_ago).count(), "so'nggi 7 kunda"),
-        card("quizzes", "Test topshirishlari", quiz_attempts.filter(submitted_at__gte=week_ago).count(), "so'nggi 7 kunda"),
+        card("labs", tr("Laboratoriya urinishlari"), lab_attempts.filter(created_at__gte=week_ago).count(), tr("so'nggi 7 kunda")),
+        card("quizzes", tr("Test topshirishlari"), quiz_attempts.filter(submitted_at__gte=week_ago).count(), tr("so'nggi 7 kunda")),
     ]
 
 
@@ -221,18 +222,18 @@ def admin_cards(submissions, lab_attempts):
     return [
         card(
             "users",
-            "Faol foydalanuvchilar",
+            tr("Faol foydalanuvchilar"),
             users["total"],
-            f"{users['teachers']} o'qituvchi, {users['students']} talaba",
+            tr("{teachers} o'qituvchi, {students} talaba", teachers=users['teachers'], students=users['students']),
         ),
-        card("groups", "Guruhlar", StudentGroup.objects.count(), ""),
+        card("groups", tr("Guruhlar"), StudentGroup.objects.count(), ""),
         card(
             "pending",
-            "Tekshirilmagan yechimlar",
+            tr("Tekshirilmagan yechimlar"),
             submissions.filter(status=Submission.Status.SUBMITTED).count(),
-            "baholashni kutmoqda",
+            tr("baholashni kutmoqda"),
         ),
-        card("labs", "Laboratoriya urinishlari", lab_attempts.filter(created_at__gte=week_ago).count(), "so'nggi 7 kunda"),
+        card("labs", tr("Laboratoriya urinishlari"), lab_attempts.filter(created_at__gte=week_ago).count(), tr("so'nggi 7 kunda")),
     ]
 
 

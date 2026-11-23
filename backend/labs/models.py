@@ -1,6 +1,7 @@
 """Virtual laboratoriya: talaba SQL kodni yozadi, tizim uni ishga tushirib tekshiradi."""
 from django.conf import settings
 from django.db import models
+from config.i18n import N_
 
 MAX_SQL_LENGTH = 50_000
 MAX_LEVEL = 5
@@ -38,25 +39,25 @@ class LabModule(models.Model):
 class Lab(models.Model):
     class Topic(models.TextChoices):
         # Kurs tartibida: moslashuvchan o'quv yo'li avval oldingi mavzuni o'zlashtirishni tavsiya qiladi
-        ER = "er", "ER-model"
-        DESIGN = "design", "Jadvallarni loyihalash"
-        INTEGRITY = "integrity", "Yaxlitlik cheklovlari"
-        EVOLUTION = "evolution", "Sxemani rivojlantirish (migratsiya)"
-        PROGRAMMABILITY = "programmability", "View, funksiya va trigger"
-        SECURITY = "security", "Xavfsizlik (qatorlar darajasida himoya)"
-        WAREHOUSE = "warehouse", "Ma'lumotlar ombori (OLAP)"
-        JSON = "json", "Yarim tuzilmali ma'lumot (JSONB)"
-        NORM = "norm", "Normallashtirish"
-        ER_SQL = "er_sql", "ER-modeldan jadvallarga"
-        SELECT = "select", "SELECT so'rovlari"
-        INDEX = "index", "Indekslar"
-        TRANSACTION = "transaction", "Tranzaksiyalar"
-        VECTOR = "vector", "Vektorli qidiruv (AI)"
+        ER = "er", N_("ER-model")
+        DESIGN = "design", N_("Jadvallarni loyihalash")
+        INTEGRITY = "integrity", N_("Yaxlitlik cheklovlari")
+        EVOLUTION = "evolution", N_("Sxemani rivojlantirish (migratsiya)")
+        PROGRAMMABILITY = "programmability", N_("View, funksiya va trigger")
+        SECURITY = "security", N_("Xavfsizlik (qatorlar darajasida himoya)")
+        WAREHOUSE = "warehouse", N_("Ma'lumotlar ombori (OLAP)")
+        JSON = "json", N_("Yarim tuzilmali ma'lumot (JSONB)")
+        NORM = "norm", N_("Normallashtirish")
+        ER_SQL = "er_sql", N_("ER-modeldan jadvallarga")
+        SELECT = "select", N_("SELECT so'rovlari")
+        INDEX = "index", N_("Indekslar")
+        TRANSACTION = "transaction", N_("Tranzaksiyalar")
+        VECTOR = "vector", N_("Vektorli qidiruv (AI)")
 
     class Kind(models.TextChoices):
-        SQL = "sql", "SQL kod"
-        ER = "er", "ER-diagramma"
-        NORM = "norm", "Normallashtirish"
+        SQL = "sql", N_("SQL kod")
+        ER = "er", N_("ER-diagramma")
+        NORM = "norm", N_("Normallashtirish")
 
     kind = models.CharField("turi", max_length=10, choices=Kind.choices, default=Kind.SQL)
     title = models.CharField("sarlavha", max_length=200)
@@ -255,8 +256,8 @@ class LabGrade(models.Model):
     """Talabaning laboratoriya bo'yicha bahosi: topshirganlari ichidan eng yuqorisi saqlanadi."""
 
     class Source(models.TextChoices):
-        AI = "ai", "Sun'iy intellekt"
-        AUTO = "auto", "Avtomatik tekshiruv"
+        AI = "ai", N_("Sun'iy intellekt")
+        AUTO = "auto", N_("Avtomatik tekshiruv")
 
     lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="grades")
     student = models.ForeignKey(
@@ -347,14 +348,14 @@ class AIOutputReview(models.Model):
     """
 
     class Kind(models.TextChoices):
-        HINT = "hint", "AI maslahati"
-        EXPLANATION = "explanation", "Tushuntirish bo'yicha AI izohi"
+        HINT = "hint", N_("AI maslahati")
+        EXPLANATION = "explanation", N_("Tushuntirish bo'yicha AI izohi")
 
     class Rating(models.TextChoices):
-        HELPFUL = "helpful", "Foydali va to'g'ri"
-        UNCLEAR = "unclear", "Tushunarsiz yoki juda umumiy"
-        WRONG = "wrong", "Noto'g'ri (fakt yoki tahlil xato)"
-        REVEALED = "revealed", "Javobni aytib qo'ydi"
+        HELPFUL = "helpful", N_("Foydali va to'g'ri")
+        UNCLEAR = "unclear", N_("Tushunarsiz yoki juda umumiy")
+        WRONG = "wrong", N_("Noto'g'ri (fakt yoki tahlil xato)")
+        REVEALED = "revealed", N_("Javobni aytib qo'ydi")
 
     attempt = models.ForeignKey(LabAttempt, verbose_name="urinish", on_delete=models.CASCADE, related_name="ai_reviews")
     kind = models.CharField("turi", max_length=20, choices=Kind.choices)
@@ -383,12 +384,12 @@ class AIAction(models.Model):
     """
 
     class Kind(models.TextChoices):
-        PLAN_EXPLAIN = "plan_explain", "EXPLAIN tushuntirishi"
-        PLAN_SUGGEST = "plan_suggest", "Indeks taklifi"
-        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
-        SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
-        VIVA = "viva", "Loyiha himoyasi"
-        STUDY_ADVICE = "study_advice", "Laboratoriya bo'yicha tavsiya"
+        PLAN_EXPLAIN = "plan_explain", N_("EXPLAIN tushuntirishi")
+        PLAN_SUGGEST = "plan_suggest", N_("Indeks taklifi")
+        LAB_CHAT = "lab_chat", N_("Laboratoriya murabbiyi")
+        SELF_EXPLAIN = "self_explain", N_("Yechimni tushuntirish")
+        VIVA = "viva", N_("Loyiha himoyasi")
+        STUDY_ADVICE = "study_advice", N_("Laboratoriya bo'yicha tavsiya")
 
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="ai_actions"
@@ -410,8 +411,8 @@ class AIFailure(models.Model):
     """
 
     class Kind(models.TextChoices):
-        HINT = "hint", "Darajali maslahat"
-        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
+        HINT = "hint", N_("Darajali maslahat")
+        LAB_CHAT = "lab_chat", N_("Laboratoriya murabbiyi")
 
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="talaba", on_delete=models.CASCADE, related_name="ai_failures"
@@ -433,8 +434,8 @@ class InterviewMessage(models.Model):
     """Talabaning AI-buyurtmachi bilan suhbati (talablarni aniqlash). Faqat talabaning o'zi ko'radi."""
 
     class Role(models.TextChoices):
-        USER = "user", "Talaba"
-        ASSISTANT = "assistant", "Buyurtmachi"
+        USER = "user", N_("Talaba")
+        ASSISTANT = "assistant", N_("Buyurtmachi")
 
     lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="interview_messages")
     student = models.ForeignKey(
@@ -457,8 +458,8 @@ class LabChatMessage(models.Model):
     """Talabaning laboratoriya murabbiyi (AI) bilan yozishmasi. Faqat talabaning o'zi ko'radi."""
 
     class Role(models.TextChoices):
-        USER = "user", "Talaba"
-        ASSISTANT = "assistant", "AI"
+        USER = "user", N_("Talaba")
+        ASSISTANT = "assistant", N_("AI")
 
     lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="chat_messages")
     student = models.ForeignKey(
@@ -483,8 +484,8 @@ class StudyAdvice(models.Model):
     """
 
     class Source(models.TextChoices):
-        AI = "ai", "Sun'iy intellekt"
-        RULES = "rules", "Xato turlari bo'yicha"
+        AI = "ai", N_("Sun'iy intellekt")
+        RULES = "rules", N_("Xato turlari bo'yicha")
 
     lab = models.ForeignKey(Lab, verbose_name="laboratoriya", on_delete=models.CASCADE, related_name="study_advice")
     student = models.ForeignKey(

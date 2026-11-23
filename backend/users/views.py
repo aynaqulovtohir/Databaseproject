@@ -22,6 +22,7 @@ from .serializers import (
     StudentGroupSerializer,
     UserSerializer,
 )
+from config.i18n import tr
 
 
 def set_refresh_cookie(response, refresh_token):
@@ -92,7 +93,7 @@ class RefreshView(APIView):
 
         # Token yo'q, muddati o'tgan, bekor qilingan yoki foydalanuvchi bloklangan: qayta login kerak
         response = Response(
-            {"detail": "Sessiya tugagan. Qayta kiring."}, status=status.HTTP_401_UNAUTHORIZED
+            {"detail": tr("Sessiya tugagan. Qayta kiring.")}, status=status.HTTP_401_UNAUTHORIZED
         )
         clear_refresh_cookie(response)
         return response
@@ -122,14 +123,13 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.pk == self.request.user.pk:
-            raise ValidationError({"detail": "O'zingizni o'chira olmaysiz."})
+            raise ValidationError({"detail": tr("O'zingizni o'chira olmaysiz.")})
         try:
             instance.delete()
         except ProtectedError:
             raise ValidationError(
                 {
-                    "detail": "Bu foydalanuvchining material, topshiriq yoki laboratoriyalari bor. "
-                    "O'chirish o'rniga uni bloklang."
+                    "detail": tr("Bu foydalanuvchining material, topshiriq yoki laboratoriyalari bor. O'chirish o'rniga uni bloklang.")
                 }
             )
 
@@ -156,7 +156,7 @@ class ChangePasswordView(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        response = Response({"detail": "Parol o'zgartirildi."}, status=status.HTTP_200_OK)
+        response = Response({"detail": tr("Parol o'zgartirildi.")}, status=status.HTTP_200_OK)
         # Parol almashtirilganda barcha sessiyalar yopiladi (models.User.save); shu qurilma esa kirgan holda qoladi
         set_refresh_cookie(response, tokens.issue(user))
         return response
@@ -174,9 +174,9 @@ class ConsentView(APIView):
 
     def post(self, request):
         if not request.user.is_student:
-            raise ValidationError({"detail": "Rozilik faqat talabalardan so'raladi."})
+            raise ValidationError({"detail": tr("Rozilik faqat talabalardan so'raladi.")})
         agreed = request.data.get("agreed")
         if not isinstance(agreed, bool):
-            raise ValidationError({"agreed": "Qiymat true yoki false bo'lishi kerak."})
+            raise ValidationError({"agreed": tr("Qiymat true yoki false bo'lishi kerak.")})
         consent.record_decision(request.user, agreed)
         return Response(consent.status_payload(request.user))

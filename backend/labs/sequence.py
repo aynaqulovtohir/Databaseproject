@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.exceptions import APIException
 
 from .models import LabAttempt
+from config.i18n import tr
 
 
 def chain_key(lab):
@@ -54,7 +55,7 @@ class LabLocked(APIException):
         super().__init__()
         # DRF lug'at qiymatlarini matnga aylantirib yuboradi; locked va id o'z turida qolishi uchun to'g'ridan-to'g'ri
         self.detail = {
-            "detail": f"Bu laboratoriya hali yopiq: avval «{blocker.title}» laboratoriyasini yeching.",
+            "detail": tr("Bu laboratoriya hali yopiq: avval «{title}» laboratoriyasini yeching.", title=blocker.title),
             "locked": True,
             "blocked_by": {"id": blocker.pk, "title": blocker.title},
         }

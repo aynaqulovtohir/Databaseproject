@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import AIAnalysis, ChatMessage
+from config.i18n import tr, N_
 
 MAX_CHAT_MESSAGE_LENGTH = 4000
 
@@ -44,8 +45,8 @@ class ChatQuestionSerializer(serializers.Serializer):
     content = serializers.CharField(
         max_length=MAX_CHAT_MESSAGE_LENGTH,
         error_messages={
-            "blank": "Xabar bo'sh bo'lmasligi kerak.",
-            "required": "Xabar matni kiritilishi shart.",
-            "max_length": "Xabar {max_length} belgidan oshmasligi kerak.",
+            "blank": N_("Xabar bo'sh bo'lmasligi kerak."),
+            "required": N_("Xabar matni kiritilishi shart."),
+            "max_length": N_("Xabar {max_length} belgidan oshmasligi kerak."),
         },
     )

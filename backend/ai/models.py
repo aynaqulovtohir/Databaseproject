@@ -2,14 +2,15 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from config.i18n import N_
 
 
 class AIAnalysis(models.Model):
     class Status(models.TextChoices):
-        PENDING = "pending", "Navbatda"
-        PROCESSING = "processing", "Tahlil qilinmoqda"
-        DONE = "done", "Tayyor"
-        FAILED = "failed", "Xato"
+        PENDING = "pending", N_("Navbatda")
+        PROCESSING = "processing", N_("Tahlil qilinmoqda")
+        DONE = "done", N_("Tayyor")
+        FAILED = "failed", N_("Xato")
 
     submission = models.OneToOneField(
         "submissions.Submission",
@@ -49,8 +50,8 @@ class AIAnalysis(models.Model):
 
 class ChatMessage(models.Model):
     class Role(models.TextChoices):
-        USER = "user", "Talaba"
-        ASSISTANT = "assistant", "AI"
+        USER = "user", N_("Talaba")
+        ASSISTANT = "assistant", N_("AI")
 
     assignment = models.ForeignKey(
         "learning.Assignment",
@@ -81,23 +82,23 @@ class AIUsage(models.Model):
     """
 
     class Purpose(models.TextChoices):
-        ANALYSIS = "analysis", "Topshiriq tahlili"
-        CHAT = "chat", "Chat-yordamchi"
-        LAB_ADVICE = "lab_advice", "SQL maslahati"
-        LAB_GRADE = "lab_grade", "SQL baholash"
-        ER_ADVICE = "er_advice", "ER maslahati"
-        ER_GRADE = "er_grade", "ER baholash"
-        PLAN_EXPLAIN = "plan_explain", "EXPLAIN tushuntirishi"
-        PLAN_SUGGEST = "plan_suggest", "Indeks taklifi (tekshiriladi)"
-        LAB_CHAT = "lab_chat", "Laboratoriya murabbiyi"
-        SELF_EXPLAIN = "self_explain", "Yechimni tushuntirish"
-        VIVA = "viva", "Loyiha himoyasi"
-        VARIANT = "variant", "Topshiriq varianti"
-        BUGGY_CODE = "buggy_code", "Xatoli kod yaratish"
-        MISTAKES_SUMMARY = "mistakes_summary", "Xatolar xulosasi"
-        INTERVIEW = "interview", "Buyurtmachi bilan suhbat"
-        STUDY_ADVICE = "study_advice", "Laboratoriya bo'yicha tavsiya"
-        OTHER = "other", "Boshqa"
+        ANALYSIS = "analysis", N_("Topshiriq tahlili")
+        CHAT = "chat", N_("Chat-yordamchi")
+        LAB_ADVICE = "lab_advice", N_("SQL maslahati")
+        LAB_GRADE = "lab_grade", N_("SQL baholash")
+        ER_ADVICE = "er_advice", N_("ER maslahati")
+        ER_GRADE = "er_grade", N_("ER baholash")
+        PLAN_EXPLAIN = "plan_explain", N_("EXPLAIN tushuntirishi")
+        PLAN_SUGGEST = "plan_suggest", N_("Indeks taklifi (tekshiriladi)")
+        LAB_CHAT = "lab_chat", N_("Laboratoriya murabbiyi")
+        SELF_EXPLAIN = "self_explain", N_("Yechimni tushuntirish")
+        VIVA = "viva", N_("Loyiha himoyasi")
+        VARIANT = "variant", N_("Topshiriq varianti")
+        BUGGY_CODE = "buggy_code", N_("Xatoli kod yaratish")
+        MISTAKES_SUMMARY = "mistakes_summary", N_("Xatolar xulosasi")
+        INTERVIEW = "interview", N_("Buyurtmachi bilan suhbat")
+        STUDY_ADVICE = "study_advice", N_("Laboratoriya bo'yicha tavsiya")
+        OTHER = "other", N_("Boshqa")
 
     purpose = models.CharField("maqsad", max_length=20, choices=Purpose.choices, default=Purpose.OTHER)
     model_name = models.CharField("AI modeli", max_length=100, blank=True)
@@ -130,8 +131,8 @@ class VivaSession(models.Model):
     """
 
     class Status(models.TextChoices):
-        ASKED = "asked", "Savollar berildi"
-        EVALUATED = "evaluated", "Baholandi"
+        ASKED = "asked", N_("Savollar berildi")
+        EVALUATED = "evaluated", N_("Baholandi")
 
     submission = models.OneToOneField(
         "submissions.Submission", verbose_name="yechim", on_delete=models.CASCADE, related_name="viva"

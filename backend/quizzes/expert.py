@@ -24,6 +24,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import ExpertInvite, ExpertPanel, Question
+from config.i18n import N_, tr
 
 ALPHA = 0.05
 MIN_EXPERTS = 3
@@ -33,7 +34,7 @@ S_CVI_UA_TARGET = 0.80
 SCALES = {"essential": (1, 3), "relevance": (1, 4), "clarity": (1, 4)}
 MAX_COMMENT = 1000
 EXPERT_FIELDS = {"full_name": 200, "degree": 200, "position": 200, "workplace": 300, "experience_years": 3}
-VERDICTS = {"keep": "Qoldirish", "revise": "Qayta ko'rib chiqish", "remove": "Olib tashlash"}
+VERDICTS = {"keep": "Qoldirish", "revise": N_("Qayta ko'rib chiqish"), "remove": "Olib tashlash"}
 
 
 def new_token():
@@ -90,7 +91,7 @@ class RatingsError(ValueError):
 
 def clean_expert(raw):
     if not isinstance(raw, dict):
-        raise RatingsError("Ekspert ma'lumotlari noto'g'ri formatda.")
+        raise RatingsError(tr("Ekspert ma'lumotlari noto'g'ri formatda."))
     cleaned = {}
     for field, limit in EXPERT_FIELDS.items():
         value = raw.get(field, "")
@@ -99,11 +100,11 @@ def clean_expert(raw):
                 cleaned[field] = None
                 continue
             if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 70:
-                raise RatingsError("Ish staji 0 dan 70 gacha butun son bo'lishi kerak.")
+                raise RatingsError(tr("Ish staji 0 dan 70 gacha butun son bo'lishi kerak."))
             cleaned[field] = value
             continue
         if not isinstance(value, str) or len(value) > limit:
-            raise RatingsError(f"Ekspert ma'lumotidagi «{field}» maydoni {limit} belgidan oshmasin.")
+            raise RatingsError(tr("Ekspert ma'lumotidagi «{field}» maydoni {limit} belgidan oshmasin.", field=field, limit=limit))
         cleaned[field] = value.strip()
     return cleaned
 
@@ -111,31 +112,31 @@ def clean_expert(raw):
 def clean_ratings(panel, raw, complete):
     """{"<key>": {"essential", "relevance", "clarity", "comment"}}. complete — hamma savol baholangan bo'lishi shart."""
     if not isinstance(raw, dict):
-        raise RatingsError("Baholar noto'g'ri formatda.")
+        raise RatingsError(tr("Baholar noto'g'ri formatda."))
     keys = {item["key"] for item in panel.items}
     cleaned = {}
     for key, value in raw.items():
         if key not in keys:
-            raise RatingsError("Bunday savol yo'q.")
+            raise RatingsError(tr("Bunday savol yo'q."))
         if not isinstance(value, dict):
-            raise RatingsError("Baholar noto'g'ri formatda.")
+            raise RatingsError(tr("Baholar noto'g'ri formatda."))
         item = {}
         for scale, (low, high) in SCALES.items():
             score = value.get(scale)
             if score is None:
                 continue
             if not isinstance(score, int) or isinstance(score, bool) or not low <= score <= high:
-                raise RatingsError(f"Baho {low} dan {high} gacha bo'lishi kerak.")
+                raise RatingsError(tr("Baho {low} dan {high} gacha bo'lishi kerak.", low=low, high=high))
             item[scale] = score
         comment = value.get("comment", "")
         if not isinstance(comment, str) or len(comment) > MAX_COMMENT:
-            raise RatingsError(f"Izoh {MAX_COMMENT} belgidan oshmasin.")
+            raise RatingsError(tr("Izoh {MAX_COMMENT} belgidan oshmasin.", MAX_COMMENT=MAX_COMMENT))
         item["comment"] = comment.strip()
         cleaned[key] = item
     if complete:
         missing = [item["order"] for item in panel.items if any(scale not in cleaned.get(item["key"], {}) for scale in SCALES)]
         if missing:
-            raise RatingsError(f"Hamma savolni baholang. Baholanmagan: {', '.join(map(str, missing[:10]))}.")
+            raise RatingsError(tr("Hamma savolni baholang. Baholanmagan: {str}.", str=', '.join(map(str, missing[:10]))))
     return cleaned
 
 
@@ -143,14 +144,14 @@ def save_ratings(invite, expert, ratings, submit):
     with transaction.atomic():
         invite = ExpertInvite.objects.select_for_update().get(pk=invite.pk)
         if invite.revoked:
-            raise RatingsError("Havola bekor qilingan.")
+            raise RatingsError(tr("Havola bekor qilingan."))
         if invite.submitted_at:
-            raise RatingsError("Baholar allaqachon yuborilgan.")
+            raise RatingsError(tr("Baholar allaqachon yuborilgan."))
         invite.expert = clean_expert(expert)
         invite.ratings = clean_ratings(invite.panel, ratings, complete=submit)
         if submit:
             if not invite.expert.get("full_name"):
-                raise RatingsError("Ism-familiyangizni kiriting: ekspertlar ro'yxati dissertatsiya ilovasida keltiriladi.")
+                raise RatingsError(tr("Ism-familiyangizni kiriting: ekspertlar ro'yxati dissertatsiya ilovasida keltiriladi."))
             invite.submitted_at = timezone.now()
         invite.save()
     return invite
