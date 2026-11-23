@@ -34,6 +34,7 @@ va nazorat guruhlari.
 Talabalar: kirish va chiqish testlarining ikkalasini topshirganlar (bir nechta test bo'lsa — foizlar o'rtachasi),
 faqat tadqiqotga rozi bo'lganlar. Hisob toza Python'da (competence/stats.py), natijalar scipy bilan solishtirilgan.
 """
+import random
 from collections import defaultdict
 
 from competence.stats import (
@@ -48,6 +49,7 @@ from competence.stats import (
     hodges_lehmann,
     holm,
     icc_oneway,
+    lee_bounds,
     levene,
     mann_whitney,
     mean_difference_ci,
@@ -82,6 +84,11 @@ HEAVY_EXTERNAL = 4
 CEILING_SHARE = 0.15
 # Tashlab ketish ulushi chegaralari (Shulz va Grayms, 2002, "5 va 20" qoidasi)
 ATTRITION_LOW, ATTRITION_HIGH = 0.05, 0.20
+# Tashlab ketish xavfi darajasi: kod ("past"...) javobda o'zgarmaydi, xulosa matnida tanlangan tilga o'giriladi
+ATTRITION_LEVELS = {"past": N_("past@@daraja"), "o'rta": N_("o'rta@@daraja"), "yuqori": N_("yuqori@@daraja")}
+# Li chegaralari uchun bootstrap: takrorlar soni va qat'iy seed (bir xil ma'lumotda natija har safar bir xil chiqadi)
+BOUNDS_BOOTSTRAP = 1000
+BOUNDS_SEED = 2009
 
 TEST_LABELS = {
     "student": N_("Styudent t-testi"),
@@ -334,7 +341,7 @@ def external_conclusions(result):
         )
     sensitivity = result["sensitivity"]
     if sensitivity:
-        verdict = "ahamiyatli" if sensitivity["significant"] else tr("ahamiyatli emas")
+        verdict = tr("ahamiyatli") if sensitivity["significant"] else tr("ahamiyatli emas")
         lines.append(
             tr("Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {excluded} ta talaba chiqarilganda ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.", excluded=sensitivity['excluded'], df1=sensitivity['df1'], df2=sensitivity['df2'], f=sensitivity['f'], p=_p_text(sensitivity['p']), verdict=verdict)
         )
@@ -360,6 +367,7 @@ def attrition_stage(started, kept_key, score_key):
         "level": None,
         "test": None,
         "baseline": None,
+        "bounds": None,
     }
     if not started_total:
         return result
@@ -382,7 +390,48 @@ def attrition_stage(started, kept_key, score_key):
             result["test"]["significant"] = result["test"]["p"] < ALPHA
     # Tashlab ketganlar boshida qolganlardan farq qilganmi (farq qilsa, qolganlar tanlanmasi siljigan)
     result["baseline"] = compare_independent(lost_scores, kept_scores)
+    if lost_total:
+        result["bounds"] = attrition_bounds(started, kept_key)
     return result
+
+
+def _stage_bounds(started, kept_key):
+    kept = {cohort: [row[kept_key] for row in started[cohort] if kept_key in row] for cohort in COHORTS}
+    return lee_bounds(kept["experimental"], kept["control"], len(started["experimental"]), len(started["control"]))
+
+
+def _quantile(values, q):
+    ordered = sorted(values)
+    position = q * (len(ordered) - 1)
+    low = int(position)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (position - low) * (ordered[high] - ordered[low])
+
+
+def attrition_bounds(started, kept_key):
+    """Li (2009) chegaralari: tashlab ketish bo'lganda keyingi test natijasi bo'yicha guruhlar farqi (tajriba − nazorat)
+    qaysi oraliqda bo'lishi mumkin. 95% oraliq — har bir guruh ichida talabalar qayta tanlanadigan bootstrap
+    (Horowitz va Manski, 2000): quyi chegaraning 2,5- va yuqori chegaraning 97,5-persentili (konservativ)."""
+    estimate = _stage_bounds(started, kept_key)
+    if estimate is None:
+        return None
+    rng = random.Random(BOUNDS_SEED)
+    lowers, uppers = [], []
+    for _ in range(BOUNDS_BOOTSTRAP):
+        sample = {cohort: rng.choices(rows, k=len(rows)) for cohort, rows in started.items()}
+        bounds = _stage_bounds(sample, kept_key)
+        if bounds:
+            lowers.append(bounds["lower"])
+            uppers.append(bounds["upper"])
+    # Qayta tanlashlarning ko'pida chegara hisoblanmasa (juda kam qolgan), oraliq ishonchli emas
+    reliable = len(lowers) >= BOUNDS_BOOTSTRAP * 0.9
+    return {
+        "lower": _r(estimate["lower"], 2),
+        "upper": _r(estimate["upper"], 2),
+        "trim_share": _r(estimate["trim_share"]),
+        "trimmed": "experimental" if estimate["trimmed"] == "treated" else "control",
+        "ci": [_r(_quantile(lowers, ALPHA / 2), 2), _r(_quantile(uppers, 1 - ALPHA / 2), 2)] if reliable else None,
+    }
 
 
 def attrition_analysis(scores, cohort_of, has_delayed):
@@ -398,29 +447,39 @@ def attrition_analysis(scores, cohort_of, has_delayed):
     return result
 
 
-def _attrition_lines(stage, title, score_label):
+def _attrition_lines(stage, title, score_label, outcome_label):
     if stage is None or not stage["overall"]:
         return []
     exp, ctrl = stage["cohorts"]["experimental"], stage["cohorts"]["control"]
     lines = [
-        tr("{title}: tajriba guruhida {lost} ta talaba ({rate}), nazorat guruhida {lost2} ta ({rate2}) tashlab ketgan; umumiy {overall} — siljish xavfi {level}.", title=title, lost=exp['lost'], rate=_share(exp['rate']), lost2=ctrl['lost'], rate2=_share(ctrl['rate']), overall=_share(stage['overall']), level=stage['level'])
+        tr("{title}: tajriba guruhida {lost} ta talaba ({rate}), nazorat guruhida {lost2} ta ({rate2}) tashlab ketgan; umumiy {overall} — siljish xavfi {level}.", title=title, lost=exp['lost'], rate=_share(exp['rate']), lost2=ctrl['lost'], rate2=_share(ctrl['rate']), overall=_share(stage['overall']), level=tr(ATTRITION_LEVELS[stage['level']]))
     ]
     test = stage["test"]
     if test and test["significant"]:
         lines.append(
-            tr("Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p imputatsiya yoki chegaraviy baholar) bilan tekshiring.", label=test['label'], p=_p_text(test['p']))
+            tr("Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Natijani quyidagi Li chegaralari bilan solishtiring.", label=test['label'], p=_p_text(test['p']))
         )
     baseline = stage["baseline"]
     if baseline and baseline["significant"]:
         lines.append(
             tr("Tashlab ketganlar {score_label} qolganlardan farq qilgan ({label}, {p}): natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling.", score_label=score_label, label=baseline['label'], p=_p_text(baseline['p']))
         )
+    bounds = stage["bounds"]
+    if bounds:
+        interval = tr(", 95% bootstrap oralig'i [{low}; {high}]", low=bounds["ci"][0], high=bounds["ci"][1]) if bounds["ci"] else ""
+        if bounds["ci"]:
+            verdict = tr("oraliq 0 ni o'z ichiga oladi: guruhlar farqi tashlab ketishga sezgir") if bounds["ci"][0] <= 0 <= bounds["ci"][1] else tr("oraliq 0 ni o'z ichiga olmaydi: farqning yo'nalishi tashlab ketishga qaramay saqlanadi")
+        else:
+            verdict = tr("qolganlar juda kam, oraliq hisoblanmadi")
+        lines.append(
+            tr("Li chegaralari (monotonlik farazi bilan, {outcome} bo'yicha tajriba − nazorat farqi): [{lower}; {upper}] ball{interval} — {verdict}.", outcome=outcome_label, lower=bounds["lower"], upper=bounds["upper"], interval=interval, verdict=verdict)
+        )
     return lines
 
 
 def attrition_conclusions(result):
-    return _attrition_lines(result["post"], "Tashlab ketish (kirish → chiqish)", tr("kirish testida")) + _attrition_lines(
-        result["delayed"], tr("Kechiktirilgan testgacha tashlab ketish"), tr("chiqish testida")
+    return _attrition_lines(result["post"], tr("Tashlab ketish (kirish → chiqish)"), tr("kirish testida"), tr("chiqish testi")) + _attrition_lines(
+        result["delayed"], tr("Kechiktirilgan testgacha tashlab ketish"), tr("chiqish testida"), tr("kechiktirilgan test")
     )
 
 
@@ -615,7 +674,7 @@ def conclusions(cohorts, baseline, comparisons, ancova_result, power, n1, n2, cl
         else:
             lines.append(tr("Tajriba boshida guruhlar kirish testi bo'yicha teng bo'lgan ({label}, {p}).", label=baseline['label'], p=_p_text(baseline['p'])))
     if ancova_result:
-        verdict = "ahamiyatli" if ancova_result["significant"] else tr("ahamiyatli emas")
+        verdict = tr("ahamiyatli") if ancova_result["significant"] else tr("ahamiyatli emas")
         lines.append(
             tr("Asosiy gipoteza (oldindan belgilangan): kirish testi natijasini hisobga olganda (ANCOVA) guruhlar farqi {verdict}: F({df1}, {df2}) = {f}, {p}, qisman η² = {partial_eta2} ({effect_label}).", verdict=verdict, df1=ancova_result['df1'], df2=ancova_result['df2'], f=ancova_result['f'], p=_p_text(ancova_result['p']), partial_eta2=ancova_result['partial_eta2'], effect_label=ancova_result['effect_label'])
         )

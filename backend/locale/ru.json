@@ -477,7 +477,6 @@
  "Tashqi AI vositalari: nazorat guruhida {heavy} ta talaba (ulushi {heavy_share}) ulardan ko'p foydalanganini bildirgan (o'rtacha ≥ {threshold}) — bu AI effektini kamaytirib ko'rsatishi mumkin.": "Внешние инструменты ИИ: {heavy} студ. контрольной группы (доля {heavy_share}) сообщили, что активно ими пользовались (среднее ≥ {threshold}) — это может занижать эффект ИИ.",
  "ahamiyatli emas": "незначимо",
  "Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {excluded} ta talaba chiqarilganda ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.": "Анализ чувствительности: при исключении {excluded} студ., активно пользовавшихся внешним ИИ, ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.",
- "Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p imputatsiya yoki chegaraviy baholar) bilan tekshiring.": "Внимание: группы различаются по доле выбывших ({label}, {p}) — дифференциальное выбывание, группы могут быть уже не равны. Проверьте анализом чувствительности (например, множественной импутацией или граничными оценками).",
  "Tashlab ketganlar {score_label} qolganlardan farq qilgan ({label}, {p}): natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling.": "Выбывшие отличались от остальных {score_label} ({label}, {p}): результаты относятся только к участвовавшим до конца, обобщайте их на всю группу осторожно.",
  "kirish testida": "во входном тесте",
  "Kechiktirilgan testgacha tashlab ketish": "Выбывание до отсроченного теста",
@@ -746,5 +745,18 @@
  "Olib tashlash": "Удалить",
  "Bu amal faqat admin uchun.": "Это действие доступно только администратору.",
  "Bu amal faqat o'qituvchi uchun.": "Это действие доступно только преподавателю.",
- "Bu amal faqat talaba uchun.": "Это действие доступно только студенту."
+ "Bu amal faqat talaba uchun.": "Это действие доступно только студенту.",
+ "past@@daraja": "низкий",
+ "o'rta@@daraja": "средний",
+ "yuqori@@daraja": "высокий",
+ "ahamiyatli": "значимо",
+ "Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Natijani quyidagi Li chegaralari bilan solishtiring.": "Внимание: группы различаются по доле выбывших ({label}, {p}) — дифференциальное выбывание, группы могут быть уже не эквивалентны. Сравните результат с границами Ли ниже.",
+ ", 95% bootstrap oralig'i [{low}; {high}]": ", 95% бутстреп-интервал [{low}; {high}]",
+ "qolganlar juda kam, oraliq hisoblanmadi": "осталось слишком мало студентов, интервал не вычислен",
+ "Li chegaralari (monotonlik farazi bilan, {outcome} bo'yicha tajriba − nazorat farqi): [{lower}; {upper}] ball{interval} — {verdict}.": "Границы Ли (при допущении монотонности, разница эксперимент − контроль по {outcome}): [{lower}; {upper}] балла{interval} — {verdict}.",
+ "Tashlab ketish (kirish → chiqish)": "Выбывание (вход → выход)",
+ "chiqish testi": "выходному тесту",
+ "kechiktirilgan test": "отсроченному тесту",
+ "oraliq 0 ni o'z ichiga oladi: guruhlar farqi tashlab ketishga sezgir": "интервал включает 0: разница между группами чувствительна к выбыванию",
+ "oraliq 0 ni o'z ichiga olmaydi: farqning yo'nalishi tashlab ketishga qaramay saqlanadi": "интервал не включает 0: направление разницы сохраняется, несмотря на выбывание"
 }

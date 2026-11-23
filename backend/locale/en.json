@@ -477,7 +477,6 @@
  "Tashqi AI vositalari: nazorat guruhida {heavy} ta talaba (ulushi {heavy_share}) ulardan ko'p foydalanganini bildirgan (o'rtacha ≥ {threshold}) — bu AI effektini kamaytirib ko'rsatishi mumkin.": "External AI tools: {heavy} students in the control group (share {heavy_share}) reported using them heavily (mean ≥ {threshold}) — this may understate the AI effect.",
  "ahamiyatli emas": "not significant",
  "Sezgirlik tahlili: tashqi AI dan ko'p foydalangan {excluded} ta talaba chiqarilganda ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.": "Sensitivity analysis: excluding {excluded} students who used external AI heavily, ANCOVA F({df1}, {df2}) = {f}, {p} — {verdict}.",
- "Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Sezgirlik tahlili (masalan, ko'p imputatsiya yoki chegaraviy baholar) bilan tekshiring.": "Note: the groups differ in dropout rate ({label}, {p}) — differential attrition, the groups may no longer be equivalent. Check with a sensitivity analysis (e.g. multiple imputation or bounds).",
  "Tashlab ketganlar {score_label} qolganlardan farq qilgan ({label}, {p}): natijalar faqat oxirigacha qatnashganlarga tegishli, ularni butun guruhga umumlashtirishda ehtiyot bo'ling.": "Dropouts differed from the rest {score_label} ({label}, {p}): the results apply only to those who participated to the end; be careful generalising them to the whole group.",
  "kirish testida": "on the pre-test",
  "Kechiktirilgan testgacha tashlab ketish": "Dropout before the delayed test",
@@ -746,5 +745,18 @@
  "Olib tashlash": "Remove",
  "Bu amal faqat admin uchun.": "This action is for administrators only.",
  "Bu amal faqat o'qituvchi uchun.": "This action is for teachers only.",
- "Bu amal faqat talaba uchun.": "This action is for students only."
+ "Bu amal faqat talaba uchun.": "This action is for students only.",
+ "past@@daraja": "low",
+ "o'rta@@daraja": "medium",
+ "yuqori@@daraja": "high",
+ "ahamiyatli": "significant",
+ "Diqqat: guruhlar tashlab ketish ulushi bo'yicha farq qiladi ({label}, {p}) — differensial tashlab ketish, guruhlar endi teng emas bo'lishi mumkin. Natijani quyidagi Li chegaralari bilan solishtiring.": "Warning: the groups differ in attrition rate ({label}, {p}) — differential attrition; the groups may no longer be equivalent. Compare the result with the Lee bounds below.",
+ ", 95% bootstrap oralig'i [{low}; {high}]": ", 95% bootstrap interval [{low}; {high}]",
+ "qolganlar juda kam, oraliq hisoblanmadi": "too few students remained, the interval was not computed",
+ "Li chegaralari (monotonlik farazi bilan, {outcome} bo'yicha tajriba − nazorat farqi): [{lower}; {upper}] ball{interval} — {verdict}.": "Lee bounds (under the monotonicity assumption, experimental − control difference on the {outcome}): [{lower}; {upper}] points{interval} — {verdict}.",
+ "Tashlab ketish (kirish → chiqish)": "Attrition (pre → post)",
+ "chiqish testi": "post-test",
+ "kechiktirilgan test": "delayed test",
+ "oraliq 0 ni o'z ichiga oladi: guruhlar farqi tashlab ketishga sezgir": "the interval includes 0: the group difference is sensitive to attrition",
+ "oraliq 0 ni o'z ichiga olmaydi: farqning yo'nalishi tashlab ketishga qaramay saqlanadi": "the interval excludes 0: the direction of the difference holds despite attrition"
 }

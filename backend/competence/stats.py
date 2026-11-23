@@ -9,7 +9,8 @@
 - sinfichi korrelyatsiya ICC(1) va dizayn effekti — talabalar guruhlarga (klasterlarga) bo'lingan tajriba uchun;
 - TOST — ikki o'rtachaning ekvivalentligi (masalan, testning parallel variantlari);
 - Spirmen rang korrelyatsiyasi (Fisher z ishonch oralig'i bilan);
-- ishonch oraliqlari: o'rtachalar farqi (Styudent, Uelch), Xodjes–Leman siljishi, Xedjes g, ANCOVA tuzatilgan farqi.
+- ishonch oraliqlari: o'rtachalar farqi (Styudent, Uelch), Xodjes–Leman siljishi, Xedjes g, ANCOVA tuzatilgan farqi;
+- Li (Lee, 2009) chegaralari — guruhlar tashlab ketish ulushi bo'yicha farq qilganda effektning quyi va yuqori chegarasi.
 
 p-qiymatlar uchun to'liq bo'lmagan gamma va beta funksiyalari (Numerical Recipes, 6.2 va 6.4) ishlatiladi.
 Natijalar scipy.stats bilan solishtirib tekshirilgan (tests.py dagi namunaviy qiymatlar).
@@ -210,6 +211,42 @@ def _pooled_sd(a, b):
 
 def _hedges_correction(n):
     return 1 - 3 / (4 * n - 9)
+
+
+def _trimmed_mean(values, share, top):
+    """Saralangan qiymatlarning share ulushi yuqoridan (top) yoki pastdan olib tashlangandagi o'rtacha.
+    Ulush butun songa to'g'ri kelmasa, chegaradagi qiymat qisman (vazn bilan) hisobga olinadi."""
+    ordered = sorted(values, reverse=not top)  # saqlanadigan qism boshida turadi
+    keep = len(ordered) * (1 - share)
+    whole = int(keep)
+    total = sum(ordered[:whole]) + (keep - whole) * (ordered[whole] if whole < len(ordered) else 0)
+    return total / keep
+
+
+def lee_bounds(treated, control, n_treated, n_control):
+    """Li (Lee, 2009) chegaralari: tashlab ketish ulushi guruhlarda har xil bo'lganda o'rtachalar farqining
+    (treated − control) quyi va yuqori chegarasi.
+
+    treated, control — oxirigacha qolganlarning natijalari; n_treated, n_control — bosqichni boshlaganlar soni.
+    Monotonlik farazi: tajriba sharoiti ba'zi talabalarni qolishga undashi mumkin, lekin hech kimni ketishga
+    majbur qilmaydi (yoki aksincha). Qolish ulushi yuqori guruhda ortiqcha qolganlar ulushi
+    p = (q_yuqori − q_past) / q_yuqori kesib tashlanadi: eng yaxshi natijalar olib tashlansa — bir chegara,
+    eng yomonlari olib tashlansa — ikkinchisi. Qolish ulushlari teng bo'lsa, ikkala chegara kuzatilgan farqqa teng.
+    """
+    if len(treated) < 2 or len(control) < 2 or not n_treated or not n_control:
+        return None
+    q_treated, q_control = len(treated) / n_treated, len(control) / n_control
+    trim_treated = q_treated >= q_control
+    q_high, q_low = (q_treated, q_control) if trim_treated else (q_control, q_treated)
+    share = (q_high - q_low) / q_high
+    if trim_treated:
+        # Quyi chegara: tajriba guruhining eng yaxshi natijalari "ortiqcha qolganlar" deb olib tashlanadi
+        low = _trimmed_mean(treated, share, top=True) - _mean(control)
+        high = _trimmed_mean(treated, share, top=False) - _mean(control)
+    else:
+        low = _mean(treated) - _trimmed_mean(control, share, top=False)
+        high = _mean(treated) - _trimmed_mean(control, share, top=True)
+    return {"lower": low, "upper": high, "trim_share": share, "trimmed": "treated" if trim_treated else "control"}
 
 
 def mean_difference_ci(a, b, equal_var, alpha=ALPHA):

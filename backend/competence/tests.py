@@ -297,6 +297,29 @@ class StatsTests(SimpleTestCase):
     A = [72, 65, 88, 91, 54, 77, 83, 69, 95, 60, 74, 81]
     B = [55, 61, 70, 48, 66, 59, 73, 52, 64, 58]
 
+    def test_lee_bounds(self):
+        """Qo'lda hisoblangan: tajriba guruhi 10/10 qolgan, nazorat 4/5 — p = (1 − 0,8) / 1 = 0,2.
+        Eng yaxshi 2 ta olib tashlansa o'rtacha 4,5, eng yomon 2 tasi olib tashlansa 6,5; nazorat o'rtachasi 5."""
+        bounds = stats.lee_bounds(list(range(1, 11)), [5, 5, 5, 5], 10, 5)
+        self.assertEqual(bounds["trimmed"], "treated")
+        self.assertAlmostEqual(bounds["trim_share"], 0.2)
+        self.assertAlmostEqual(bounds["lower"], -0.5)
+        self.assertAlmostEqual(bounds["upper"], 1.5)
+        # Nazorat guruhida ko'proq qolgan: kesish nazoratda, chegaralar ishorasi teskari
+        mirrored = stats.lee_bounds([5, 5, 5, 5], list(range(1, 11)), 5, 10)
+        self.assertEqual(mirrored["trimmed"], "control")
+        self.assertAlmostEqual(mirrored["lower"], -1.5)
+        self.assertAlmostEqual(mirrored["upper"], 0.5)
+        # Ulush butun songa to'g'ri kelmaydi (p = 0,1, 4,5 ta qiymat saqlanadi): chegaradagi qiymat yarim vazn bilan
+        # (1 + 2 + 3 + 4 + 0,5·5) / 4,5 − 2 va (5 + 4 + 3 + 2 + 0,5·1) / 4,5 − 2
+        partial = stats.lee_bounds([1, 2, 3, 4, 5], [1, 2, 3], 6, 4)
+        self.assertAlmostEqual(partial["lower"], 12.5 / 4.5 - 2)
+        self.assertAlmostEqual(partial["upper"], 14.5 / 4.5 - 2)
+        # Qolish ulushlari teng — chegaralar kuzatilgan farqqa teng
+        equal = stats.lee_bounds([1, 2, 3], [4, 5], 3, 2)
+        self.assertEqual((equal["lower"], equal["upper"], equal["trim_share"]), (-2.5, -2.5, 0))
+        self.assertIsNone(stats.lee_bounds([1], [2, 3], 3, 3))
+
     def test_welch_t(self):
         result = stats.welch_t_test(self.A, self.B)
         self.assertAlmostEqual(result["t"], 3.446702, places=5)
