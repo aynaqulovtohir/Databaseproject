@@ -38,30 +38,30 @@ RELIABLE_STUDENTS = 30
 LEVELS = [
     # (raqam, kalit, nomi, p shu qiymatdan katta bo'lsa)
     (1, "very_easy", N_("Juda oson"), 0.80),
-    (2, "easy", "Oson", 0.60),
-    (3, "medium", "O'rtacha", 0.40),
-    (4, "hard", "Qiyin", 0.20),
+    (2, "easy", N_("Oson"), 0.60),
+    (3, "medium", N_("O'rtacha"), 0.40),
+    (4, "hard", N_("Qiyin"), 0.20),
     (5, "very_hard", N_("Juda qiyin"), -math.inf),
 ]
 
 DISCRIMINATION = [
-    ("excellent", "A'lo", 0.40),
-    ("good", "Yaxshi", 0.30),
-    ("fair", "Qoniqarli", 0.20),
-    ("poor", "Past", 0.0),
-    ("negative", "Manfiy", -math.inf),
+    ("excellent", N_("A'lo"), 0.40),
+    ("good", N_("Yaxshi"), 0.30),
+    ("fair", N_("Qoniqarli"), 0.20),
+    ("poor", N_("Past"), 0.0),
+    ("negative", N_("Manfiy"), -math.inf),
 ]
 
 ALPHA_LEVELS = [
-    ("excellent", "A'lo", 0.9),
-    ("good", "Yaxshi", 0.8),
-    ("acceptable", "Maqbul", 0.7),
-    ("questionable", "Shubhali", 0.6),
-    ("poor", "Past", 0.5),
+    ("excellent", N_("A'lo"), 0.9),
+    ("good", N_("Yaxshi"), 0.8),
+    ("acceptable", N_("Maqbul"), 0.7),
+    ("questionable", N_("Shubhali"), 0.6),
+    ("poor", N_("Past"), 0.5),
     ("unacceptable", N_("Qabul qilinmaydi"), -math.inf),
 ]
 
-VERDICTS = {"good": "Yaxshi", "review": N_("Qayta ko'rib chiqing"), "replace": N_("Tekshiring yoki almashtiring")}
+VERDICTS = {"good": N_("Yaxshi"), "review": N_("Qayta ko'rib chiqing"), "replace": N_("Tekshiring yoki almashtiring")}
 
 # α shu qiymatdan ko'proq oshsa, laboratoriya to'plamni "buzyapti" deb hisoblanadi
 ALPHA_GAIN = 0.02

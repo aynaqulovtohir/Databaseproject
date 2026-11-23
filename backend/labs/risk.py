@@ -31,7 +31,7 @@ MIN_HINT_ATTEMPTS = 6
 
 WEIGHTS = {"inactive": 2, "behind": 2, "stuck": 1, "low_mastery": 1, "low_test": 1, "hints": 1}
 LEVELS = [(3, "high"), (2, "medium"), (1, "low")]
-LEVEL_LABELS = {"high": "Yuqori", "medium": "O'rta", "low": "Past", "none": N_("Xavf yo'q")}
+LEVEL_LABELS = {"high": N_("Yuqori"), "medium": N_("O'rta"), "low": N_("Past"), "none": N_("Xavf yo'q")}
 
 
 def level_of(score):

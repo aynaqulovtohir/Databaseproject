@@ -4,6 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.i18n import tr
+
 from . import linking, telegram
 from .models import TelegramAccount
 
@@ -32,7 +34,7 @@ class TelegramLinkView(APIView):
     def post(self, request):
         if not telegram.is_configured():
             return Response(
-                {"detail": "Telegram bot hali sozlanmagan. Administratorga murojaat qiling."},
+                {"detail": tr("Telegram bot hali sozlanmagan. Administratorga murojaat qiling.")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         url, expires_at = linking.create_link(request.user)

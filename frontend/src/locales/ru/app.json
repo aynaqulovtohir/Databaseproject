@@ -1602,5 +1602,14 @@
  "Kirish@@tizimga": "Войти",
  "Chiqish@@tizimdan": "Выйти",
  "Topshirish@@tugma": "Сдать",
- "Statistika@@ustun": "Статистика"
+ "Statistika@@ustun": "Статистика",
+ "boshida → oxirida": "начало → конец",
+ "O'sishlar farqi": "Разница приростов",
+ "oxirida → keyin": "конец → отсроченный",
+ "Saqlanish farqi": "Разница сохранения",
+ "past@@daraja": "низкий",
+ "o'rta@@daraja": "средний",
+ "yuqori@@daraja": "высокий",
+ "kirish testida": "по входному тесту",
+ "chiqish testida": "по выходному тесту"
 }

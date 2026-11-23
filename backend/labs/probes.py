@@ -103,7 +103,7 @@ def validate_lab_probes(setup_sql, solution_sql, probes):
         raise LabSetupError("solution_sql", outcome.error)
     for probe, error in zip(probes, errors):
         if not passed(probe, error):
-            what = "to'xtatmadi" if probe["kind"] == "attack" else tr("rad etdi")
+            what = tr("to'xtatmadi") if probe["kind"] == "attack" else tr("rad etdi")
             detail = f": {message(error)}" if error else ""
             raise LabSetupError("probes", SqlError(tr("Namunaviy yechim «{title}» sinovini {what}{detail}", title=probe['title'], what=what, detail=detail)))
 

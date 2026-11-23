@@ -68,7 +68,7 @@ from .services import finalize_if_expired, likert_value, percent
 from .survey_bank import EXTERNAL_AI_TEXTS
 from config.i18n import N_, tr
 
-COHORTS = {"experimental": N_("Tajriba (AI yoqilgan)"), "control": "Nazorat"}
+COHORTS = {"experimental": N_("Tajriba (AI yoqilgan)"), "control": N_("Nazorat")}
 MIN_GROUP = 3
 MEDIUM_EFFECT = 0.5
 TARGET_POWER = 0.8
@@ -84,8 +84,8 @@ CEILING_SHARE = 0.15
 ATTRITION_LOW, ATTRITION_HIGH = 0.05, 0.20
 
 TEST_LABELS = {
-    "student": "Styudent t-testi",
-    "welch": "Uelch t-testi",
+    "student": N_("Styudent t-testi"),
+    "welch": N_("Uelch t-testi"),
     "mann_whitney": N_("Mann–Uitni U testi"),
     "paired_t": N_("Juftlangan t-testi"),
     "wilcoxon": N_("Uilkokson ishorali ranglar testi"),
@@ -105,10 +105,11 @@ def _effect_label(kind, value):
     if value < bounds[0]:
         return tr("juda kichik")
     if value < bounds[1]:
-        return "kichik"
+        return tr("kichik")
     if value < bounds[2]:
-        return "o'rta"
-    return "katta"
+        # @@: "o'rta" daraja kodi (hake_level, tashlab ketish) bilan aralashmasin, u kod sifatida qoladi
+        return tr("o'rta@@effekt")
+    return tr("katta")
 
 
 def hake_level(g):

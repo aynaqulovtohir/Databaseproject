@@ -266,7 +266,7 @@ def compare(student, reference):
     if missing_entities:
         differences.append(tr("{missing_entities} ta obyekt yetishmaydi.", missing_entities=len(missing_entities)))
     for name in sorted(extra_entities - associative_names):
-        differences.append(f"Ortiqcha obyekt: «{_display(student_entities, name)}».")
+        differences.append(tr("Ortiqcha obyekt: «{name}».", name=_display(student_entities, name)))
         extras += 1
     total += len(reference_entities)
     matched += len(common)

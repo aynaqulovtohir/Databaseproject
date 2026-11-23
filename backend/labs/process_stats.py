@@ -29,13 +29,13 @@ CURVE_POINTS = 21
 KNOWN_STRATEGIES = [key for key in STRATEGIES if key != "aniqlanmadi"]
 
 METRICS = {
-    "active_minutes": "Faol vaqt (daqiqa)",
+    "active_minutes": N_("Faol vaqt (daqiqa)"),
     "checks": N_("Tekshiruvlar soni"),
     "churn": N_("Qaytarish ulushi (o'chirilgan / qo'shilgan)"),
     "first_relationship_minutes": N_("Birinchi bog'lanishgacha (daqiqa)"),
     "entities_first_share": N_("Obyektlarning bog'lanishdan oldin chizilgan ulushi"),
-    "first_check_ratio": "Birinchi tekshiruvdagi moslik",
-    "final_ratio": "Yakuniy moslik",
+    "first_check_ratio": N_("Birinchi tekshiruvdagi moslik"),
+    "final_ratio": N_("Yakuniy moslik"),
 }
 
 

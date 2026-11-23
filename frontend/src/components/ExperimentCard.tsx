@@ -8,9 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { AttritionStage, Descriptive, ExperimentAnalysis, ExperimentCohort, Normality, ParallelForms, StatTest } from '@/lib/types'
-import { t } from '@/lib/i18n'
+import { localized, t } from '@/lib/i18n'
 
 const COHORTS: ExperimentCohort[] = ['experimental', 'control']
+// Server daraja kodlari (tashlab ketish xavfi, Heyk g): kod o'zbekcha keladi, ko'rsatishda tanlangan tilga o'giriladi
+const LEVEL_LABELS: Record<string, string> = localized({ past: 'past@@daraja', "o'rta": "o'rta@@daraja", yuqori: 'yuqori@@daraja' })
 
 function num(value: number | null | undefined, digits = 2) {
   return value === null || value === undefined ? '—' : value.toFixed(digits)
@@ -177,7 +179,7 @@ function AttritionRow({ title, stage, score }: { title: string; stage: Attrition
       <TableCell className="text-right tabular-nums">
         {percentText(stage.overall)}
         {stage.level ? (
-          <span className={`block text-xs ${stage.level === 'yuqori' ? 'text-destructive' : 'text-muted-foreground'}`}>{t('xavf {level}', { level: stage.level })}</span>
+          <span className={`block text-xs ${stage.level === 'yuqori' ? 'text-destructive' : 'text-muted-foreground'}`}>{t('xavf {level}', { level: LEVEL_LABELS[stage.level] })}</span>
         ) : null}
       </TableCell>
       <TableCell className="max-w-64 whitespace-normal text-sm">
@@ -221,8 +223,8 @@ function AttritionBlock({ attrition }: { attrition: ExperimentAnalysis['attritio
           </TableRow>
         </TableHeader>
         <TableBody>
-          <AttritionRow title={t('Kirish → chiqish')} stage={attrition.post} score="kirish testida" />
-          {attrition.delayed ? <AttritionRow title={t('Chiqish → kechiktirilgan')} stage={attrition.delayed} score="chiqish testida" /> : null}
+          <AttritionRow title={t('Kirish → chiqish')} stage={attrition.post} score={t('kirish testida')} />
+          {attrition.delayed ? <AttritionRow title={t('Chiqish → kechiktirilgan')} stage={attrition.delayed} score={t('chiqish testida')} /> : null}
         </TableBody>
       </Table>
     </div>
@@ -377,7 +379,7 @@ export function ExperimentCard() {
                     <TableCell className="text-right tabular-nums">{describe(cohort.delayed)}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {num(cohort.gain.class)}
-                      {cohort.gain.level ? <span className="block text-xs text-muted-foreground">{cohort.gain.level}</span> : null}
+                      {cohort.gain.level ? <span className="block text-xs text-muted-foreground">{LEVEL_LABELS[cohort.gain.level] ?? cohort.gain.level}</span> : null}
                       {cohort.gain.excluded_full_pre ? (
                         <span className="block text-xs text-muted-foreground" title={t('Kirish testida 100%: individual g aniqlanmaydi')}>
                           {t('{excluded_full_pre} ta chiqarilgan', { excluded_full_pre: cohort.gain.excluded_full_pre })}

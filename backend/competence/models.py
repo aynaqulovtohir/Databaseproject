@@ -10,7 +10,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from labs.models import Lab
-from config.i18n import N_
+from config.i18n import N_, tr
 
 
 class Component(models.Model):
@@ -41,10 +41,10 @@ class Component(models.Model):
 
     def clean(self):
         if self.medium_from is not None and self.high_from is not None and self.medium_from >= self.high_from:
-            raise ValidationError({"high_from": "Yuqori daraja chegarasi o'rta daraja chegarasidan katta bo'lishi kerak."})
+            raise ValidationError({"high_from": tr("Yuqori daraja chegarasi o'rta daraja chegarasidan katta bo'lishi kerak.")})
         if self.high_from is not None and self.creative_from is not None and self.high_from >= self.creative_from:
             raise ValidationError(
-                {"creative_from": "Ijodiy-amaliy daraja chegarasi yuqori daraja chegarasidan katta bo'lishi kerak."}
+                {"creative_from": tr("Ijodiy-amaliy daraja chegarasi yuqori daraja chegarasidan katta bo'lishi kerak.")}
             )
 
 
@@ -128,4 +128,4 @@ class Indicator(models.Model):
         if not isinstance(topics, list) or any(topic not in valid for topic in topics):
             raise ValidationError({"topics": f"Mavzu kodlari ro'yxati bo'lishi kerak, mumkin bo'lganlari: {', '.join(sorted(valid))}."})
         if topics and self.source not in self.TOPIC_SOURCES:
-            raise ValidationError({"topics": "Mavzular faqat laboratoriya manbalari uchun beriladi."})
+            raise ValidationError({"topics": tr("Mavzular faqat laboratoriya manbalari uchun beriladi.")})

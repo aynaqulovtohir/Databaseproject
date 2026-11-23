@@ -46,7 +46,7 @@ ACTIVITIES = {
     "boglanish_qayta_ulandi": N_("Bog'lanish boshqa obyektga ulandi"),
     "kardinallik_ozgardi": N_("Kardinallik o'zgardi"),
     "joylashuv_ozgardi": N_("Obyektlar joyi o'zgardi"),
-    "tekshirish": "Tekshirish",
+    "tekshirish": N_("Tekshirish"),
     "topshirish": N_("Baholashga topshirish"),
 }
 CHECK_ACTIVITIES = {"run": "tekshirish", "submit": "topshirish"}
