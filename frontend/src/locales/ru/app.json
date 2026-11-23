@@ -1611,5 +1611,12 @@
  "o'rta@@daraja": "средний",
  "yuqori@@daraja": "высокий",
  "kirish testida": "по входному тесту",
- "chiqish testida": "по выходному тесту"
+ "chiqish testida": "по выходному тесту",
+ "95% oraliq [{low}; {high}]": "95% интервал [{low}; {high}]",
+ "qolganlar juda kam, oraliq hisoblanmadi": "осталось слишком мало, интервал не вычислен",
+ "{group} guruhidan {share} kesildi": "из группы «{group}» отсечено {share}",
+ "farq tashlab ketishga sezgir": "разница чувствительна к выбыванию",
+ "farq yo'nalishi saqlanadi": "направление разницы сохраняется",
+ "Li (2009): ko'proq qolgan guruhning keyingi test natijalari tashlab ketish farqi ulushida eng yaxshi va eng yomon tomondan kesiladi. Faraz — monotonlik: guruh sharoiti talabalarning qolishiga faqat bir yo'nalishda ta'sir qiladi.": "Ли (2009): результаты следующего теста в группе с большей долей оставшихся отсекаются сверху и снизу на долю разницы в выбывании. Допущение — монотонность: условие группы влияет на то, останется ли студент, только в одном направлении.",
+ "Li chegaralari (tajriba − nazorat)": "Границы Ли (эксперимент − контроль)"
 }

@@ -165,6 +165,30 @@ function percentText(value: number | null) {
   return value === null ? '—' : `${Math.round(100 * value)}%`
 }
 
+/** Li chegaralari: farqning tashlab ketishga qaramay bo'lishi mumkin bo'lgan oralig'i va 95% bootstrap oralig'i */
+function BoundsCell({ bounds }: { bounds: AttritionStage['bounds'] }) {
+  if (!bounds) return <span className="text-muted-foreground">—</span>
+  const sensitive = bounds.ci ? bounds.ci[0] <= 0 && bounds.ci[1] >= 0 : null
+  return (
+    <>
+      <span className="tabular-nums">[{num(bounds.lower)}; {num(bounds.upper)}]</span>
+      <span className="block text-xs text-muted-foreground">
+        {bounds.ci
+          ? t("95% oraliq [{low}; {high}]", { low: num(bounds.ci[0]), high: num(bounds.ci[1]) })
+          : t('qolganlar juda kam, oraliq hisoblanmadi')}
+      </span>
+      <span className="block text-xs text-muted-foreground">
+        {t('{group} guruhidan {share} kesildi', { group: t(bounds.trimmed === 'experimental' ? 'Tajriba' : 'Nazorat'), share: percentText(bounds.trim_share) })}
+      </span>
+      {sensitive === null ? null : (
+        <span className={`block text-xs ${sensitive ? 'text-destructive' : 'text-muted-foreground'}`}>
+          {sensitive ? t('farq tashlab ketishga sezgir') : t("farq yo'nalishi saqlanadi")}
+        </span>
+      )}
+    </>
+  )
+}
+
 function AttritionRow({ title, stage, score }: { title: string; stage: AttritionStage; score: string }) {
   const { test, baseline } = stage
   return (
@@ -201,6 +225,9 @@ function AttritionRow({ title, stage, score }: { title: string; stage: Attrition
             : t('Tashlab ketganlar {score} solishtirilmadi (kamida 3 ta kerak)', { score })}
         </span>
       </TableCell>
+      <TableCell className="max-w-56 whitespace-normal text-sm">
+        <BoundsCell bounds={stage.bounds} />
+      </TableCell>
     </TableRow>
   )
 }
@@ -220,6 +247,11 @@ function AttritionBlock({ attrition }: { attrition: ExperimentAnalysis['attritio
               {t('Umumiy')}
             </TableHead>
             <TableHead>{t('Guruhlar farqi')}</TableHead>
+            <TableHead
+              title={t("Li (2009): ko'proq qolgan guruhning keyingi test natijalari tashlab ketish farqi ulushida eng yaxshi va eng yomon tomondan kesiladi. Faraz — monotonlik: guruh sharoiti talabalarning qolishiga faqat bir yo'nalishda ta'sir qiladi.")}
+            >
+              {t('Li chegaralari (tajriba − nazorat)')}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

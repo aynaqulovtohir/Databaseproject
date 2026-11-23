@@ -1391,6 +1391,15 @@ export interface AttritionStage {
   test: { name: 'chi2' | 'fisher'; label: string; chi2?: number; df?: number; p: number; significant: boolean } | null
   /** Tashlab ketganlar va qolganlar oldingi test bo'yicha */
   baseline: StatTest | null
+  /** Li (2009) chegaralari: keyingi test bo'yicha tajriba − nazorat farqi; hech kim tashlab ketmasa null */
+  bounds: {
+    lower: number
+    upper: number
+    trim_share: number
+    trimmed: ExperimentCohort
+    /** 95% bootstrap oralig'i; qolganlar juda kam bo'lsa null */
+    ci: [number, number] | null
+  } | null
 }
 
 export interface ExperimentAnalysis {

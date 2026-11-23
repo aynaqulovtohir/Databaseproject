@@ -23,7 +23,7 @@ from labs.psychometrics import cronbach_alpha
 from users.consent import record_decision
 from users.models import StudentGroup, User
 
-from .experiment import analyse as analyse_experiment, attrition_stage, compare_independent, hake_level
+from .experiment import analyse as analyse_experiment, attrition_conclusions, attrition_stage, compare_independent, hake_level
 from .models import LIKERT_SCALE, Choice, Question, Quiz, QuizAttempt
 from .psychometrics import analyse_quiz
 
@@ -519,6 +519,34 @@ class ExperimentTests(ResearchBase):
         self.assertAlmostEqual(stage["test"]["chi2"], 6.646, places=3)
         self.assertAlmostEqual(stage["test"]["p"], 0.0099, places=4)
         self.assertEqual(stage["differential"], 0.225)
+
+    def test_attrition_lee_bounds(self):
+        """Tajriba guruhidan 12/40, nazoratdan 3/40 tashlab ketgan: tajriba natijalari teng, nazoratda 0 dan 100 gacha.
+        Nazorat guruhida ko'proq qolgan (37/40 > 28/40) — u kesiladi, p = (37/40 − 28/40) / (37/40) = 9/37."""
+        started = {
+            "experimental": [{"pre": 50, **({} if i < 12 else {"post": 70})} for i in range(40)],
+            "control": [{"pre": 50, **({} if i < 3 else {"post": [0, 100][i % 2]})} for i in range(40)],
+        }
+        stage = attrition_stage(started, "post", "pre")
+        bounds = stage["bounds"]
+        self.assertEqual(bounds["trimmed"], "control")
+        self.assertAlmostEqual(bounds["trim_share"], round(9 / 37, 3))
+        control = sorted(row["post"] for row in started["control"] if "post" in row)
+        keep = 37 * (1 - 9 / 37)  # 28 ta: nazoratda 18 ta 0 va 19 ta 100
+        lowest_kept = sum(control[:28]) / keep  # eng yaxshilari olib tashlangan: nazorat past, farq katta
+        highest_kept = sum(control[-28:]) / keep
+        self.assertAlmostEqual(bounds["lower"], round(70 - highest_kept, 2))
+        self.assertAlmostEqual(bounds["upper"], round(70 - lowest_kept, 2))
+        # Bootstrap oralig'i nuqtaviy chegaralarni o'z ichiga oladi va har safar bir xil chiqadi
+        low, high = bounds["ci"]
+        self.assertLessEqual(low, bounds["lower"])
+        self.assertGreaterEqual(high, bounds["upper"])
+        self.assertEqual(attrition_stage(started, "post", "pre")["bounds"], bounds)
+        lines = attrition_conclusions({"post": stage, "delayed": None})
+        self.assertTrue(any(line.startswith("Li chegaralari") and "chiqish testi bo'yicha" in line for line in lines))
+        # Hech kim tashlab ketmasa chegara kerak emas
+        full = {cohort: [row for row in rows if "post" in row] for cohort, rows in started.items()}
+        self.assertIsNone(attrition_stage(full, "post", "pre")["bounds"])
 
     def test_estimate_matches_selected_test(self):
         # Normal bo'lmagan taqsimot: Mann–Uitni tanlanadi, baho ham parametrsiz va oraliq p ga zid emas

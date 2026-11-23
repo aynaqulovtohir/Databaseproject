@@ -1611,5 +1611,12 @@
  "o'rta@@daraja": "medium",
  "yuqori@@daraja": "high",
  "kirish testida": "on the pre-test",
- "chiqish testida": "on the post-test"
+ "chiqish testida": "on the post-test",
+ "95% oraliq [{low}; {high}]": "95% interval [{low}; {high}]",
+ "qolganlar juda kam, oraliq hisoblanmadi": "too few remained, interval not computed",
+ "{group} guruhidan {share} kesildi": "{share} trimmed from the {group} group",
+ "farq tashlab ketishga sezgir": "difference is sensitive to attrition",
+ "farq yo'nalishi saqlanadi": "direction of the difference holds",
+ "Li (2009): ko'proq qolgan guruhning keyingi test natijalari tashlab ketish farqi ulushida eng yaxshi va eng yomon tomondan kesiladi. Faraz — monotonlik: guruh sharoiti talabalarning qolishiga faqat bir yo'nalishda ta'sir qiladi.": "Lee (2009): the next-test scores of the group with higher retention are trimmed from the top and from the bottom by the share of differential attrition. Assumption — monotonicity: group condition affects students' retention in one direction only.",
+ "Li chegaralari (tajriba − nazorat)": "Lee bounds (experimental − control)"
 }
